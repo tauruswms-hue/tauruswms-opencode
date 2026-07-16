@@ -1,0 +1,36 @@
+<div id="modalTipos" class="modal-overlay">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3 id="modalTitle">Nuevo Tipo</h3>
+            <button class="close-btn" onclick="closeModal()">&times;</button>
+        </div>
+        <form action="{{ url_for('tipoubicacion.guardar') }}" method="POST" id="formTipos">
+            <input type="hidden" name="id" id="form_id">
+
+            <div class="modal-scroll-body">
+                <div class="form-section">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Descripción *</label>
+                            <input type="text" name="descipcion" id="form_descipcion" required maxlength="45">
+                        </div>
+                    </div>
+                    <div class="form-row" style="margin-top:12px;">
+                        <div class="form-group">
+                            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:normal;">
+                                <input type="checkbox" name="soporte_picking" id="form_soporte_picking" value="1"
+                                       style="width:16px; height:16px; cursor:pointer;">
+                                <span>Soporta picking <small style="color:#7f8c8d;">(los contenedores en estas ubicaciones se pueden asignar a pedidos)</small></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn-sec" onclick="closeModal()">Cancelar</button>
+                <button type="submit" class="btn-pri">Guardar</button>
+            </div>
+        </form>
+    </div>
+</div>

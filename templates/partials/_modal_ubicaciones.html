@@ -1,0 +1,81 @@
+<div id="modalUbicaciones" class="modal-overlay">
+    <div class="modal-card modal-xl">
+        <div class="modal-header">
+            <h3 id="modalTitle">Nueva Ubicación</h3>
+            <button class="close-btn" onclick="closeModal()">&times;</button>
+        </div>
+        <form action="{{ url_for('ubicaciones.guardar') }}" method="POST" id="formUbicaciones">
+            <input type="hidden" name="id" id="form_id">
+
+            <div class="modal-scroll-body">
+                <div class="form-section">
+                    <h4><i class="fas fa-info-circle"></i> Datos Generales</h4>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Código Único *</label>
+                            <input type="text" name="codigo" id="form_codigo" required maxlength="50">
+                        </div>
+                        <div class="form-group">
+                            <label>Descripción</label>
+                            <input type="text" name="descipcion" id="form_descipcion" maxlength="100">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Tipo de Ubicación</label>
+                            <select name="tipoubicacion" id="form_tipo">
+                                <option value="">Seleccione...</option>
+                                {% for t in tipos %}
+                                <option value="{{ t.id }}">{{ t.descipción }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Zona</label>
+                            <select name="id_zona" id="form_zona">
+                                <option value="">Sin zona</option>
+                                {% for z in zonas %}
+                                <option value="{{ z.id }}">{{ z.codigo }} — {{ z.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Orden de Picking <small style="color:#888;">(en la zona)</small></label>
+                            <input type="number" name="orden_picking" id="form_orden_picking"
+                                   min="0" step="1" value="0" required>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h4><i class="fas fa-map-marker-alt"></i> Coordenadas</h4>
+                    <div class="form-row">
+                        <div class="form-group"><label>Eje A</label><input type="text" name="coordenadaA" id="form_coorA" maxlength="10"></div>
+                        <div class="form-group"><label>Eje B</label><input type="text" name="coordenadaB" id="form_coorB" maxlength="10"></div>
+                        <div class="form-group"><label>Eje C</label><input type="text" name="coordenadaC" id="form_coorC" maxlength="10"></div>
+                        <div class="form-group"><label>Optativo D</label><input type="text" name="coordenadaD" id="form_coorD" maxlength="10"></div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h4><i class="fas fa-cogs"></i> Capacidad y Estado</h4>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Capacidad Máxima (Unidades)</label>
+                            <input type="number" name="capacidad_maxima" id="form_capacidad" value="0">
+                        </div>
+                        <div class="form-group check-group" style="padding-top:20px;">
+                            <label><input type="checkbox" name="disponible_entrada" id="form_entrada" checked> Entrada</label>
+                            <label><input type="checkbox" name="disponible_salida" id="form_salida" checked> Salida</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn-sec" onclick="closeModal()">Cancelar</button>
+                <button type="submit" class="btn-pri">Guardar</button>
+            </div>
+        </form>
+    </div>
+</div>

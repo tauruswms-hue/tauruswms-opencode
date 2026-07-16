@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block content %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/tipoubicacion.css') }}">
+
+<div class="materiales-container">
+    <div class="header-actions">
+        <h1><i class="fas fa-project-diagram"></i> Tipos de Ubicación</h1>
+        <div style="display:flex; gap:10px; align-items:center;">
+            <div class="mat-dropdown" style="position:relative;">
+                <button onclick="toggleDropdownExportar(event)" style="background:#8e44ad; color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer; font-weight:bold;">
+                    <i class="fas fa-file-export"></i> Exportar <i class="fas fa-caret-down" style="margin-left:4px;"></i>
+                </button>
+                <div id="dropdownExportar" style="display:none; position:absolute; right:0; top:100%; margin-top:4px; background:white; border:1px solid #ddd; border-radius:4px; box-shadow:0 4px 12px rgba(0,0,0,0.15); z-index:500; min-width:160px;">
+                    <a href="{{ url_for('tipoubicacion.exportar', formato='csv') }}" style="display:flex; align-items:center; gap:8px; padding:10px 16px; color:#333; text-decoration:none; font-size:0.9rem; border-bottom:1px solid #f0f0f0;" onmouseenter="this.style.background='#f5f5f5'" onmouseleave="this.style.background=''"><i class="fas fa-file-csv" style="color:#27ae60; width:16px;"></i> CSV</a>
+                    <a href="{{ url_for('tipoubicacion.exportar', formato='xlsx') }}" style="display:flex; align-items:center; gap:8px; padding:10px 16px; color:#333; text-decoration:none; font-size:0.9rem; border-bottom:1px solid #f0f0f0;" onmouseenter="this.style.background='#f5f5f5'" onmouseleave="this.style.background=''"><i class="fas fa-file-excel" style="color:#217346; width:16px;"></i> Excel (XLSX)</a>
+                    <a href="{{ url_for('tipoubicacion.exportar', formato='json') }}" style="display:flex; align-items:center; gap:8px; padding:10px 16px; color:#333; text-decoration:none; font-size:0.9rem;" onmouseenter="this.style.background='#f5f5f5'" onmouseleave="this.style.background=''"><i class="fas fa-file-code" style="color:#e67e22; width:16px;"></i> JSON</a>
+                </div>
+            </div>
+            <button onclick="openModalImportar()" style="background:#3498db; color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer; font-weight:bold;">
+                <i class="fas fa-file-import"></i> Importar
+            </button>
+            <button class="btn-add" onclick="openModal()">
+                <i class="fas fa-plus"></i> Nuevo Tipo
+            </button>
+        </div>
+    </div>
+
+    <div class="table-card">
+        <table id="tablaTipos" class="display cell-border hover stripe" style="width:100%">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Descripción</th>
+                    <th style="text-align:center;">Soporta Picking</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in tipos %}
+                <tr>
+                    <td>{{ t.id }}</td>
+                    <td><strong>{{ t.descipción }}</strong></td>
+                    <td style="text-align:center;">
+                        {% if t.soporte_picking %}
+                            <span style="color:#27ae60; font-size:1.1rem;" title="Sí"><i class="fas fa-check-circle"></i></span>
+                        {% else %}
+                            <span style="color:#bdc3c7; font-size:1.1rem;" title="No"><i class="fas fa-times-circle"></i></span>
+                        {% endif %}
+                    </td>
+                    <td class="actions-cell">
+                        <button class="btn-icon edit" onclick='editTipo({{ t | tojson }})'>
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <a href="{{ url_for('tipoubicacion.eliminar', id=t.id) }}" class="btn-icon delete" onclick="return confirm('¿Eliminar este tipo?')">
+                            <i class="fas fa-trash"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% include "partials/_modal_tipoubicacion.html" %}
+{% include "partials/_modal_importar_tipoubicacion.html" %}
+
+<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="{{ url_for('static', filename='js/tipoubicacion.js') }}"></script>
+<script src="{{ url_for('static', filename='js/batch_ui.js') }}"></script>
+{% endblock %}

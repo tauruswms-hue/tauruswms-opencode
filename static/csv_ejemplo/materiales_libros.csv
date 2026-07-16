@@ -1,0 +1,31 @@
+codigo,nombre,descripcion,codigo_barras,categoria_id,stock_minimo,stock_maximo,unidad_medida_id,trazabilidad,peso_bruto,peso_neto
+LIB001,Don Quijote de la Mancha,Novela经典 de Miguel de Cervantes,9788424921893,1,5,50,1,serie,0.350,0.300
+LIB002,Cien Años de Soledad,Novela de Gabriel García Márquez,9780307351628,1,3,30,1,lote,0.400,0.350
+LIB003,El Principito,Historia de Antoine de Saint-Exupéry,9788498383624,1,10,100,1,serie,0.150,0.120
+LIB004,La Odisea,Épica de Homero,9788424915908,1,2,20,1,lote,0.300,0.250
+LIB005,1984,Distopía de George Orwell,9780451524935,1,5,40,1,lote,0.250,0.200
+LIB006,El Señor de los Anillos,Trilogía de J.R.R. Tolkien,9788445074620,1,3,25,1,lote,0.800,0.750
+LIB007,Harry Potter y la Piedra Filosofal,Novela de J.K. Rowling,9788478884959,1,8,80,1,serie,0.300,0.250
+LIB008,El Código Da Vinci,Thriller de Dan Brown,9780307474278,1,5,50,1,lote,0.350,0.300
+LIB009,El Alquimista,Novela de Paulo Coelho,9780061122415,1,4,40,1,lote,0.200,0.150
+LIB010,La Metamorfosis,Cuento de Franz Kafka,9788420687424,2,2,15,1,lote,0.180,0.150
+LIB011,Orgullo y Prejuicio,Novela de Jane Austen,9780141439518,1,3,25,1,lote,0.280,0.230
+LIB012,El Lobo Estepario,Novela de Hermann Hesse,9788420678316,2,2,15,1,lote,0.250,0.200
+LIB013,Lafairytale,Historia de hadas variadas,9781408856776,3,5,30,1,lote,0.400,0.350
+LIB014,Alicia en el País de las Maravillas,Aventura de Lewis Carroll,9780141439761,3,6,60,1,lote,0.200,0.150
+LIB015,El Mago de Oz,Aventura de L. Frank Baum,9780688071440,3,4,35,1,lote,0.220,0.170
+LIB016,La Biblia,Sagradas Escrituras,9780825450405,4,1,10,1,lote,0.900,0.850
+LIB017,El Corán,Sagrado Texto Islámico,9789960958902,4,1,5,1,lote,0.400,0.350
+LIB018,El Arte de la Guerra,Tratado de Sun Tzu,9781599869778,2,2,15,1,lote,0.150,0.120
+LIB019,El Príncipe,Ensayo político de Maquiavelo,9788424921961,2,2,20,1,lote,0.180,0.140
+LIB020,Sapiens: De Animales a Dioses,Historia de Yuval Noah Harari,9780062316097,5,3,30,1,lote,0.450,0.400
+LIB021,Una Breve Historia del Tiempo,Astrofísica de Stephen Hawking,9780553380163,5,2,20,1,lote,0.250,0.200
+LIB022,El Gen Egoísta,Divulgación científica de Richard Dawkins,9780199291168,5,2,15,1,lote,0.350,0.300
+LIB023,El poder del ahora,Espiritualidad de Eckhart Tolle,9781570627049,6,5,40,1,lote,0.250,0.200
+LIB024,Los Cuatro Acuerdos,Sabiduría tolteca de Don Miguel Ruiz,9781878424318,6,6,50,1,lote,0.150,0.120
+LIB025,Padre Rico Padre Pobre,Finanzas personales de Robert Kiyosaki,9781615230018,7,4,35,1,lote,0.350,0.300
+LIB026,El Inversor Inteligente,Inversión de Benjamin Graham,9780060555665,7,2,15,1,lote,0.550,0.500
+LIB027,El Cujo,Novela de Stephen King,9781501144018,1,3,25,1,lote,0.400,0.350
+LIB028,It,Novela de Stephen King,9781501144001,1,3,25,1,lote,0.650,0.600
+LIB029,Carrie,Novela de Stephen King,9780385085951,1,2,20,1,lote,0.250,0.200
+LIB030,La Torre Oscura: El Pistolero,Novela de Stephen King,9781880284829,1,2,15,1,lote,0.300,0.250

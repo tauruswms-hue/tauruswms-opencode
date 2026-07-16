@@ -1,0 +1,272 @@
+{% extends "base.html" %}
+
+{% block title %}Inventarios{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+
+<style>
+.badge { padding: 3px 10px; border-radius: 12px; font-size: .78rem; font-weight: 600; }
+.badge-abierto  { background: #d4edda; color: #155724; }
+.badge-cerrado  { background: #e2e3e5; color: #383d41; }
+.badge-anulado  { background: #f8d7da; color: #721c24; }
+
+.modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(0,0,0,.45);
+    align-items: center;
+    justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal-box {
+    background: #fff;
+    border-radius: 8px;
+    padding: 28px 32px;
+    width: 460px;
+    max-width: 95vw;
+    box-shadow: 0 8px 32px rgba(0,0,0,.2);
+}
+.modal-box h3 { margin: 0 0 20px; font-size: 1.1rem; color: #333; }
+.modal-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
+.modal-field label { font-size: .78rem; font-weight: 600; color: #555; text-transform: uppercase; letter-spacing: .04em; }
+.modal-field input, .modal-field textarea {
+    padding: 7px 10px; border: 1px solid #ccc; border-radius: 5px; font-size: .92rem;
+}
+.modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+.btn-primary { padding: 8px 20px; background: #2980b9; color: #fff; border: none; border-radius: 5px; cursor: pointer; font-weight: 600; }
+.btn-primary:hover { background: #2471a3; }
+.btn-secondary { padding: 8px 16px; background: #f0f0f0; border: 1px solid #aaa; border-radius: 5px; cursor: pointer; }
+.btn-secondary:hover { background: #e0e0e0; }
+
+.stat-mini { font-size: .8rem; color: #666; }
+.diff-pos { color: #27ae60; font-weight: 600; }
+.diff-neg { color: #c0392b; font-weight: 600; }
+
+/* Tabs de modo */
+.modo-tab {
+    flex: 1;
+    text-align: center;
+    padding: 8px 4px;
+    font-size: .83rem;
+    font-weight: 600;
+    color: #555;
+    cursor: pointer;
+    background: #f7f7f7;
+    border-right: 1px solid #ccc;
+    transition: background .15s, color .15s;
+    user-select: none;
+}
+.modo-tab:last-child { border-right: none; }
+.modo-tab.active { background: #2980b9; color: #fff; }
+.modo-tab i { margin-right: 4px; }
+
+.btn-link-sm {
+    background: none;
+    border: none;
+    color: #2980b9;
+    font-size: .8rem;
+    cursor: pointer;
+    padding: 0;
+    text-decoration: underline;
+}
+.btn-link-sm:hover { color: #1a5276; }
+</style>
+
+<div class="materiales-container">
+    <div class="header-actions">
+        <h1><i class="fas fa-clipboard-list"></i> Inventarios</h1>
+        <button class="btn btn-primary" onclick="document.getElementById('modalCrear').classList.add('open')">
+            <i class="fas fa-plus"></i> Nuevo Inventario
+        </button>
+    </div>
+
+    <div class="table-card">
+        <table id="tablaInv" class="display cell-border hover stripe" style="width:100%">
+            <thead>
+                <tr>
+                    <th>Número</th>
+                    <th>Descripción</th>
+                    <th>Estado</th>
+                    <th>Progreso</th>
+                    <th>Diferencias</th>
+                    <th>Creado</th>
+                    <th>Usuario</th>
+                    <th class="no-sort">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for inv in inventarios %}
+                <tr>
+                    <td><strong>{{ inv.numero }}</strong></td>
+                    <td>{{ inv.descripcion or '-' }}</td>
+                    <td>
+                        <span class="badge badge-{{ inv.estado | lower }}">{{ inv.estado }}</span>
+                    </td>
+                    <td class="stat-mini">
+                        {{ inv.lineas_contadas or 0 }} / {{ inv.total_lineas or 0 }} líneas
+                    </td>
+                    <td>
+                        {% if inv.lineas_con_diferencia and inv.lineas_con_diferencia > 0 %}
+                        <span class="diff-neg">{{ inv.lineas_con_diferencia }} con diferencia</span>
+                        {% elif inv.lineas_contadas and inv.lineas_contadas > 0 %}
+                        <span class="diff-pos">Sin diferencias</span>
+                        {% else %}
+                        <span class="stat-mini">—</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ inv.fecha_creacion.strftime('%d/%m/%Y %H:%M') if inv.fecha_creacion else '-' }}</td>
+                    <td>{{ inv.usuario_creacion or '-' }}</td>
+                    <td>
+                        <a href="{{ url_for('inventario.detalle', id_inventario=inv.id) }}"
+                           class="btn btn-sm" title="Ver / Contar">
+                            <i class="fas fa-{{ 'pencil-alt' if inv.estado == 'Abierto' else 'eye' }}"></i>
+                            {{ 'Contar' if inv.estado == 'Abierto' else 'Ver' }}
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal crear inventario -->
+<div class="modal-overlay" id="modalCrear">
+    <div class="modal-box" style="width:540px;">
+        <h3><i class="fas fa-plus-circle"></i> Nuevo Inventario</h3>
+        <form method="POST" action="{{ url_for('inventario.crear') }}" id="formCrear">
+
+            <div class="modal-field">
+                <label>Descripción (opcional)</label>
+                <input type="text" name="descripcion" maxlength="200"
+                       placeholder="Ej: Inventario mensual marzo 2026">
+            </div>
+
+            <!-- Alcance -->
+            <div style="margin-bottom:14px;">
+                <label style="font-size:.78rem; font-weight:700; color:#555; text-transform:uppercase; letter-spacing:.04em; display:block; margin-bottom:8px;">
+                    Alcance del inventario
+                </label>
+                <div style="display:flex; gap:0; border:1px solid #ccc; border-radius:6px; overflow:hidden;">
+                    <label class="modo-tab active" data-modo="todo">
+                        <input type="radio" name="modo" value="todo" checked hidden>
+                        <i class="fas fa-layer-group"></i> Todo el stock
+                    </label>
+                    <label class="modo-tab" data-modo="ubicaciones">
+                        <input type="radio" name="modo" value="ubicaciones" hidden>
+                        <i class="fas fa-warehouse"></i> Por ubicación
+                    </label>
+                    <label class="modo-tab" data-modo="material">
+                        <input type="radio" name="modo" value="material" hidden>
+                        <i class="fas fa-box"></i> Por material
+                    </label>
+                </div>
+            </div>
+
+            <!-- Selector ubicaciones -->
+            <div id="panelUbicaciones" class="panel-alcance" style="display:none;">
+                <div class="modal-field">
+                    <label>Ubicaciones <span style="font-weight:400;color:#888;">(seleccione una o más)</span></label>
+                    <div style="border:1px solid #ccc; border-radius:5px; max-height:180px; overflow-y:auto; padding:6px 10px; background:#fafafa;">
+                        {% for u in ubicaciones %}
+                        <label style="display:flex; align-items:center; gap:8px; padding:3px 0; cursor:pointer; font-size:.88rem;">
+                            <input type="checkbox" name="id_ubicaciones" value="{{ u.id }}" class="chk-ubicacion">
+                            <strong>{{ u.codigo }}</strong>
+                            {% if u.descipcion %}<span style="color:#666;">— {{ u.descipcion }}</span>{% endif %}
+                        </label>
+                        {% endfor %}
+                    </div>
+                    <div style="margin-top:6px; display:flex; gap:10px;">
+                        <button type="button" class="btn-link-sm" onclick="toggleTodos(true)">Seleccionar todas</button>
+                        <button type="button" class="btn-link-sm" onclick="toggleTodos(false)">Limpiar</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Selector material -->
+            <div id="panelMaterial" class="panel-alcance" style="display:none;">
+                <div class="modal-field">
+                    <label>Material</label>
+                    <select name="id_material" id="selectMaterial">
+                        <option value="">— Seleccione un material —</option>
+                        {% for m in materiales %}
+                        <option value="{{ m.id }}">{{ m.codigo }} — {{ m.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                    <span style="font-size:.8rem; color:#666; margin-top:4px;">
+                        Se incluirán <strong>todas las ubicaciones</strong> que tengan este material en stock.
+                    </span>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" onclick="cerrarModal()">Cancelar</button>
+                <button type="submit" class="btn-primary">
+                    <i class="fas fa-check"></i> Crear
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script>
+$(document).ready(function () {
+    $('#tablaInv').DataTable({
+        language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json' },
+        pageLength: 25,
+        order: [[0, 'desc']],
+        columnDefs: [{ targets: [-1], orderable: false, searchable: false }]
+    });
+});
+
+// ── Tabs de modo ──────────────────────────────────────────────────────────────
+document.querySelectorAll('.modo-tab').forEach(function(tab) {
+    tab.addEventListener('click', function() {
+        document.querySelectorAll('.modo-tab').forEach(function(t) { t.classList.remove('active'); });
+        tab.classList.add('active');
+        tab.querySelector('input[type=radio]').checked = true;
+
+        var modo = tab.dataset.modo;
+        document.getElementById('panelUbicaciones').style.display = modo === 'ubicaciones' ? '' : 'none';
+        document.getElementById('panelMaterial').style.display    = modo === 'material'    ? '' : 'none';
+    });
+});
+
+function toggleTodos(seleccionar) {
+    document.querySelectorAll('.chk-ubicacion').forEach(function(chk) {
+        chk.checked = seleccionar;
+    });
+}
+
+function cerrarModal() {
+    document.getElementById('modalCrear').classList.remove('open');
+}
+
+// Cerrar modal al hacer clic fuera
+document.getElementById('modalCrear').addEventListener('click', function(e) {
+    if (e.target === this) cerrarModal();
+});
+
+// Validación antes de enviar
+document.getElementById('formCrear').addEventListener('submit', function(e) {
+    var modo = document.querySelector('input[name=modo]:checked').value;
+    if (modo === 'ubicaciones') {
+        var seleccionadas = document.querySelectorAll('.chk-ubicacion:checked').length;
+        if (seleccionadas === 0) {
+            e.preventDefault();
+            alert('Seleccione al menos una ubicación.');
+        }
+    } else if (modo === 'material') {
+        var mat = document.getElementById('selectMaterial').value;
+        if (!mat) {
+            e.preventDefault();
+            alert('Seleccione un material.');
+        }
+    }
+});
+</script>
+{% endblock %}

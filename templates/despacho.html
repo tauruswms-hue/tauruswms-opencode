@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}Despacho{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/select/1.7.0/css/select.dataTables.min.css">
+
+<div style="padding: 20px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2><i class="fas fa-truck"></i> Despacho</h2>
+        <div style="display: flex; gap: 10px;">
+            <button onclick="despacharSeleccionados()" class="btn-action"
+                    style="background: #276749; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer;">
+                <i class="fas fa-truck"></i> Despachar Seleccionados
+            </button>
+        </div>
+    </div>
+
+    {% if pedidos %}
+    <div style="background: #eafaf1; border-left: 4px solid #27ae60; padding: 10px 16px; border-radius: 4px; margin-bottom: 16px; font-size: 0.9rem; color: #276749;">
+        <i class="fas fa-info-circle"></i>
+        Mostrando <strong>{{ pedidos|length }}</strong> pedido(s) en estado <strong>Preparado</strong>, listos para despachar.
+    </div>
+    {% else %}
+    <div style="background: #f8f9fa; border-left: 4px solid #95a5a6; padding: 10px 16px; border-radius: 4px; margin-bottom: 16px; font-size: 0.9rem; color: #555;">
+        <i class="fas fa-info-circle"></i>
+        No hay pedidos preparados pendientes de despacho.
+    </div>
+    {% endif %}
+
+    <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+        <table id="tablaDespacho" class="display cell-border hover" style="width:100%">
+            <thead>
+                <tr>
+                    <th style="width: 30px;"><input type="checkbox" id="selectAll"></th>
+                    <th>Nro. Pedido</th>
+                    <th>Fecha</th>
+                    <th>Cliente</th>
+                    <th>Ruta</th>
+                    <th>Transporte</th>
+                    <th>Clase</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in pedidos %}
+                <tr data-id="{{ p.id_pedido }}">
+                    <td><input type="checkbox" class="row-select" value="{{ p.id_pedido }}"></td>
+                    <td><strong>{{ p.nro_pedido }}</strong></td>
+                    <td>{{ p.fecha_pedido }}</td>
+                    <td>{{ p.cliente_nombre }}</td>
+                    <td>{{ p.nombre_ruta or '-' }}</td>
+                    <td>{{ p.transporte_nombre or '-' }}</td>
+                    <td>{{ p.clase_nombre or '-' }}</td>
+                    <td style="text-align: center;">
+                        <a href="{{ url_for('pedidos.ver_detalle', id_pedido=p.id_pedido) }}"
+                           title="Ver Detalle" style="color: #3498db; margin: 0 5px;">
+                            <i class="fas fa-eye"></i>
+                        </a>
+                        <form method="POST"
+                              action="{{ url_for('despacho.despachar', id_pedido=p.id_pedido) }}"
+                              style="display:inline;"
+                              onsubmit="return confirm('¿Despachar el pedido {{ p.nro_pedido }}?');">
+                            <button type="submit" title="Despachar"
+                                    style="background: none; border: none; cursor: pointer; color: #276749; font-size: 1rem; padding: 0 5px;">
+                                <i class="fas fa-truck"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script>
+    $(document).ready(function () {
+        const table = $('#tablaDespacho').DataTable({
+            "order": [[2, "asc"]],
+            "columnDefs": [{"targets": 0, "orderable": false}],
+            "language": {"url": "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json"}
+        });
+
+        $('#selectAll').on('click', function () {
+            const rows = table.rows({'search': 'applied'}).nodes();
+            $('input[type="checkbox"]', rows).prop('checked', this.checked);
+        });
+    });
+
+    function getSelectedIds() {
+        const ids = [];
+        $('.row-select:checked').each(function () {
+            ids.push($(this).val());
+        });
+        return ids;
+    }
+
+    function despacharSeleccionados() {
+        const ids = getSelectedIds();
+        if (ids.length === 0) return alert("Seleccione al menos un pedido.");
+        if (!confirm(`¿Despachar ${ids.length} pedido(s) seleccionado(s)?`)) return;
+
+        fetch('/despacho/despachar_masivo', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ids})
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'success') {alert(data.message); location.reload();}
+            else {alert('Error: ' + data.message);}
+        })
+        .catch(err => alert('Error de conexión: ' + err));
+    }
+</script>
+
+<style>
+    .btn-action:hover {opacity: 0.9; transform: scale(1.02);}
+</style>
+{% endblock %}

@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}Panel de Control{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+    <div class="dashboard-header">
+        <h1><i class="fas fa-tachometer-alt"></i> Panel de Control</h1>
+        <p>Bienvenido, {{ session.nombre if session.user_id else 'Invitado' }}</p>
+
+        {% if estado_db %}
+        <div class="estado-db">
+            <i class="fas fa-circle" style="color: {{ '#38a169' if estado_db_ok else '#e53e3e' }};"></i> {{ estado_db }}
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="stats-grid">
+
+        <! Dashboard  inicio  --->
+        <a href="{{ url_for('pedidos.listar') }}" class="stat-card">
+            <div class="stat-icon">
+                <i class="fas fa-boxes"></i>
+            </div>
+            <div class="stat-info">
+                <h3>Pedidos</h3>
+                <p class="stat-number">{{ (pedidos_por_estado.Pendiente + pedidos_por_estado.Preparado + pedidos_por_estado.Despachado) }}</p>
+                <p>Gestión de salida de materiales</p>
+            </div>
+        </a>
+
+        <a href="{{ url_for('recepciones.listar') }}" class="stat-card">
+            <div class="stat-icon">
+                <i class="fas fa-warehouse"></i>
+            </div>
+            <div class="stat-info">
+                <h3>Recepciones</h3>
+                <p class="stat-number">{{ recepciones_abiertas }}</p>
+                <p>Abiertas — ingresos de materiales</p>
+            </div>
+        </a>
+
+        <a href="{{ url_for('stockcontable.listar') }}" class="stat-card stat-card-stock">
+            <div class="stat-icon">
+                <i class="fas fa-clipboard-check"></i>
+            </div>
+            <div class="stat-info">
+                <h3>Stock</h3>
+                <p class="stat-number">{{ '{:,}'.format(stock_total).replace(',', '.') }}</p>
+                <div class="stock-tipos">
+                    <span class="stock-tipo tipo-lv"><i class="fas fa-circle"></i> L.V. <strong>{{ '{:,}'.format(stock_por_tipo['Libre Venta']).replace(',', '.') }}</strong></span>
+                    <span class="stock-tipo tipo-ca"><i class="fas fa-circle"></i> Cal. <strong>{{ '{:,}'.format(stock_por_tipo['Calidad']).replace(',', '.') }}</strong></span>
+                    <span class="stock-tipo tipo-bl"><i class="fas fa-circle"></i> Bloq. <strong>{{ '{:,}'.format(stock_por_tipo['Bloqueado']).replace(',', '.') }}</strong></span>
+                    <span class="stock-tipo tipo-me"><i class="fas fa-circle"></i> Mal <strong>{{ '{:,}'.format(stock_por_tipo['Mal Estado']).replace(',', '.') }}</strong></span>
+                </div>
+            </div>
+        </a>
+
+        <a href="{{ url_for('omc.listar') }}" class="stat-card">
+            <div class="stat-icon">
+                <i class="fas fa-exchange-alt"></i>
+            </div>
+            <div class="stat-info">
+                <h3>Movimientos</h3>
+                <p class="stat-number">{{ omc_pendientes }}</p>
+                <p>OMC pendientes de confirmación</p>
+            </div>
+        </a>
+
+        <a href="{{ url_for('despacho.listar') }}" class="stat-card">
+            <div class="stat-icon" style="background: linear-gradient(135deg, #276749 0%, #38a169 100%);">
+                <i class="fas fa-truck"></i>
+            </div>
+            <div class="stat-info">
+                <h3>Despacho</h3>
+                <p class="stat-number">{{ pedidos_por_estado.Preparado }}</p>
+                <p>Pedidos listos para despachar</p>
+            </div>
+        </a>
+        <! Dashboard  fin --->
+    </div>
+
+    <div class="pedidos-estado-section">
+        <h3><i class="fas fa-clipboard-list"></i> Pedidos por Estado</h3>
+        <div class="pedidos-estado-grid">
+            <a href="{{ url_for('pedidos.listar') }}?estado=Pendiente" class="pedido-estado-card estado-pendiente">
+                <div class="pedido-estado-icon"><i class="fas fa-hourglass-half"></i></div>
+                <div class="pedido-estado-info">
+                    <p class="pedido-estado-numero">{{ pedidos_por_estado.Pendiente }}</p>
+                    <p class="pedido-estado-label">Pendiente</p>
+                </div>
+            </a>
+            <a href="{{ url_for('despacho.listar') }}" class="pedido-estado-card estado-picking">
+                <div class="pedido-estado-icon"><i class="fas fa-people-carry"></i></div>
+                <div class="pedido-estado-info">
+                    <p class="pedido-estado-numero">{{ pedidos_por_estado.Preparado }}</p>
+                    <p class="pedido-estado-label">Preparado</p>
+                </div>
+            </a>
+            <a href="{{ url_for('pedidos.listar') }}?estado=Despachado" class="pedido-estado-card estado-despachado">
+                <div class="pedido-estado-icon"><i class="fas fa-truck"></i></div>
+                <div class="pedido-estado-info">
+                    <p class="pedido-estado-numero">{{ pedidos_por_estado.Despachado }}</p>
+                    <p class="pedido-estado-label">Despachado</p>
+                </div>
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

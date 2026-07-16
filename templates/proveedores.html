@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block content %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/tipoubicacion.css') }}">
+
+<div class="materiales-container">
+    <div class="header-actions">
+        <h1><i class="fas fa-truck"></i> Gestión de Proveedores</h1>
+        <div style="display:flex; gap:10px; align-items:center;">
+            <div class="mat-dropdown" style="position:relative;">
+                <button onclick="toggleDropdownExportar(event)" style="background:#8e44ad; color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer; font-weight:bold;">
+                    <i class="fas fa-file-export"></i> Exportar <i class="fas fa-caret-down" style="margin-left:4px;"></i>
+                </button>
+                <div id="dropdownExportar" style="display:none; position:absolute; right:0; top:100%; margin-top:4px; background:white; border:1px solid #ddd; border-radius:4px; box-shadow:0 4px 12px rgba(0,0,0,0.15); z-index:500; min-width:160px;">
+                    <a href="{{ url_for('proveedores.exportar', formato='csv') }}" style="display:flex; align-items:center; gap:8px; padding:10px 16px; color:#333; text-decoration:none; font-size:0.9rem; border-bottom:1px solid #f0f0f0;" onmouseenter="this.style.background='#f5f5f5'" onmouseleave="this.style.background=''"><i class="fas fa-file-csv" style="color:#27ae60; width:16px;"></i> CSV</a>
+                    <a href="{{ url_for('proveedores.exportar', formato='xlsx') }}" style="display:flex; align-items:center; gap:8px; padding:10px 16px; color:#333; text-decoration:none; font-size:0.9rem; border-bottom:1px solid #f0f0f0;" onmouseenter="this.style.background='#f5f5f5'" onmouseleave="this.style.background=''"><i class="fas fa-file-excel" style="color:#217346; width:16px;"></i> Excel (XLSX)</a>
+                    <a href="{{ url_for('proveedores.exportar', formato='json') }}" style="display:flex; align-items:center; gap:8px; padding:10px 16px; color:#333; text-decoration:none; font-size:0.9rem;" onmouseenter="this.style.background='#f5f5f5'" onmouseleave="this.style.background=''"><i class="fas fa-file-code" style="color:#e67e22; width:16px;"></i> JSON</a>
+                </div>
+            </div>
+            <button class="btn-add" onclick="openModalImportar()" style="background:#3498db; color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer; font-weight:bold;">
+                <i class="fas fa-file-import"></i> Importar
+            </button>
+            <button class="btn-add" onclick="openModal()">
+                <i class="fas fa-plus"></i> Nuevo Proveedor
+            </button>
+        </div>
+    </div>
+
+    <div class="table-card">
+        <table id="tablaProveedores" class="display cell-border hover stripe" style="width:100%">
+            <thead>
+                <tr>
+                    <th>Código</th>
+                    <th>Razón Social</th>
+                    <th>CUIT/ID</th>
+                    <th>Teléfono</th>
+                    <th>Email</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in proveedores %}
+                <tr>
+                    <td><code>{{ p.codigo }}</code></td>
+                    <td><strong>{{ p.razonsocial }}</strong></td>
+                    <td>{{ p.cuit or '-' }}</td>
+                    <td>{{ p.telefono or '-' }}</td>
+                    <td>{{ p.email or '-' }}</td>
+                    <td class="actions-cell">
+                        <button class="btn-icon edit" onclick='editProveedor({{ p | tojson }})'>
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <a href="{{ url_for('proveedores.eliminar', id=p.id) }}" class="btn-icon delete" onclick="return confirm('¿Inactivar proveedor?')">
+                            <i class="fas fa-trash"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% include "partials/_modal_proveedores.html" %}
+{% include "partials/_modal_importar_proveedores.html" %}
+
+<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="{{ url_for('static', filename='js/batch_ui.js') }}"></script>
+<script>
+    $(document).ready(function() {
+        $('#tablaProveedores').DataTable({
+            "pageLength": 10,
+            "language": { "url": "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json" }
+        });
+    });
+
+    function openModal() {
+        $('#formProveedor')[0].reset();
+        $('#form_id').val('');
+        $('#modalTitle').text('Nuevo Proveedor');
+        $('#modalProveedor').css('display', 'flex').hide().fadeIn(150);
+    }
+
+    function closeModal() { $('#modalProveedor').fadeOut(150); }
+
+    function editProveedor(data) {
+        openModal();
+        $('#modalTitle').text('Editar: ' + data.razonsocial);
+        $('#form_id').val(data.id);
+        $('#form_codigo').val(data.codigo);
+        $('#form_razon').val(data.razonsocial);
+        $('#form_cuit').val(data.cuit);
+        $('#form_dir').val(data.direccion);
+        $('#form_tel').val(data.telefono);
+        $('#form_email').val(data.email);
+    }
+</script>
+{% endblock %}

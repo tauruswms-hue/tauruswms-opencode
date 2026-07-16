@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Taurus Suite - Configuración</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root { --primary-color: #1a365d; }
+        body { background: #f8f9fa; }
+        .admin-header {
+            background: var(--primary-color);
+            color: white;
+            padding: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-header">
+        <div class="container">
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-2">
+                    <img src="{{ url_for('static', filename='logo/Taurussuite.jpg') }}" alt="Taurus Suite" style="height: 40px;">
+                    <h4 class="mb-0">Taurus Suite</h4>
+                </div>
+                <div class="d-flex align-items-center gap-3">
+                    <span><i class="fas fa-user me-1"></i>{{ session.admin_nombre }} ({{ session.admin_rol }})</span>
+                    <a href="{{ url_for('admin.logout') }}" class="btn btn-outline-light btn-sm">
+                        <i class="fas fa-sign-out-alt"></i> Salir
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="container py-4">
+        <ul class="nav nav-pills mb-4">
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('admin.tenants') }}">
+                    <i class="fas fa-building me-1"></i>Empresas
+                </a>
+            </li>
+            {% if session.admin_rol == 'SUPERADMIN' %}
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('admin.usuarios') }}">
+                    <i class="fas fa-users me-1"></i>Todos los Usuarios
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('admin.audit') }}">
+                    <i class="fas fa-clipboard-list me-1"></i>Auditoría
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('admin.configuracion') }}">
+                    <i class="fas fa-cog me-1"></i>Configuración
+                </a>
+            </li>
+            {% endif %}
+        </ul>
+        
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h3><i class="fas fa-cog"></i> Configuración del Sistema</h3>
+            <button type="button" class="btn btn-primary" onclick="nuevaConfig()">
+                <i class="fas fa-plus"></i> Nueva Configuración
+            </button>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    {% if category == 'error' %}
+                    <div class="alert alert-danger alert-dismissible fade show">
+                    {% else %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show">
+                    {% endif %}
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Clave</th>
+                                <th>Valor</th>
+                                <th>Descripción</th>
+                                <th>Última Actualización</th>
+                                <th width="120">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for config in configs %}
+                            <tr>
+                                <td><code>{{ config.clave }}</code></td>
+                                <td>
+                                    {% if 'PASSWORD' in config.clave %}
+                                    ********
+                                    {% else %}
+                                    {{ config.valor[:60] if config.valor else '' }}{% if config.valor|length > 60 %}...{% endif %}
+                                    {% endif %}
+                                </td>
+                                <td>{{ config.descripcion or '-' }}</td>
+                                <td>{{ config.updated_at.strftime('%d/%m/%Y %H:%M') if config.updated_at else '-' }}</td>
+                                <td>
+                                    <button type="button" class="btn btn-outline-warning btn-sm" 
+                                            onclick="editarConfig({{ config.id }}, '{{ config.clave }}', '{{ config.valor | e }}', '{{ config.descripcion or '' | e }}')">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-danger btn-sm"
+                                            onclick="eliminarConfig('{{ url_for('admin.configuracion_eliminar', config_id=config.id) }}', '{{ config.clave }}')">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5" class="text-center text-muted">No hay configuraciones registradas</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalConfig" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST" action="{{ url_for('admin.configuracion_guardar') }}">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="modalTitulo">Nueva Configuración</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" name="id" id="configId">
+                        <div class="mb-3">
+                            <label for="configClave" class="form-label">Clave *</label>
+                            <input type="text" class="form-control" id="configClave" name="clave" required
+                                   placeholder="Ej: DB_HOST">
+                        </div>
+                        <div class="mb-3">
+                            <label for="configValor" class="form-label">Valor</label>
+                            <input type="text" class="form-control" id="configValor" name="valor"
+                                   placeholder="Ej: localhost">
+                        </div>
+                        <div class="mb-3">
+                            <label for="configDescripcion" class="form-label">Descripción</label>
+                            <input type="text" class="form-control" id="configDescripcion" name="descripcion"
+                                   placeholder="Descripción de la configuración">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Guardar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    function nuevaConfig() {
+        document.getElementById('modalTitulo').textContent = 'Nueva Configuración';
+        document.getElementById('configId').value = '';
+        document.getElementById('configClave').value = '';
+        document.getElementById('configClave').readOnly = false;
+        document.getElementById('configValor').value = '';
+        document.getElementById('configDescripcion').value = '';
+        var modal = new bootstrap.Modal(document.getElementById('modalConfig'));
+        modal.show();
+    }
+
+    function editarConfig(id, clave, valor, descripcion) {
+        document.getElementById('modalTitulo').textContent = 'Editar Configuración';
+        document.getElementById('configId').value = id;
+        document.getElementById('configClave').value = clave;
+        document.getElementById('configClave').readOnly = true;
+        document.getElementById('configValor').value = valor;
+        document.getElementById('configDescripcion').value = descripcion;
+        var modal = new bootstrap.Modal(document.getElementById('modalConfig'));
+        modal.show();
+    }
+
+    function eliminarConfig(url, clave) {
+        if (confirm('¿Está seguro de eliminar la configuración "' + clave + '"?')) {
+            window.location.href = url;
+        }
+    }
+    </script>
+</body>
+</html>

@@ -1,0 +1,69 @@
+<div id="modalUnidades" class="modal-overlay">
+    <div class="modal-card modal-xl">
+        <div class="modal-header">
+            <h3 id="modalTitle">Nueva Unidad</h3>
+            <button class="close-btn" onclick="closeModal()">&times;</button>
+        </div>
+        <form action="{{ url_for('unidades.guardar') }}" method="POST" id="formUnidades">
+            <input type="hidden" name="id_unidad" id="form_id_unidad">
+
+            <div class="modal-scroll-body">
+                <div class="form-section">
+                    <h4><i class="fas fa-info-circle"></i> Información General</h4>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Código *</label>
+                            <input type="text" name="codigo" id="codigo" required maxlength="5">
+                        </div>
+                        <div class="form-group">
+                            <label>Nombre *</label>
+                            <input type="text" name="nombre" id="nombre" required maxlength="30">
+                        </div>
+                        <div class="form-group">
+                            <label>Símbolo *</label>
+                            <input type="text" name="simbolo" id="simbolo" required maxlength="5">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h4><i class="fas fa-calculator"></i> Configuración Técnica</h4>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Tipo Magnitud</label>
+                            <select name="tipo_magnitud" id="tipo_magnitud">
+                                <option value="MASA">Masa</option>
+                                <option value="VOLUMEN">Volumen</option>
+                                <option value="UNIDAD">Unidad</option>
+                                <option value="LONGITUD">Longitud</option>
+                                <option value="TIEMPO">Tiempo</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Conversión a Base</label>
+                            <input type="number" step="0.0001" name="conversion_a_base" id="conversion_a_base" value="1.0000">
+                        </div>
+                        <div class="form-group">
+                            <label>Unidad Base Referencia</label>
+                            <input type="text" name="unidad_base_referencia" id="unidad_base_referencia" maxlength="5" value="U">
+                        </div>
+                        <div class="form-group">
+                            <label>Decimales Permitidos</label>
+                            <input type="number" name="decimales_permitidos" id="decimales_permitidos" value="0">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group check-group">
+                            <label><input type="checkbox" name="activo" id="activo" checked> Unidad Activa</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn-sec" onclick="closeModal()">Cancelar</button>
+                <button type="submit" class="btn-pri">Guardar Unidad</button>
+            </div>
+        </form>
+    </div>
+</div>

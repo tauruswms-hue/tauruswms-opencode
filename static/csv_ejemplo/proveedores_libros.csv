@@ -1,0 +1,6 @@
+codigo,razonsocial,cuit,direccion,telefono,email
+ED1,Editorial uno S.A.,30-12345678-1,Av. Corrientes 1234,011-4555-1234,ventas@editorial1.com
+ED2,Editorial dos S.A.,30-23456789-2,Av. Santa Fe 5678,011-4555-5678,compras@editorial2.com
+ED3,Distribuidora tres S.R.L.,30-34567890-3,Av. Rivadavia 9012,011-4555-9012,info@distribuidora3.com
+ED4,Librería cuatro S.A.,30-45678901-4,Calle Mayor 345,011-4555-3456,libreria4@libreria4.com
+ED5,Proveedora cinco S.A.,30-56789012-5,Av. 9 de Julio 789,011-4555-7890,proveedora5@proveedora5.com

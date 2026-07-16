@@ -1,0 +1,1003 @@
+{% extends "base.html" %}
+
+{% block content %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/select/1.7.0/css/select.dataTables.min.css">
+<style> .main-content { overflow-y: hidden !important; } </style>
+
+<div style="height: calc(100vh - 96px); display: flex; flex-direction: column; padding: 0 16px 12px; overflow: hidden;">
+
+    <!-- Encabezado -->
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; padding: 8px 0 8px 0;">
+        <div style="display:flex; align-items:center; gap:10px; margin-right:16px;">
+            <h2 style="margin:0; font-size:1.2rem;"><i class="fas fa-tasks"></i> Consola de Pedidos</h2>
+            <span id="badgeSeleccionados"
+                  style="display:none; background:#6c3483; color:white; font-size:0.78rem;
+                         font-weight:bold; padding:3px 10px; border-radius:12px; white-space:nowrap;">
+                0 seleccionados
+            </span>
+        </div>
+        <div style="display: flex; gap: 8px;">
+            <button onclick="verificarStockSeleccionado()" class="btn-action" style="background: #3498db; color: white; border: none; padding: 7px 12px; border-radius: 4px; cursor: pointer; font-size:0.85rem;">
+                <i class="fas fa-warehouse"></i> Verificar Stock
+            </button>
+            <button onclick="prepararSeleccionados()" class="btn-action" style="background: #8e44ad; color: white; border: none; padding: 7px 12px; border-radius: 4px; cursor: pointer; font-size:0.85rem;">
+                <i class="fas fa-box-open"></i> Preparar (Picking)
+            </button>
+            <button onclick="abrirCambioRutaTransporte()" class="btn-action" style="background: #16a085; color: white; border: none; padding: 7px 12px; border-radius: 4px; cursor: pointer; font-size:0.85rem;">
+                <i class="fas fa-exchange-alt"></i> Cambiar Ruta / Transporte
+            </button>
+            <button onclick="openModalImportar()" style="background:#3498db; color:white; border:none; padding:7px 12px; border-radius:4px; cursor:pointer; font-size:0.85rem;">
+                <i class="fas fa-file-import"></i> Importar
+            </button>
+            <a href="{{ url_for('pedidos.nuevo') }}" style="background: #27ae60; color: white; padding: 7px 12px; border-radius: 4px; text-decoration: none; font-size:0.85rem;">
+                <i class="fas fa-plus"></i> Nuevo Pedido
+            </a>
+        </div>
+    </div>
+
+    <!-- Filtros compactos -->
+    <div style="background: #f8f9fa; padding: 7px 12px; border-radius: 6px; margin-bottom: 8px; flex-shrink: 0;
+                display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; border: 1px solid #e0e0e0; align-items: end;">
+        <div>
+            <label style="font-size: 0.72rem; font-weight: bold; display:block; margin-bottom:2px;">Cliente</label>
+            <select id="filterCliente" style="width: 100%; padding: 3px 6px; font-size:0.82rem; border:1px solid #ccc; border-radius:3px;">
+                <option value="">Todos</option>
+            </select>
+        </div>
+        <div style="position:relative;">
+            <label style="font-size: 0.72rem; font-weight: bold; display:block; margin-bottom:2px;">Estado</label>
+            <div id="estadoDropdown" onclick="toggleEstadoMenu(event)"
+                 style="width:100%; padding:3px 8px; background:white; border:1px solid #ccc; border-radius:3px; cursor:pointer; user-select:none; display:flex; justify-content:space-between; align-items:center; font-size:0.82rem;">
+                <span id="estadoLabel" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Pendiente, Trabajo, Preparado</span>
+                <i class="fas fa-chevron-down" style="font-size:0.6rem; color:#666; flex-shrink:0; margin-left:4px;"></i>
+            </div>
+            <div id="estadoMenu" style="display:none; position:absolute; top:100%; left:0; right:0; background:white; border:1px solid #ccc; border-radius:4px; box-shadow:0 4px 12px rgba(0,0,0,0.12); z-index:1000; padding:4px 0;">
+                <label style="display:flex; align-items:center; gap:8px; padding:4px 10px; cursor:pointer; font-size:0.82rem;" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">
+                    <input type="checkbox" value="Pendiente"  class="chkEstado" checked> Pendiente
+                </label>
+                <label style="display:flex; align-items:center; gap:8px; padding:4px 10px; cursor:pointer; font-size:0.82rem;" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">
+                    <input type="checkbox" value="Trabajo"    class="chkEstado" checked> Trabajo
+                </label>
+                <label style="display:flex; align-items:center; gap:8px; padding:4px 10px; cursor:pointer; font-size:0.82rem;" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">
+                    <input type="checkbox" value="Preparado"  class="chkEstado" checked> Preparado
+                </label>
+                <label style="display:flex; align-items:center; gap:8px; padding:4px 10px; cursor:pointer; font-size:0.82rem;" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">
+                    <input type="checkbox" value="Despachado" class="chkEstado"> Despachado
+                </label>
+                <label style="display:flex; align-items:center; gap:8px; padding:4px 10px; cursor:pointer; font-size:0.82rem;" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">
+                    <input type="checkbox" value="Anulado"    class="chkEstado"> Anulado
+                </label>
+            </div>
+        </div>
+        <div>
+            <label style="font-size: 0.72rem; font-weight: bold; display:block; margin-bottom:2px;">Clase</label>
+            <select id="filterClase" style="width: 100%; padding: 3px 6px; font-size:0.82rem; border:1px solid #ccc; border-radius:3px;">
+                <option value="">Todas</option>
+            </select>
+        </div>
+        <div>
+            <label style="font-size: 0.72rem; font-weight: bold; display:block; margin-bottom:2px;">Ruta</label>
+            <select id="filterRuta" style="width: 100%; padding: 3px 6px; font-size:0.82rem; border:1px solid #ccc; border-radius:3px;">
+                <option value="">Todas</option>
+            </select>
+        </div>
+        <div>
+            <label style="font-size: 0.72rem; font-weight: bold; display:block; margin-bottom:2px;">Transporte</label>
+            <select id="filterTransporte" style="width: 100%; padding: 3px 6px; font-size:0.82rem; border:1px solid #ccc; border-radius:3px;">
+                <option value="">Todos</option>
+            </select>
+        </div>
+        <div>
+            <label style="font-size: 0.72rem; font-weight: bold; display:block; margin-bottom:2px;">Desde</label>
+            <input type="date" id="filterDesde" style="width: 100%; padding: 3px 6px; font-size:0.82rem; border:1px solid #ccc; border-radius:3px;">
+        </div>
+        <div>
+            <label style="font-size: 0.72rem; font-weight: bold; display:block; margin-bottom:2px;">Hasta</label>
+            <input type="date" id="filterHasta" style="width: 100%; padding: 3px 6px; font-size:0.82rem; border:1px solid #ccc; border-radius:3px;">
+        </div>
+    </div>
+
+    <!-- Grilla -->
+    <div id="tablaPedidosCard" style="background: white; padding: 10px 16px 10px 16px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); flex: 1; min-height: 0; overflow: hidden;">
+        <table id="tablaPedidos" class="display cell-border hover" style="width:100%">
+            <thead>
+                <tr>
+                    <th style="width: 30px;"><input type="checkbox" id="selectAll"></th>
+                    <th>Nro. Pedido</th>
+                    <th>Fecha</th>
+                    <th>Cliente</th>
+                    <th>Clase</th>
+                    <th>Ruta</th>
+                    <th>Transporte</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in pedidos %}
+                <tr data-id="{{ p.id_pedido }}">
+                    <td><input type="checkbox" class="row-select" value="{{ p.id_pedido }}" data-estado="{{ p.estado }}"></td>
+                    <td><strong>{{ p.nro_pedido }}</strong></td>
+                    <td>{{ p.fecha_pedido }}</td>
+                    <td>{{ p.cliente_nombre }}</td>
+                    <td>{{ p.clase_nombre or '-' }}</td>
+                    <td>{{ p.nombre_ruta or '-' }}</td>
+                    <td>{{ p.transporte_nombre or '-' }}</td>
+                    <td>
+                        <span class="badge" style="padding: 4px 8px; border-radius: 12px; font-size: 0.85rem; background: {% if p.estado == 'Pendiente' %}#f39c12{% elif p.estado == 'Trabajo' %}#8e44ad{% elif p.estado == 'Preparado' %}#2980b9{% elif p.estado == 'Despachado' %}#27ae60{% elif p.estado == 'Anulado' %}#e74c3c{% else %}#95a5a6{% endif %}; color: white;">
+                            {{ p.estado }}
+                        </span>
+                    </td>
+                    <td style="text-align: center;">
+                        <a href="{{ url_for('pedidos.ver_detalle', id_pedido=p.id_pedido) }}" title="Ver Detalle" style="color: #3498db; margin: 0 5px;"><i class="fas fa-eye"></i></a>
+                        {% if p.estado == 'Pendiente' %}
+                        <a href="{{ url_for('pedidos.editar', id_pedido=p.id_pedido) }}" title="Editar" style="color: #f39c12; margin: 0 5px;"><i class="fas fa-edit"></i></a>
+                        <a href="javascript:void(0)" onclick="confirmarEliminar('{{ p.id_pedido }}')" title="Eliminar" style="color: #e74c3c; margin: 0 5px;"><i class="fas fa-trash"></i></a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div><!-- /tablaPedidosCard -->
+</div><!-- /flex container -->
+
+{% include "partials/_modal_importar_pedidos.html" %}
+
+<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="{{ url_for('static', filename='js/batch_ui.js') }}"></script>
+
+<script>
+    // ── Selección persistente entre páginas ─────────────────────────────────
+    // Map: id_pedido (string) → estado (string)
+    // Se construye ANTES de que DataTables pagine los rows
+    const rowMeta = {};   // id → estado  (fuente de verdad estática)
+    const selectedRows = new Map();  // id → estado  (selección activa)
+
+    $('#tablaPedidos tbody tr').each(function() {
+        const cb = $(this).find('.row-select');
+        if (cb.length) rowMeta[cb.val()] = cb.data('estado');
+    });
+
+    function syncCheckboxes(tableRef) {
+        // Restaura estado visual de los checkboxes en la página actual
+        tableRef.rows({page:'current'}).nodes().to$().each(function() {
+            const cb = $(this).find('.row-select');
+            if (cb.length) cb.prop('checked', selectedRows.has(cb.val()));
+        });
+        // Actualiza "seleccionar todo"
+        const currentIds = tableRef.rows({page:'current', search:'applied'})
+            .nodes().to$().map(function() {
+                return $(this).find('.row-select').val();
+            }).get().filter(Boolean);
+        const allChecked = currentIds.length > 0 && currentIds.every(id => selectedRows.has(id));
+        $('#selectAll').prop('checked', allChecked);
+        // Actualiza badge de seleccionados
+        const n = selectedRows.size;
+        const badge = document.getElementById('badgeSeleccionados');
+        if (badge) {
+            badge.textContent = n + (n === 1 ? ' seleccionado' : ' seleccionados');
+            badge.style.display = n > 0 ? 'inline-block' : 'none';
+        }
+    }
+
+    function getAllFilteredIds(tableRef) {
+        // Extrae IDs de TODAS las filas filtradas (incluidas páginas no visibles)
+        // data()[0] es el HTML del checkbox: <input ... value="ID" ...>
+        const ids = [];
+        tableRef.rows({search:'applied'}).data().each(function(rowData) {
+            const m = rowData[0].match(/value="(\d+)"/);
+            if (m) ids.push(m[1]);
+        });
+        return ids;
+    }
+
+    $(document).ready(function() {
+        const table = $('#tablaPedidos').DataTable({
+            "order": [[ 2, "desc" ]],
+            "columnDefs": [{ "targets": 0, "orderable": false }],
+            "language": { "url": "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json" },
+            "scrollY": "300px",   // valor inicial; ajustarAlturaTabla() lo recalcula
+            "scrollX": true,
+            "scrollCollapse": true,
+            "drawCallback": function() { syncCheckboxes(this.api()); }
+        });
+
+        // Ajusta scrollY al espacio real disponible en el card
+        function ajustarAlturaTabla() {
+            const card      = document.getElementById('tablaPedidosCard');
+            const wrapper   = document.getElementById('tablaPedidos_wrapper');
+            const scrollDiv = wrapper ? wrapper.querySelector('.dataTables_scroll')    : null;
+            const scrollBody= wrapper ? wrapper.querySelector('.dataTables_scrollBody'): null;
+            const scrollHead= wrapper ? wrapper.querySelector('.dataTables_scrollHead'): null;
+            if (!card || !wrapper || !scrollBody) return;
+
+            // Suma las alturas de todos los hijos del wrapper que NO sean el scroll container
+            // (captura: length, filter, info, paginate — independientemente del idioma/render)
+            let nonScrollH = 0;
+            for (const child of wrapper.children) {
+                if (child !== scrollDiv) nonScrollH += child.offsetHeight;
+            }
+            const headH   = scrollHead ? scrollHead.offsetHeight : 0;
+            const overhead = nonScrollH + headH + 6; // 6px de gaps/márgenes internos
+
+            const cardInner = card.clientHeight - 20; // padding 10px arriba + 10px abajo
+            const h         = Math.max(80, cardInner - overhead);
+
+            table.settings()[0].oScroll.sY = h + 'px';
+            $(scrollBody).css({ height: h + 'px', maxHeight: h + 'px' });
+            table.columns.adjust();
+        }
+        $(window).on('resize', ajustarAlturaTabla);
+        // Ejecutar en dos momentos para capturar cualquier reflow del layout
+        setTimeout(ajustarAlturaTabla, 50);
+        setTimeout(ajustarAlturaTabla, 300);
+
+        // ── Selección masiva (persiste entre páginas) ────────────────────────
+        $('#selectAll').on('click', function() {
+            const check = this.checked;
+            getAllFilteredIds(table).forEach(id => {
+                if (check) selectedRows.set(id, rowMeta[id] || '');
+                else       selectedRows.delete(id);
+            });
+            syncCheckboxes(table);
+        });
+
+        $(document).on('change', '.row-select', function() {
+            const id = $(this).val();
+            if (this.checked) selectedRows.set(id, rowMeta[id] || '');
+            else              selectedRows.delete(id);
+            syncCheckboxes(table);
+        });
+
+        // ── Filtros Cliente / Clase / Ruta (selects poblados dinámicamente) ───
+        const clientesSet    = new Set();
+        const clasesSet      = new Set();
+        const rutasSet       = new Set();
+        const transportesSet = new Set();
+        table.rows().data().each(function(row) {
+            const cliente    = (row[3] || '').trim();
+            const clase      = (row[4] || '').trim();
+            const ruta       = (row[5] || '').trim();
+            const transporte = (row[6] || '').trim();
+            if (cliente)                  clientesSet.add(cliente);
+            if (clase && clase !== '-')   clasesSet.add(clase);
+            if (ruta  && ruta  !== '-')   rutasSet.add(ruta);
+            if (transporte && transporte !== '-') transportesSet.add(transporte);
+        });
+        [...clientesSet].sort().forEach(v    => $('#filterCliente').append(`<option value="${v}">${v}</option>`));
+        [...clasesSet].sort().forEach(v      => $('#filterClase').append(`<option value="${v}">${v}</option>`));
+        [...rutasSet].sort().forEach(v       => $('#filterRuta').append(`<option value="${v}">${v}</option>`));
+        [...transportesSet].sort().forEach(v => $('#filterTransporte').append(`<option value="${v}">${v}</option>`));
+
+        $.fn.dataTable.ext.search.push(function(settings, data) {
+            if (settings.nTable.id !== 'tablaPedidos') return true;
+            const clase      = $('#filterClase').val();
+            const ruta       = $('#filterRuta').val();
+            const transporte = $('#filterTransporte').val();
+            if (clase      && data[4].trim() !== clase)      return false;
+            if (ruta       && data[5].trim() !== ruta)       return false;
+            if (transporte && data[6].trim() !== transporte) return false;
+            return true;
+        });
+
+        $('#filterCliente').on('change', function() {
+            table.column(3).search(this.value ? '^' + $.fn.dataTable.util.escapeRegex(this.value) + '$' : '', true, false).draw();
+        });
+        $('#filterClase, #filterRuta, #filterTransporte').on('change', function() { table.draw(); });
+
+        // ── Filtro multi-estado ──────────────────────────────────────────────
+        function getEstadosSeleccionados() {
+            return [...document.querySelectorAll('.chkEstado:checked')].map(c => c.value);
+        }
+
+        function actualizarLabelEstado() {
+            const sel = getEstadosSeleccionados();
+            const label = document.getElementById('estadoLabel');
+            if (sel.length === 0)      label.textContent = 'Ninguno';
+            else if (sel.length === 5) label.textContent = 'Todos';
+            else                       label.textContent = sel.join(', ');
+        }
+
+        $.fn.dataTable.ext.search.push(function(settings, data) {
+            if (settings.nTable.id !== 'tablaPedidos') return true;
+            const sel = getEstadosSeleccionados();
+            if (sel.length === 0) return false;
+            return sel.some(e => data[7].includes(e));
+        });
+
+        $(document).on('change', '.chkEstado', function() {
+            actualizarLabelEstado();
+            table.draw();
+        });
+
+        $(document).on('click', function(e) {
+            if (!$(e.target).closest('#estadoDropdown, #estadoMenu').length)
+                document.getElementById('estadoMenu').style.display = 'none';
+        });
+
+        window.toggleEstadoMenu = function(e) {
+            e.stopPropagation();
+            const menu = document.getElementById('estadoMenu');
+            menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+        };
+
+        // ── Filtro Fechas ────────────────────────────────────────────────────
+        $.fn.dataTable.ext.search.push(function(settings, data) {
+            if (settings.nTable.id !== 'tablaPedidos') return true;
+            const min = $('#filterDesde').val();
+            const max = $('#filterHasta').val();
+            const date = data[2];
+            if (!min && !max) return true;
+            if (!min) return date <= max;
+            if (!max) return date >= min;
+            return date >= min && date <= max;
+        });
+
+        $('#filterDesde, #filterHasta').on('change', function() { table.draw(); });
+
+        const diasFiltro = {{ dias_filtro | default(30) }};
+        const hoy = new Date();
+        const desde = new Date(hoy);
+        desde.setDate(hoy.getDate() - diasFiltro);
+        const toISO = d => d.toISOString().split('T')[0];
+        document.getElementById('filterDesde').value = toISO(desde);
+        document.getElementById('filterHasta').value = toISO(hoy);
+
+        table.draw();
+    });
+
+    function getSelectedIds() {
+        return [...selectedRows.keys()];
+    }
+
+    function verificarStockSeleccionado() {
+        const ids = getSelectedIds();
+        if (ids.length === 0) return alert("Seleccione al menos un pedido.");
+
+        const btn = document.querySelector('[onclick="verificarStockSeleccionado()"]');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verificando...';
+
+        fetch('/pedidos/verificar_stock_masivo', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ids})
+        })
+        .then(r => r.json())
+        .then(data => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-warehouse"></i> Verificar Stock';
+            if (data.status !== 'ok') { alert('Error del servidor: ' + data.message); return; }
+            mostrarInformeStock(data);
+        })
+        .catch(err => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-warehouse"></i> Verificar Stock';
+            alert('Error de conexión: ' + err);
+        });
+    }
+
+    function mostrarInformeStock(data) {
+        const ok  = data.total_ok;
+        const nok = data.total_faltante;
+
+        // ── Pedidos incluidos ──────────────────────────────────
+        const pedFilas = data.pedidos.map(p => {
+            const badge = {
+                'Pendiente': '#f39c12', 'Trabajo': '#8e44ad',
+                'Preparado': '#2980b9', 'Despachado': '#27ae60', 'Anulado': '#e74c3c'
+            }[p.estado] || '#95a5a6';
+            return `<tr style="border-bottom:1px solid #eee;">
+                <td style="padding:6px 10px;"><strong>${p.nro_pedido}</strong></td>
+                <td style="padding:6px 10px;">${p.cliente_codigo} — ${p.cliente_nombre}</td>
+                <td style="padding:6px 10px;">
+                    <span style="background:${badge};color:white;padding:2px 8px;border-radius:10px;font-size:0.8rem;">${p.estado}</span>
+                </td>
+            </tr>`;
+        }).join('');
+
+        // ── Líneas de materiales ───────────────────────────────
+        const tsColor = {
+            'Libre Venta': '#27ae60', 'Calidad': '#f39c12',
+            'Bloqueado': '#e74c3c',   'Mal Estado': '#95a5a6'
+        };
+        const matFilas = data.lineas.map(l => {
+            const color    = l.ok ? '#27ae60' : '#e74c3c';
+            const icono    = l.ok ? '✔' : '✘';
+            const difStr   = (l.diferencia >= 0 ? '+' : '') + fmt(l.diferencia);
+            const difColor = l.ok ? '#27ae60' : '#e74c3c';
+            const tc       = tsColor[l.tipo_stock] || '#333';
+
+            const detPed = l.pedidos.map(p =>
+                `<small style="color:#666;">${p.nro_pedido}: ${fmt(p.cantidad)}</small>`
+            ).join('<br>');
+
+            return `<tr style="border-bottom:1px solid #eee; background:${l.ok ? 'white' : '#fff5f5'};">
+                <td style="padding:8px 10px; text-align:center;">
+                    <span style="color:${color}; font-weight:bold; font-size:1.1rem;">${icono}</span>
+                </td>
+                <td style="padding:8px 10px;"><code style="background:#f0f0f0;padding:2px 6px;border-radius:4px;">${l.material_codigo}</code></td>
+                <td style="padding:8px 10px;">${l.material_nombre}</td>
+                <td style="padding:8px 10px;">
+                    <span style="color:${tc}; font-weight:bold;">● ${l.tipo_stock}</span>
+                </td>
+                <td style="padding:8px 10px; text-align:right;">${fmt(l.cantidad_total)} ${l.unidad_nombre}</td>
+                <td style="padding:8px 10px; text-align:right;">${fmt(l.stock_disponible)}</td>
+                <td style="padding:8px 10px; text-align:right; font-weight:bold; color:${difColor};">${difStr}</td>
+                <td style="padding:8px 10px; font-size:0.8rem;">${detPed}</td>
+            </tr>`;
+        }).join('');
+
+        document.getElementById('informe-fecha').textContent    = data.fecha;
+        document.getElementById('informe-npedidos').textContent = data.pedidos.length;
+        document.getElementById('informe-ok').textContent       = ok;
+        document.getElementById('informe-nok').textContent      = nok;
+        document.getElementById('informe-pedidos-body').innerHTML = pedFilas;
+        document.getElementById('informe-mat-body').innerHTML     = matFilas;
+
+        // Colorear totalizadores
+        document.getElementById('informe-nok').style.color = nok > 0 ? '#e74c3c' : '#27ae60';
+        document.getElementById('informe-ok').style.color  = '#27ae60';
+
+        document.getElementById('modalInformeStock').style.display = 'flex';
+    }
+
+    function fmt(n) {
+        return parseFloat(n).toLocaleString('es-AR', {minimumFractionDigits: 0, maximumFractionDigits: 4});
+    }
+
+    function cerrarInforme() {
+        document.getElementById('modalInformeStock').style.display = 'none';
+    }
+
+    function imprimirInforme() {
+        const contenido = document.getElementById('informe-contenido').innerHTML;
+        const ventana = window.open('', '_blank', 'width=1000,height=700');
+        ventana.document.write(`<!DOCTYPE html><html><head>
+            <meta charset="UTF-8">
+            <title>Informe de Stock</title>
+            <style>
+                body{font-family:Arial,sans-serif;padding:20px;font-size:13px;}
+                table{width:100%;border-collapse:collapse;margin-bottom:16px;}
+                th{background:#1a365d;color:white;padding:8px;text-align:left;}
+                td{padding:7px 10px;border-bottom:1px solid #ddd;}
+                .ok{color:#27ae60;font-weight:bold;} .nok{color:#e74c3c;font-weight:bold;}
+                h2{color:#1a365d;} h4{color:#444;margin:16px 0 6px;}
+                code{background:#f0f0f0;padding:2px 5px;border-radius:3px;}
+                .fila-nok{background:#fff5f5;}
+                @media print{button{display:none;}}
+            </style></head><body>${contenido}
+            <script>window.onload=()=>window.print();<\/script>
+            </body></html>`);
+        ventana.document.close();
+    }
+
+    function prepararSeleccionados() {
+        if (selectedRows.size === 0) return alert("Seleccione al menos un pedido.");
+
+        // Validar que todos sean Pendiente (usando el Map, no el DOM)
+        const estadosInvalidos = [...new Set(
+            [...selectedRows.values()].filter(e => e !== 'Pendiente')
+        )];
+        if (estadosInvalidos.length > 0) {
+            alert('Solo se admiten pedidos en estado "Pendiente" para la preparación.\n\nSe encontraron pedidos en estado: ' + estadosInvalidos.join(', ') + '.\n\nDeseleccione esos pedidos e intente nuevamente.');
+            return;
+        }
+
+        const ids = [...selectedRows.keys()];
+        const btn = document.querySelector('[onclick="prepararSeleccionados()"]');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando...';
+
+        fetch('/pedidos/resumen_preparar', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ids})
+        })
+        .then(r => r.json())
+        .then(data => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-box-open"></i> Preparar (Picking)';
+            if (data.status !== 'ok') { alert('Error: ' + data.message); return; }
+            mostrarResumenPreparar(ids, data);
+        })
+        .catch(err => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-box-open"></i> Preparar (Picking)';
+            alert('Error de conexión: ' + err);
+        });
+    }
+
+    function calcularIC(unidades, materiales, clientes, ubicaciones) {
+        const s_u  = Math.min(unidades   / 50, 10) * 0.30;
+        const s_m  = Math.min(materiales / 2,  10) * 0.25;
+        const s_c  = Math.min(clientes   / 1,  10) * 0.20;
+        const s_ub = Math.min(ubicaciones/ 2,  10) * 0.25;
+        return Math.round((s_u + s_m + s_c + s_ub) * 10) / 10;
+    }
+
+    function mostrarResumenPreparar(ids, data) {
+        document.getElementById('res-pedidos').textContent    = data.cant_pedidos;
+        document.getElementById('res-unidades').textContent   = fmt(data.total_unidades);
+        document.getElementById('res-materiales').textContent = data.cant_materiales;
+        document.getElementById('res-clientes').textContent   = data.cant_clientes;
+        document.getElementById('res-ubicaciones').textContent= data.cant_ubicaciones;
+
+        // Coeficiente de Complejidad
+        const ic = calcularIC(data.total_unidades, data.cant_materiales, data.cant_clientes, data.cant_ubicaciones);
+        const pct = Math.round(ic / 10 * 100);  // para la barra (0-100%)
+
+        let nivel, colorFondo, colorTexto, colorBarra;
+        if      (ic < 2.5) { nivel = 'Baja';     colorFondo = '#e8f5e9'; colorTexto = '#1e7e34'; colorBarra = '#27ae60'; }
+        else if (ic < 5.0) { nivel = 'Media';    colorFondo = '#fff8e1'; colorTexto = '#b7770d'; colorBarra = '#f39c12'; }
+        else if (ic < 7.5) { nivel = 'Alta';     colorFondo = '#fff3e0'; colorTexto = '#c0392b'; colorBarra = '#e67e22'; }
+        else               { nivel = 'Muy Alta'; colorFondo = '#fdecea'; colorTexto = '#922b21'; colorBarra = '#e74c3c'; }
+
+        const icEl    = document.getElementById('res-ic-valor');
+        const nivelEl = document.getElementById('res-ic-nivel');
+        const barraEl = document.getElementById('res-ic-barra');
+        const bloqueEl= document.getElementById('res-ic-bloque');
+
+        bloqueEl.style.background   = colorFondo;
+        bloqueEl.style.borderColor  = colorBarra;
+        icEl.style.color            = colorTexto;
+        nivelEl.style.color         = colorTexto;
+        nivelEl.style.background    = colorBarra;
+        barraEl.style.width         = pct + '%';
+        barraEl.style.background    = colorBarra;
+        icEl.textContent            = ic.toFixed(1);
+        nivelEl.textContent         = nivel;
+
+        document.getElementById('modalResumenPreparar').style.display = 'flex';
+        window._idsPreparar = ids;
+    }
+
+    function cerrarResumenPreparar() {
+        document.getElementById('modalResumenPreparar').style.display = 'none';
+        window._idsPreparar = null;
+    }
+
+    const _botonesPrep = [
+        { id: 'btnPrepDirecta',  label: '<i class="fas fa-bolt"></i> Preparación directa' },
+        { id: 'btnPrepCliente',  label: '<i class="fas fa-user-tag"></i> Por cliente' },
+        { id: 'btnPrepDospasos', label: '<i class="fas fa-layer-group"></i> En dos pasos' },
+    ];
+
+    function _setBotonesPrep(disabled, spinnerIdx) {
+        _botonesPrep.forEach(({ id, label }, i) => {
+            const btn = document.getElementById(id);
+            if (!btn) return;
+            btn.disabled = disabled;
+            btn.innerHTML = (disabled && i === spinnerIdx)
+                ? '<i class="fas fa-spinner fa-spin"></i> Procesando...'
+                : label;
+        });
+    }
+
+    async function confirmarPreparar(modo) {
+        const ids = window._idsPreparar;
+        if (!ids || ids.length === 0) return;
+
+        const modos = { directa: 0, cliente: 1, dospasos: 2 };
+        const idx   = modos[modo] ?? 0;
+        _setBotonesPrep(true, idx);
+
+        try {
+            // ── 1. Generar y descargar JSON de picking ────────────────────
+            const r1 = await fetch('/pedidos/picking_json', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ ids, modo })
+            });
+
+            if (r1.ok) {
+                const blob = await r1.blob();
+                const cd   = r1.headers.get('Content-Disposition') || '';
+                const fn   = (cd.match(/filename="([^"]+)"/) || [])[1]
+                           || `picking_${modo}.json`;
+                const url  = URL.createObjectURL(blob);
+                const a    = document.createElement('a');
+                a.href     = url;
+                a.download = fn;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } else {
+                const err = await r1.json().catch(() => ({}));
+                console.warn('picking_json error:', err.message || r1.status);
+            }
+
+            // ── 2. Actualizar estados de pedidos ──────────────────────────
+            const r2   = await fetch('/pedidos/preparar_masivo', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ ids, modo })
+            });
+            const data = await r2.json();
+            cerrarResumenPreparar();
+            if (data.status === 'success') { alert(data.message); location.reload(); }
+            else { _setBotonesPrep(false); alert('Error: ' + data.message); }
+
+        } catch(err) {
+            _setBotonesPrep(false);
+            alert('Error de conexión: ' + err);
+        }
+    }
+
+    function confirmarEliminar(id) {
+        if (confirm('¿Seguro que desea anular este pedido? El pedido pasará al estado Anulado.')) {
+            window.location.href = "{{ url_for('pedidos.eliminar', id_pedido=0) }}".replace('0', id);
+        }
+    }
+</script>
+
+<style>
+    .btn-action:hover { opacity: 0.9; transform: scale(1.02); }
+    .badge { display: inline-block; min-width: 80px; text-align: center; }
+
+    table#tablaPedidos thead th,
+    table#tablaPedidos tbody td { padding: 1px 6px !important; font-size: 0.78rem !important; line-height: 1.1 !important; }
+    table#tablaPedidos tbody .badge { padding: 1px 5px !important; font-size: 0.72rem !important; min-width: 0 !important; }
+    #tablaPedidos_wrapper .dataTables_filter,
+    #tablaPedidos_wrapper .dataTables_length { margin-bottom: 4px; font-size: 0.82rem; }
+    #tablaPedidos_wrapper .dataTables_info,
+    #tablaPedidos_wrapper .dataTables_paginate { padding-top: 4px; font-size: 0.82rem; }
+</style>
+
+<!-- ── MODAL INFORME DE STOCK ─────────────────────────────────── -->
+<div id="modalInformeStock"
+     style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55);
+            z-index:9999; align-items:flex-start; justify-content:center;
+            overflow-y:auto; padding:30px 15px;">
+    <div style="background:white; border-radius:10px; width:100%; max-width:1000px;
+                box-shadow:0 10px 40px rgba(0,0,0,0.25);">
+
+        <!-- Cabecera modal -->
+        <div style="background:#1a365d; color:white; padding:18px 24px; border-radius:10px 10px 0 0;
+                    display:flex; justify-content:space-between; align-items:center;">
+            <div>
+                <h3 style="margin:0;"><i class="fas fa-warehouse"></i> Informe de Verificación de Stock</h3>
+                <small style="opacity:0.75;">Generado: <span id="informe-fecha"></span></small>
+            </div>
+            <button onclick="cerrarInforme()"
+                    style="background:rgba(255,255,255,0.15); border:none; color:white;
+                           font-size:1.3rem; cursor:pointer; border-radius:4px; padding:4px 10px;">&times;</button>
+        </div>
+
+        <div id="informe-contenido" style="padding:24px;">
+
+            <!-- Resumen -->
+            <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:24px;">
+                <div style="background:#eaf4fb; border-radius:8px; padding:14px 18px; border-left:4px solid #3498db;">
+                    <div style="font-size:1.8rem; font-weight:bold; color:#1a365d;" id="informe-npedidos">0</div>
+                    <div style="color:#555; font-size:0.85rem;">Pedidos verificados</div>
+                </div>
+                <div style="background:#eafaf1; border-radius:8px; padding:14px 18px; border-left:4px solid #27ae60;">
+                    <div style="font-size:1.8rem; font-weight:bold;" id="informe-ok">0</div>
+                    <div style="color:#555; font-size:0.85rem;">Materiales con stock suficiente</div>
+                </div>
+                <div style="background:#fdf3f3; border-radius:8px; padding:14px 18px; border-left:4px solid #e74c3c;">
+                    <div style="font-size:1.8rem; font-weight:bold;" id="informe-nok">0</div>
+                    <div style="color:#555; font-size:0.85rem;">Materiales con faltante</div>
+                </div>
+            </div>
+
+            <!-- Pedidos incluidos -->
+            <h4 style="margin:0 0 8px; color:#1a365d; border-bottom:2px solid #f6ad55; padding-bottom:6px;">
+                <i class="fas fa-file-invoice"></i> Pedidos incluidos
+            </h4>
+            <div style="overflow-x:auto; margin-bottom:24px;">
+                <table style="width:100%; border-collapse:collapse; font-size:0.88rem;">
+                    <thead>
+                        <tr style="background:#f8f9fa;">
+                            <th style="padding:8px 10px; text-align:left;">Nro. Pedido</th>
+                            <th style="padding:8px 10px; text-align:left;">Cliente</th>
+                            <th style="padding:8px 10px; text-align:left;">Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody id="informe-pedidos-body"></tbody>
+                </table>
+            </div>
+
+            <!-- Materiales -->
+            <h4 style="margin:0 0 8px; color:#1a365d; border-bottom:2px solid #f6ad55; padding-bottom:6px;">
+                <i class="fas fa-boxes"></i> Disponibilidad por material
+            </h4>
+            <div style="overflow-x:auto;">
+                <table style="width:100%; border-collapse:collapse; font-size:0.88rem;">
+                    <thead>
+                        <tr style="background:#1a365d; color:white;">
+                            <th style="padding:9px 10px; width:40px;"></th>
+                            <th style="padding:9px 10px; text-align:left;">Código</th>
+                            <th style="padding:9px 10px; text-align:left;">Material</th>
+                            <th style="padding:9px 10px; text-align:left;">Tipo de Stock</th>
+                            <th style="padding:9px 10px; text-align:right;">Cant. Pedida</th>
+                            <th style="padding:9px 10px; text-align:right;">Stock Disponible</th>
+                            <th style="padding:9px 10px; text-align:right;">Diferencia</th>
+                            <th style="padding:9px 10px; text-align:left;">Detalle por pedido</th>
+                        </tr>
+                    </thead>
+                    <tbody id="informe-mat-body"></tbody>
+                </table>
+            </div>
+
+        </div><!-- /informe-contenido -->
+
+        <!-- Pie modal -->
+        <div style="padding:16px 24px; border-top:1px solid #eee; display:flex;
+                    justify-content:flex-end; gap:12px;">
+            <button onclick="imprimirInforme()"
+                    style="background:#2c3e50; color:white; border:none; padding:10px 20px;
+                           border-radius:4px; cursor:pointer;">
+                <i class="fas fa-print"></i> Imprimir
+            </button>
+            <button onclick="cerrarInforme()"
+                    style="background:#95a5a6; color:white; border:none; padding:10px 20px;
+                           border-radius:4px; cursor:pointer;">
+                Cerrar
+            </button>
+        </div>
+    </div>
+</div>
+<!-- ── MODAL RESUMEN PREPARAR (PICKING) ──────────────────────────────────── -->
+<div id="modalResumenPreparar"
+     style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55);
+            z-index:9999; align-items:center; justify-content:center;">
+    <div style="background:white; border-radius:10px; width:100%; max-width:580px;
+                box-shadow:0 10px 40px rgba(0,0,0,0.25); margin:20px;">
+
+        <div style="background:#6c3483; color:white; padding:10px 18px; border-radius:10px 10px 0 0;
+                    display:flex; justify-content:space-between; align-items:center;">
+            <h3 style="margin:0; font-size:0.95rem;">
+                <i class="fas fa-box-open"></i> Resumen de Preparación (Picking)
+            </h3>
+            <button onclick="cerrarResumenPreparar()"
+                    style="background:rgba(255,255,255,0.15); border:none; color:white;
+                           font-size:1.1rem; cursor:pointer; border-radius:4px; padding:1px 8px;">&times;</button>
+        </div>
+
+        <div style="padding:14px 18px;">
+            <p style="margin:0 0 10px; color:#555; font-size:0.8rem;">
+                Revise el resumen antes de iniciar la preparación. Los pedidos pasarán a estado <strong>Trabajo</strong>.
+            </p>
+
+            <!-- Cards métricas: 3 columnas -->
+            <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:10px;">
+                <div style="background:#f3e5f5; border-radius:6px; padding:8px 12px; border-left:3px solid #8e44ad;">
+                    <div style="font-size:1.4rem; font-weight:bold; color:#6c3483;" id="res-pedidos">0</div>
+                    <div style="color:#666; font-size:0.72rem; margin-top:1px;">Pedidos</div>
+                </div>
+                <div style="background:#e8f5e9; border-radius:6px; padding:8px 12px; border-left:3px solid #27ae60;">
+                    <div style="font-size:1.4rem; font-weight:bold; color:#1e7e34;" id="res-unidades">0</div>
+                    <div style="color:#666; font-size:0.72rem; margin-top:1px;">Unidades</div>
+                </div>
+                <div style="background:#fff3e0; border-radius:6px; padding:8px 12px; border-left:3px solid #f39c12;">
+                    <div style="font-size:1.4rem; font-weight:bold; color:#b7770d;" id="res-materiales">0</div>
+                    <div style="color:#666; font-size:0.72rem; margin-top:1px;">Materiales</div>
+                </div>
+                <div style="background:#e3f2fd; border-radius:6px; padding:8px 12px; border-left:3px solid #2980b9;">
+                    <div style="font-size:1.4rem; font-weight:bold; color:#1a5276;" id="res-clientes">0</div>
+                    <div style="color:#666; font-size:0.72rem; margin-top:1px;">Clientes</div>
+                </div>
+                <div style="background:#fce4ec; border-radius:6px; padding:8px 12px; border-left:3px solid #c0392b;">
+                    <div style="font-size:1.4rem; font-weight:bold; color:#922b21;" id="res-ubicaciones">0</div>
+                    <div style="color:#666; font-size:0.72rem; margin-top:1px;">Ubicaciones</div>
+                </div>
+            </div>
+
+            <!-- Coeficiente de Complejidad -->
+            <div id="res-ic-bloque"
+                 style="border-radius:6px; padding:10px 14px; border-left:4px solid #ccc;
+                        transition: background 0.3s, border-color 0.3s;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                    <div style="font-size:0.75rem; color:#555; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">
+                        <i class="fas fa-chart-line"></i>&nbsp; Coeficiente de Complejidad
+                    </div>
+                    <span id="res-ic-nivel"
+                          style="font-size:0.7rem; font-weight:bold; color:white;
+                                 padding:1px 8px; border-radius:10px;">—</span>
+                </div>
+                <div style="display:flex; align-items:baseline; gap:6px;">
+                    <div id="res-ic-valor" style="font-size:1.9rem; font-weight:bold;">0.0</div>
+                    <div style="color:#888; font-size:0.75rem;">/ 10</div>
+                </div>
+                <div style="margin-top:6px; background:rgba(0,0,0,0.08); border-radius:4px; height:5px; overflow:hidden;">
+                    <div id="res-ic-barra" style="height:100%; width:0%; border-radius:4px; transition:width 0.4s ease;"></div>
+                </div>
+                <div style="margin-top:4px; color:#777; font-size:0.68rem;">
+                    Ponderado: unidades&nbsp;30% · materiales&nbsp;25% · ubicaciones&nbsp;25% · clientes&nbsp;20%
+                </div>
+            </div>
+        </div>
+
+        <div style="padding:10px 18px; border-top:1px solid #eee; display:flex;
+                    justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+            <button onclick="cerrarResumenPreparar()"
+                    style="background:#95a5a6; color:white; border:none; padding:7px 14px;
+                           border-radius:4px; cursor:pointer; font-size:0.8rem;">
+                <i class="fas fa-times"></i> Cancelar
+            </button>
+            <div style="display:flex; gap:7px; flex-wrap:wrap;">
+                <button id="btnPrepDirecta" onclick="confirmarPreparar('directa')"
+                        style="background:#6c3483; color:white; border:none; padding:7px 12px;
+                               border-radius:4px; cursor:pointer; font-size:0.8rem; font-weight:bold;">
+                    <i class="fas fa-bolt"></i> Preparación directa
+                </button>
+                <button id="btnPrepCliente" onclick="confirmarPreparar('cliente')"
+                        style="background:#2980b9; color:white; border:none; padding:7px 12px;
+                               border-radius:4px; cursor:pointer; font-size:0.8rem; font-weight:bold;">
+                    <i class="fas fa-user-tag"></i> Por cliente
+                </button>
+                <button id="btnPrepDospasos" onclick="confirmarPreparar('dospasos')"
+                        style="background:#16a085; color:white; border:none; padding:7px 12px;
+                               border-radius:4px; cursor:pointer; font-size:0.8rem; font-weight:bold;">
+                    <i class="fas fa-layer-group"></i> En dos pasos
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- ── MODAL CAMBIO DE RUTA / TRANSPORTE ──────────────────────────────── -->
+<div id="modalCambioRuta"
+     style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55);
+            z-index:9999; align-items:center; justify-content:center;">
+    <div style="background:white; border-radius:10px; width:100%; max-width:460px;
+                box-shadow:0 10px 40px rgba(0,0,0,0.25); margin:20px;">
+
+        <div style="background:#16a085; color:white; padding:14px 20px; border-radius:10px 10px 0 0;
+                    display:flex; justify-content:space-between; align-items:center;">
+            <h3 style="margin:0; font-size:1rem;">
+                <i class="fas fa-exchange-alt"></i> Cambiar Ruta / Transporte
+            </h3>
+            <button onclick="cerrarCambioRuta()"
+                    style="background:rgba(255,255,255,0.15); border:none; color:white;
+                           font-size:1.2rem; cursor:pointer; border-radius:4px; padding:2px 9px;">&times;</button>
+        </div>
+
+        <div style="padding:22px 24px;">
+            <p id="crt-subtitulo" style="margin:0 0 18px; color:#555; font-size:0.88rem;"></p>
+
+            <div style="margin-bottom:16px;">
+                <label style="display:flex; align-items:center; gap:8px; margin-bottom:6px; font-size:0.82rem; font-weight:600; color:#333;">
+                    <input type="checkbox" id="chkCambioRuta" onchange="toggleCampo('crt-ruta', this.checked)">
+                    Cambiar Ruta
+                </label>
+                <select id="crt-ruta" disabled
+                        style="width:100%; padding:6px 10px; border:1px solid #ccc; border-radius:4px;
+                               font-size:0.88rem; background:#f5f5f5; color:#aaa;">
+                    <option value="">— Sin asignar —</option>
+                    {% for r in rutas %}
+                    <option value="{{ r.id_ruta }}">{{ r.nombre_ruta }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div style="margin-bottom:8px;">
+                <label style="display:flex; align-items:center; gap:8px; margin-bottom:6px; font-size:0.82rem; font-weight:600; color:#333;">
+                    <input type="checkbox" id="chkCambioTransporte" onchange="toggleCampo('crt-transporte', this.checked)">
+                    Cambiar Transporte
+                </label>
+                <select id="crt-transporte" disabled
+                        style="width:100%; padding:6px 10px; border:1px solid #ccc; border-radius:4px;
+                               font-size:0.88rem; background:#f5f5f5; color:#aaa;">
+                    <option value="">— Sin asignar —</option>
+                    {% for t in transportes %}
+                    <option value="{{ t.id_transporte }}">{{ t.razonsocial }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div style="padding:12px 24px 18px; display:flex; justify-content:flex-end; gap:10px; border-top:1px solid #eee;">
+            <button onclick="cerrarCambioRuta()"
+                    style="background:#95a5a6; color:white; border:none; padding:8px 18px;
+                           border-radius:4px; cursor:pointer; font-size:0.88rem;">
+                Cancelar
+            </button>
+            <button id="btnAplicarCambioRuta" onclick="aplicarCambioRuta()"
+                    style="background:#16a085; color:white; border:none; padding:8px 20px;
+                           border-radius:4px; cursor:pointer; font-weight:bold; font-size:0.88rem;">
+                <i class="fas fa-check"></i> Aplicar
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+// Relaciones transporte-ruta válidas: Set de "idTransporte-idRuta"
+const relacionesTransporteRuta = new Set([
+    {% for tr in transporte_rutas %}
+    "{{ tr.id_transporte }}-{{ tr.id_ruta }}"{% if not loop.last %},{% endif %}
+    {% endfor %}
+]);
+
+function abrirCambioRutaTransporte() {
+    if (selectedRows.size === 0) {
+        alert('Seleccione al menos un pedido.');
+        return;
+    }
+    // Resetear estado del modal
+    document.getElementById('chkCambioRuta').checked = false;
+    document.getElementById('chkCambioTransporte').checked = false;
+    toggleCampo('crt-ruta', false);
+    toggleCampo('crt-transporte', false);
+    document.getElementById('crt-ruta').value = '';
+    document.getElementById('crt-transporte').value = '';
+    document.getElementById('crt-subtitulo').textContent =
+        selectedRows.size + ' pedido(s) seleccionado(s). Marque los campos a modificar:';
+    document.getElementById('modalCambioRuta').style.display = 'flex';
+}
+
+function cerrarCambioRuta() {
+    document.getElementById('modalCambioRuta').style.display = 'none';
+}
+
+function toggleCampo(id, habilitado) {
+    const sel = document.getElementById(id);
+    sel.disabled = !habilitado;
+    sel.style.background = habilitado ? 'white' : '#f5f5f5';
+    sel.style.color       = habilitado ? '#333'  : '#aaa';
+}
+
+function aplicarCambioRuta() {
+    const cambiaRuta       = document.getElementById('chkCambioRuta').checked;
+    const cambiaTransporte = document.getElementById('chkCambioTransporte').checked;
+
+    if (!cambiaRuta && !cambiaTransporte) {
+        alert('Marque al menos un campo a modificar.');
+        return;
+    }
+
+    const idRuta       = cambiaRuta       ? document.getElementById('crt-ruta').value       : null;
+    const idTransporte = cambiaTransporte ? document.getElementById('crt-transporte').value : null;
+
+    // Validar relación transporte-ruta si se modifican ambos o si ya hay uno asignado
+    if (idRuta && idTransporte) {
+        const clave = idTransporte + '-' + idRuta;
+        if (!relacionesTransporteRuta.has(clave)) {
+            const rutaNombre       = document.getElementById('crt-ruta').selectedOptions[0].text;
+            const transporteNombre = document.getElementById('crt-transporte').selectedOptions[0].text;
+            const continuar = confirm(
+                '⚠️ Advertencia: la combinación\n\n' +
+                '   Transporte: ' + transporteNombre + '\n' +
+                '   Ruta: ' + rutaNombre + '\n\n' +
+                'no está configurada en las relaciones de transporte-ruta.\n\n' +
+                '¿Desea continuar de todas formas?'
+            );
+            if (!continuar) return;
+        }
+    }
+
+    const payload = { ids: [...selectedRows.keys()] };
+    if (idRuta       !== null) payload.id_ruta       = idRuta;
+    if (idTransporte !== null) payload.id_transporte = idTransporte;
+
+    const btn = document.getElementById('btnAplicarCambioRuta');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Aplicando...';
+
+    fetch('/pedidos/cambiar_ruta_transporte', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+    })
+    .then(r => r.json())
+    .then(data => {
+        cerrarCambioRuta();
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-check"></i> Aplicar';
+        if (data.status === 'success') { alert(data.message); location.reload(); }
+        else { alert('Error: ' + data.message); }
+    })
+    .catch(err => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-check"></i> Aplicar';
+        alert('Error de conexión: ' + err);
+    });
+}
+</script>
+{% endblock %}

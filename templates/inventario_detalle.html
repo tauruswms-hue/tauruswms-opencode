@@ -1,0 +1,456 @@
+{% extends "base.html" %}
+
+{% block title %}{{ inventario.numero }}{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+
+<style>
+.inv-header {
+    background: #fff;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    align-items: center;
+    justify-content: space-between;
+}
+.inv-header-info { display: flex; flex-wrap: wrap; gap: 24px; align-items: center; }
+.inv-header-info .field { display: flex; flex-direction: column; gap: 2px; }
+.inv-header-info .field label { font-size: .72rem; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: .05em; }
+.inv-header-info .field span { font-size: .92rem; color: #333; }
+
+.badge { padding: 3px 10px; border-radius: 12px; font-size: .78rem; font-weight: 600; }
+.badge-abierto  { background: #d4edda; color: #155724; }
+.badge-cerrado  { background: #e2e3e5; color: #383d41; }
+.badge-anulado  { background: #f8d7da; color: #721c24; }
+
+.progress-bar-wrap { background: #e9ecef; border-radius: 6px; height: 8px; min-width: 140px; }
+.progress-bar-fill { background: #2980b9; border-radius: 6px; height: 8px; transition: width .3s; }
+
+/* Filtros */
+.filtros-card { background:#fff; border-radius:8px; padding:14px 20px; margin-bottom:14px; box-shadow:0 1px 4px rgba(0,0,0,.08); }
+.filtros-row { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; }
+.filtro-group { display:flex; flex-direction:column; gap:4px; min-width:140px; }
+.filtro-group label { font-size:.75rem; font-weight:600; color:#555; text-transform:uppercase; letter-spacing:.04em; }
+.filtro-group select, .filtro-group input { padding:6px 10px; border:1px solid #ccc; border-radius:5px; font-size:.9rem; background:#fafafa; }
+.btn-limpiar { padding:6px 14px; border:1px solid #aaa; border-radius:5px; background:#f0f0f0; cursor:pointer; font-size:.88rem; }
+.btn-limpiar:hover { background:#e0e0e0; }
+
+/* Tabla */
+#tablaLineas { font-size: .83rem; }
+#tablaLineas thead th { white-space: nowrap; }
+
+.input-contado {
+    width: 90px;
+    padding: 4px 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: .88rem;
+    text-align: right;
+}
+.input-contado:focus { border-color: #2980b9; outline: none; box-shadow: 0 0 0 2px rgba(41,128,185,.2); }
+.input-contado.guardado { border-color: #27ae60; background: #f0fdf4; }
+
+.btn-guardar-linea {
+    padding: 4px 10px;
+    background: #2980b9;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: .82rem;
+}
+.btn-guardar-linea:hover { background: #2471a3; }
+.btn-guardar-linea:disabled { background: #aaa; cursor: default; }
+
+.diff-pos { color: #27ae60; font-weight: 700; }
+.diff-neg { color: #c0392b; font-weight: 700; }
+.diff-zero { color: #888; }
+.text-right { text-align: right !important; }
+.text-center { text-align: center !important; }
+
+.btn-cerrar-inv {
+    padding: 8px 18px;
+    background: #e74c3c;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: .9rem;
+}
+.btn-cerrar-inv:hover { background: #c0392b; }
+.btn-anular-inv {
+    padding: 8px 18px;
+    background: #fff;
+    color: #c0392b;
+    border: 2px solid #c0392b;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: .9rem;
+}
+.btn-anular-inv:hover { background: #fdf0ef; }
+
+.resumen-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    background: #fff;
+    border-radius: 8px;
+    padding: 12px 20px;
+    margin-bottom: 14px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+}
+.resumen-item { display: flex; flex-direction: column; gap: 2px; }
+.resumen-item .r-label { font-size: .72rem; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: .04em; }
+.resumen-item .r-val { font-size: 1.1rem; font-weight: 700; color: #333; }
+.resumen-item .r-val.danger { color: #c0392b; }
+.resumen-item .r-val.success { color: #27ae60; }
+
+.toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: #27ae60;
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-size: .9rem;
+    box-shadow: 0 4px 16px rgba(0,0,0,.2);
+    z-index: 9999;
+    display: none;
+}
+.toast.error { background: #c0392b; }
+</style>
+
+<div class="materiales-container">
+
+    <!-- Cabecera del inventario -->
+    <div class="inv-header">
+        <div class="inv-header-info">
+            <div class="field">
+                <label>Número</label>
+                <span><strong>{{ inventario.numero }}</strong></span>
+            </div>
+            {% if inventario.descripcion %}
+            <div class="field">
+                <label>Descripción</label>
+                <span>{{ inventario.descripcion }}</span>
+            </div>
+            {% endif %}
+            <div class="field">
+                <label>Estado</label>
+                <span><span class="badge badge-{{ inventario.estado | lower }}">{{ inventario.estado }}</span></span>
+            </div>
+            <div class="field">
+                <label>Creado</label>
+                <span>{{ inventario.fecha_creacion.strftime('%d/%m/%Y %H:%M') if inventario.fecha_creacion else '-' }}
+                      — {{ inventario.usuario_creacion or '-' }}</span>
+            </div>
+            {% if inventario.fecha_cierre %}
+            <div class="field">
+                <label>Cerrado</label>
+                <span>{{ inventario.fecha_cierre.strftime('%d/%m/%Y %H:%M') }}
+                      — {{ inventario.usuario_cierre or '-' }}</span>
+            </div>
+            {% endif %}
+        </div>
+
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <a href="{{ url_for('inventario.listar') }}" class="btn btn-sm">
+                <i class="fas fa-arrow-left"></i> Volver
+            </a>
+            {% if inventario.estado == 'Abierto' %}
+            <form method="POST"
+                  action="{{ url_for('inventario.anular', id_inventario=inventario.id) }}"
+                  onsubmit="return confirm('¿Anular el inventario {{ inventario.numero }}? Esta acción no se puede deshacer.')">
+                <button type="submit" class="btn-anular-inv">
+                    <i class="fas fa-ban"></i> Anular
+                </button>
+            </form>
+            <form method="POST"
+                  action="{{ url_for('inventario.cerrar', id_inventario=inventario.id) }}"
+                  onsubmit="return confirm('¿Cerrar el inventario {{ inventario.numero }}? No podrá modificarse.')">
+                <button type="submit" class="btn-cerrar-inv">
+                    <i class="fas fa-lock"></i> Cerrar Inventario
+                </button>
+            </form>
+            {% endif %}
+            {% if inventario.fecha_anulacion %}
+            <span style="font-size:.82rem; color:#721c24;">
+                Anulado {{ inventario.fecha_anulacion.strftime('%d/%m/%Y %H:%M') }}
+                por {{ inventario.usuario_anulacion or '-' }}
+            </span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Resumen dinámico -->
+    <div class="resumen-bar" id="resumenBar">
+        <div class="resumen-item">
+            <span class="r-label">Total líneas</span>
+            <span class="r-val" id="rTotal">{{ lineas | length }}</span>
+        </div>
+        <div class="resumen-item">
+            <span class="r-label">Contadas</span>
+            <span class="r-val success" id="rContadas">{{ lineas | selectattr('stock_contado', 'ne', None) | list | length }}</span>
+        </div>
+        <div class="resumen-item">
+            <span class="r-label">Pendientes</span>
+            <span class="r-val" id="rPendientes">{{ lineas | selectattr('stock_contado', 'equalto', None) | list | length }}</span>
+        </div>
+        <div class="resumen-item">
+            <span class="r-label">Con diferencia</span>
+            <span class="r-val danger" id="rDiff">
+                {{ lineas | selectattr('stock_contado', 'ne', None)
+                          | selectattr('stock_contado', 'ne', 0)
+                          | list | length }}
+            </span>
+        </div>
+        <div class="resumen-item" style="margin-left:auto; align-self:center;">
+            <span class="r-label">Progreso</span>
+            <div class="progress-bar-wrap" style="min-width:200px;">
+                <div class="progress-bar-fill" id="progressFill"
+                     style="width:{% if lineas | length > 0 %}{{ ((lineas | selectattr('stock_contado', 'ne', None) | list | length) / (lineas | length) * 100) | int }}{% else %}0{% endif %}%">
+                </div>
+            </div>
+            <span id="progressPct" style="font-size:.78rem; color:#666; margin-top:2px;">
+                {% if lineas | length > 0 %}
+                {{ ((lineas | selectattr('stock_contado', 'ne', None) | list | length) / (lineas | length) * 100) | int }}%
+                {% else %}0%{% endif %}
+            </span>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="filtros-card">
+        <div class="filtros-row">
+            <div class="filtro-group">
+                <label>Búsqueda</label>
+                <input type="text" id="f_global" placeholder="Buscar...">
+            </div>
+            <div class="filtro-group">
+                <label>Estado conteo</label>
+                <select id="f_estado">
+                    <option value="">Todos</option>
+                    <option value="pendiente">Pendientes</option>
+                    <option value="contada">Contadas</option>
+                    <option value="diferencia">Con diferencia</option>
+                </select>
+            </div>
+            <button class="btn-limpiar" onclick="limpiarFiltros()">
+                <i class="fas fa-times"></i> Limpiar
+            </button>
+        </div>
+    </div>
+
+    <!-- Tabla -->
+    <div class="table-card" style="overflow-x:auto;">
+        <table id="tablaLineas" class="display cell-border hover stripe" style="width:100%">
+            <thead>
+                <tr>
+                    <th>Ubicación</th>
+                    <th>Material</th>
+                    <th>Contenedor</th>
+                    <th>Lote</th>
+                    <th>Tipo Stock</th>
+                    <th class="text-right">Stock Sistema</th>
+                    <th class="text-right">Stock Contado</th>
+                    <th class="text-right">Diferencia</th>
+                    <th>Fecha Conteo</th>
+                    <th>Usuario</th>
+                    {% if inventario.estado == 'Abierto' %}
+                    <th class="no-sort text-center">Acción</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for l in lineas %}
+                {% set contado = l.stock_contado is not none %}
+                {% set diferencia = (l.stock_contado | float - l.stock_sistema | float) if contado else none %}
+                <tr data-id="{{ l.id }}"
+                    data-sistema="{{ l.stock_sistema }}"
+                    data-estado="{{ 'diferencia' if (contado and diferencia != 0) else ('contada' if contado else 'pendiente') }}">
+                    <td>
+                        <strong>{{ l.ubicacion_codigo or '-' }}</strong><br>
+                        <small>{{ l.ubicacion_descripcion or '' }}</small>
+                    </td>
+                    <td>
+                        <strong>{{ l.material_codigo or '-' }}</strong><br>
+                        <small>{{ l.material_nombre or '' }}</small>
+                    </td>
+                    <td>{{ l.id_contenedor or '-' }}</td>
+                    <td>{{ l.lote or '-' }}</td>
+                    <td>{{ l.tipo_stock or '-' }}</td>
+                    <td class="text-right">{{ '%g' % (l.stock_sistema | float) }}</td>
+                    <td class="text-right celda-contado">
+                        {% if inventario.estado == 'Abierto' %}
+                        <input type="number" step="any" min="0"
+                               class="input-contado {% if contado %}guardado{% endif %}"
+                               value="{{ '%g' % (l.stock_contado | float) if contado else '' }}"
+                               data-id="{{ l.id }}"
+                               placeholder="—">
+                        {% else %}
+                            {{ ('%g' % (l.stock_contado | float)) if contado else '—' }}
+                        {% endif %}
+                    </td>
+                    <td class="text-right celda-diferencia">
+                        {% if contado %}
+                            {% if diferencia > 0 %}
+                            <span class="diff-pos">+{{ '%g' % diferencia }}</span>
+                            {% elif diferencia < 0 %}
+                            <span class="diff-neg">{{ '%g' % diferencia }}</span>
+                            {% else %}
+                            <span class="diff-zero">0</span>
+                            {% endif %}
+                        {% else %}
+                        —
+                        {% endif %}
+                    </td>
+                    <td class="celda-fecha">
+                        {{ l.fecha_conteo.strftime('%d/%m/%Y %H:%M') if l.fecha_conteo else '—' }}
+                    </td>
+                    <td class="celda-usuario">{{ l.usuario_conteo or '—' }}</td>
+                    {% if inventario.estado == 'Abierto' %}
+                    <td class="text-center">
+                        <button class="btn-guardar-linea" data-id="{{ l.id }}" title="Guardar conteo">
+                            <i class="fas fa-save"></i>
+                        </button>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script>
+var tabla;
+var filtroEstado = '';
+var totalLineas  = parseInt($('#rTotal').text()) || 0;
+
+$(document).ready(function () {
+    tabla = $('#tablaLineas').DataTable({
+        language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json' },
+        pageLength: 50,
+        order: [[0, 'asc']],
+        scrollX: true,
+        columnDefs: [
+            { targets: [-1], orderable: false, searchable: false },
+            { targets: [5, 6, 7], className: 'text-right' }
+        ]
+    });
+
+    $('#f_global').on('keyup', function () { tabla.search(this.value).draw(); });
+
+    $('#f_estado').on('change', function () {
+        filtroEstado = this.value;
+        tabla.draw();
+    });
+
+    // Guardar al hacer clic en el botón
+    $(document).on('click', '.btn-guardar-linea', function () {
+        var id  = $(this).data('id');
+        var inp = $('input.input-contado[data-id="' + id + '"]');
+        var val = inp.val().trim();
+        if (val === '') { showToast('Ingrese la cantidad contada.', true); return; }
+        guardarLinea(id, parseFloat(val), inp, $(this).closest('tr'));
+    });
+
+    // Guardar con Enter en el input
+    $(document).on('keydown', '.input-contado', function (e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            var id  = $(this).data('id');
+            var val = $(this).val().trim();
+            if (val === '') return;
+            guardarLinea(id, parseFloat(val), $(this), $(this).closest('tr'));
+        }
+    });
+});
+
+// Filtro personalizado por estado de conteo
+$.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
+    if (settings.nTable.id !== 'tablaLineas') return true;
+    if (!filtroEstado) return true;
+    var fila = tabla.row(dataIndex).node();
+    return fila && fila.dataset.estado === filtroEstado;
+});
+
+function limpiarFiltros() {
+    $('#f_global').val('');
+    $('#f_estado').val('');
+    filtroEstado = '';
+    tabla.search('').draw();
+}
+
+function guardarLinea(id, cantidad, $inp, $fila) {
+    $.ajax({
+        url: '/inventario/linea/' + id + '/contar',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ cantidad: cantidad }),
+        success: function (resp) {
+            if (!resp.ok) { showToast(resp.error || 'Error al guardar.', true); return; }
+
+            $inp.addClass('guardado');
+
+            var diff = resp.diferencia;
+            var diffHtml = diff > 0
+                ? '<span class="diff-pos">+' + fmtNum(diff) + '</span>'
+                : diff < 0
+                    ? '<span class="diff-neg">' + fmtNum(diff) + '</span>'
+                    : '<span class="diff-zero">0</span>';
+
+            $fila.find('.celda-diferencia').html(diffHtml);
+            $fila.find('.celda-fecha').text(resp.fecha);
+            $fila.find('.celda-usuario').text(resp.usuario);
+
+            var estado = diff !== 0 ? 'diferencia' : 'contada';
+            $fila[0].dataset.estado = estado;
+
+            tabla.row($fila[0]).invalidate().draw(false);
+            actualizarResumen();
+            showToast('Conteo guardado.');
+        },
+        error: function () { showToast('Error de conexión.', true); }
+    });
+}
+
+function fmtNum(n) { return parseFloat(n.toFixed(3)).toString(); }
+
+function actualizarResumen() {
+    var contadas    = 0;
+    var conDiff     = 0;
+    $('#tablaLineas tbody tr').each(function () {
+        var estado = this.dataset.estado;
+        if (estado === 'contada' || estado === 'diferencia') contadas++;
+        if (estado === 'diferencia') conDiff++;
+    });
+    var pendientes = totalLineas - contadas;
+    var pct = totalLineas > 0 ? Math.round(contadas / totalLineas * 100) : 0;
+
+    $('#rContadas').text(contadas);
+    $('#rPendientes').text(pendientes);
+    $('#rDiff').text(conDiff);
+    $('#progressFill').css('width', pct + '%');
+    $('#progressPct').text(pct + '%');
+}
+
+function showToast(msg, error) {
+    var $t = $('#toast');
+    $t.text(msg).toggleClass('error', !!error).fadeIn(200);
+    clearTimeout(window._toastTimer);
+    window._toastTimer = setTimeout(function () { $t.fadeOut(300); }, 2500);
+}
+</script>
+{% endblock %}

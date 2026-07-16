@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}Nueva Recepción{% endblock %}
+
+{% block content %}
+<div style="padding:20px; max-width:900px; margin:auto;">
+
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <h2><i class="fas fa-warehouse"></i> Nueva Recepción de Materiales</h2>
+        <a href="{{ url_for('recepciones.listar') }}"
+           style="background:#95a5a6; color:white; padding:10px 15px; border-radius:4px; text-decoration:none;">
+            <i class="fas fa-arrow-left"></i> Volver
+        </a>
+    </div>
+
+    <form action="{{ url_for('recepciones.guardar') }}" method="POST" id="formNuevaRecepcion">
+
+        <!-- DATOS PRINCIPALES -->
+        <div style="background:white; border-radius:8px; padding:25px; box-shadow:0 2px 10px rgba(0,0,0,0.08); margin-bottom:20px;">
+            <h4 style="margin:0 0 20px; padding-bottom:12px; border-bottom:2px solid #f6ad55; color:#1a365d;">
+                <i class="fas fa-clipboard-list"></i> Datos de la Recepción
+            </h4>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+
+                <!-- PROVEEDOR -->
+                <div>
+                    <label style="display:block; font-weight:bold; margin-bottom:6px;">
+                        Proveedor <span style="color:red;">*</span>
+                    </label>
+                    <select name="id_proveedor" id="sel_proveedor" required
+                            style="width:100%; padding:9px; border:1px solid #ddd; border-radius:4px;">
+                        <option value="">Seleccione un proveedor...</option>
+                        {% for p in proveedores %}
+                        <option value="{{ p.id }}">{{ p.codigo }} — {{ p.razonsocial }}</option>
+                        {% endfor %}
+                    </select>
+                    <small style="color:#888;">Solo se podrán agregar materiales asignados a este proveedor.</small>
+                </div>
+
+                <!-- UBICACIÓN DE RECEPCIÓN -->
+                <div>
+                    <label style="display:block; font-weight:bold; margin-bottom:6px;">
+                        Ubicación de Recepción <span style="color:red;">*</span>
+                    </label>
+                    {% if ubicaciones_recep %}
+                    <div style="position:relative; margin-bottom:6px;">
+                        <span style="position:absolute; left:9px; top:50%; transform:translateY(-50%); color:#aaa;">
+                            <i class="fas fa-search"></i>
+                        </span>
+                        <input type="text" id="buscar_ubic_recep"
+                               placeholder="Filtrar por código o nombre..."
+                               autocomplete="off"
+                               style="width:100%; padding:8px 8px 8px 32px; border:1px solid #ddd; border-radius:4px; box-sizing:border-box;"
+                               oninput="filtrarSelect('sel_ubic_recep', this.value)">
+                    </div>
+                    <select name="id_ubicacion_recep" id="sel_ubic_recep" required
+                            style="width:100%; padding:9px; border:1px solid #ddd; border-radius:4px;">
+                        <option value="">Seleccione ubicación...</option>
+                        {% for u in ubicaciones_recep %}
+                        <option value="{{ u.id }}"
+                                data-texto="{{ u.codigo }} {{ u.nombre }} {{ u.tipo }}"
+                                {% if ubicacion_default and u.id|string == ubicacion_default|string %}selected{% endif %}>
+                            {{ u.codigo }} — {{ u.nombre }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    {% else %}
+                    <div style="padding:10px; background:#fff3cd; border-radius:4px; border:1px solid #ffc107; font-size:0.9rem; color:#856404;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        No hay ubicaciones de tipo "Recepción".
+                        <a href="{{ url_for('tipoubicacion.listar') }}">Crear tipo de ubicación</a>
+                        y luego <a href="{{ url_for('ubicaciones.listar') }}">crear ubicaciones</a>.
+                    </div>
+                    <input type="hidden" name="id_ubicacion_recep" value="">
+                    {% endif %}
+                </div>
+
+                <!-- OBSERVACIONES (ancho completo) -->
+                <div style="grid-column:1/-1;">
+                    <label style="display:block; font-weight:bold; margin-bottom:6px;">
+                        Observaciones
+                    </label>
+                    <textarea name="observaciones" rows="2"
+                              placeholder="Número de remito, referencia, notas..."
+                              style="width:100%; padding:9px; border:1px solid #ddd; border-radius:4px; resize:vertical; box-sizing:border-box;"></textarea>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- INFORMACIÓN GENERADA AUTOMÁTICAMENTE -->
+        <div style="background:#eaf4fb; border-radius:8px; padding:18px 22px; margin-bottom:20px; border-left:4px solid #3498db;">
+            <p style="margin:0; color:#2c5282; font-size:0.9rem;">
+                <i class="fas fa-info-circle"></i>
+                Al guardar se generará automáticamente el <strong>número de recepción</strong> (REC-YYYY-NNNNN)
+                y el <strong>código de contenedor</strong> (RCNNNNN). Luego podrá agregar los materiales recibidos.
+            </p>
+        </div>
+
+        <!-- ACCIONES -->
+        <input type="hidden" name="redirect_to" id="redirect_to" value="ver">
+        <div style="display:flex; justify-content:flex-end; gap:12px;">
+            <a href="{{ url_for('recepciones.listar') }}"
+               style="background:#95a5a6; color:white; padding:11px 22px; border-radius:4px; text-decoration:none;">
+                Cancelar
+            </a>
+            <button type="button" onclick="submitSinMateriales()"
+                    style="background:#7f8c8d; color:white; border:none; padding:11px 22px; border-radius:4px; cursor:pointer; font-size:1rem;">
+                <i class="fas fa-save"></i> Crear sin materiales
+            </button>
+            <button type="submit"
+                    style="background:#27ae60; color:white; border:none; padding:11px 28px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:1rem;">
+                <i class="fas fa-arrow-right"></i> Crear y cargar materiales
+            </button>
+        </div>
+
+        <script>
+        function submitSinMateriales() {
+            var form = document.getElementById('formNuevaRecepcion');
+            var ubicSelect = document.getElementById('sel_ubic_recep');
+            
+            if (ubicSelect && !ubicSelect.value) {
+                alert('Debe seleccionar una ubicación de recepción.');
+                ubicSelect.focus();
+                return;
+            }
+            
+            document.getElementById('redirect_to').value = 'listar';
+            form.submit();
+        }
+        
+        document.getElementById('formNuevaRecepcion').addEventListener('submit', function(e) {
+            var ubicSelect = document.getElementById('sel_ubic_recep');
+            if (ubicSelect && !ubicSelect.value) {
+                e.preventDefault();
+                alert('Debe seleccionar una ubicación de recepción.');
+                ubicSelect.focus();
+            }
+        });
+        </script>
+
+    </form>
+</div>
+
+<script>
+function filtrarSelect(selectId, texto) {
+    const sel = document.getElementById(selectId);
+    const t = texto.toLowerCase();
+    Array.from(sel.options).forEach(opt => {
+        if (!opt.value) return; // placeholder
+        const datos = (opt.dataset.texto || opt.text).toLowerCase();
+        opt.style.display = datos.includes(t) ? '' : 'none';
+    });
+    // Si había una selección que ya no es visible, limpiarla
+    const selected = sel.options[sel.selectedIndex];
+    if (selected && selected.value && selected.style.display === 'none') {
+        sel.value = '';
+    }
+}
+</script>
+{% endblock %}

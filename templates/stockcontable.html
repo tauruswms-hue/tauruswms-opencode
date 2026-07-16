@@ -1,0 +1,745 @@
+{% extends "base.html" %}
+
+{% block title %}Stock Contable{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+
+<style>
+.filtros-card {
+    background: #fff;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+}
+.filtros-card .filtros-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: flex-end;
+}
+.filtros-card .filtro-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 160px;
+}
+.filtros-card .filtro-group label {
+    font-size: .75rem;
+    font-weight: 600;
+    color: #555;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+.filtros-card select,
+.filtros-card input[type="text"],
+.filtros-card input[type="date"] {
+    padding: 6px 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: .9rem;
+    background: #fafafa;
+}
+.filtros-card .btn-limpiar {
+    padding: 6px 14px;
+    border: 1px solid #aaa;
+    border-radius: 5px;
+    background: #f0f0f0;
+    cursor: pointer;
+    font-size: .88rem;
+    align-self: flex-end;
+}
+.filtros-card .btn-limpiar:hover { background: #e0e0e0; }
+
+/* badges inline */
+.badge { padding: 3px 8px; border-radius: 12px; font-size: .78rem; font-weight: 600; }
+.badge-success  { background: #d4edda; color: #155724; }
+.badge-warning  { background: #fff3cd; color: #856404; }
+.badge-danger   { background: #f8d7da; color: #721c24; }
+.badge-secondary{ background: #e2e3e5; color: #383d41; }
+.text-right { text-align: right; }
+
+/* dropdowns multi-select filtros */
+.chk-dropdown-trigger {
+    padding: 6px 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: .9rem;
+    background: #fafafa;
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    overflow: hidden;
+}
+.chk-dropdown-trigger span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.chk-dropdown-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: white;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    box-shadow: 0 4px 12px rgba(0,0,0,.12);
+    z-index: 1000;
+    padding: 6px 0;
+    max-height: 240px;
+    overflow-y: auto;
+    min-width: 100%;
+}
+.chk-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 12px;
+    cursor: pointer;
+    font-size: .85rem;
+    font-weight: normal;
+    text-transform: none;
+    letter-spacing: normal;
+    color: #333;
+    white-space: nowrap;
+}
+.chk-option:hover { background: #f5f5f5; }
+
+/* tabla stock */
+#tablaStock { font-size: .7rem; }
+#tablaStock thead th { white-space: nowrap; }
+#tablaStock tbody td { white-space: nowrap; }
+#tablaStock_wrapper .dataTables_scrollHead thead th { background: #f8f9fa; }
+#tablaStock_wrapper .dataTables_scrollBody td,
+#tablaStock_wrapper .dataTables_scrollHead th { font-size: 0.7rem; padding: 1px 5px; }
+#tablaStock_wrapper .dataTables_filter { margin-bottom: 8px; }
+#tablaStock_wrapper .dataTables_filter label { font-size: .82rem; }
+#tablaStock_wrapper .dataTables_filter input { margin-left: 6px; }
+
+/* Modal edición */
+#modalEditStock {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(0,0,0,.45);
+    align-items: center;
+    justify-content: center;
+}
+#modalEditStock.open { display: flex; }
+.modal-box {
+    background: #fff;
+    border-radius: 8px;
+    padding: 28px 32px;
+    width: 420px;
+    max-width: 95vw;
+    box-shadow: 0 8px 32px rgba(0,0,0,.2);
+}
+.modal-box h3 {
+    margin: 0 0 20px;
+    font-size: 1.1rem;
+    color: #333;
+}
+.modal-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 14px;
+}
+.modal-field label {
+    font-size: .78rem;
+    font-weight: 600;
+    color: #555;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+.modal-field select,
+.modal-field input {
+    padding: 7px 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: .92rem;
+}
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+}
+.btn-guardar {
+    padding: 8px 20px;
+    background: #2980b9;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: 600;
+}
+.btn-guardar:hover { background: #2471a3; }
+.btn-cancelar {
+    padding: 8px 16px;
+    background: #f0f0f0;
+    border: 1px solid #aaa;
+    border-radius: 5px;
+    cursor: pointer;
+}
+.btn-cancelar:hover { background: #e0e0e0; }
+.btn-edit-row {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #2980b9;
+    font-size: .95rem;
+    padding: 2px 6px;
+}
+.btn-edit-row:hover { color: #1a5276; }
+#modalError {
+    color: #721c24;
+    background: #f8d7da;
+    border-radius: 4px;
+    padding: 6px 10px;
+    font-size: .85rem;
+    margin-bottom: 10px;
+    display: none;
+}
+</style>
+
+<div class="materiales-container" style="padding: 0 20px 20px 20px; height: calc(100vh - 50px); display: flex; flex-direction: column;">
+    <div class="header-actions" style="display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; position: sticky; top: 0; z-index: 10; background: #f8f9fa; margin: -20px -20px 20px -20px; padding: 10px 20px 8px 20px;">
+        <h1><i class="fas fa-clipboard-list"></i> Stock Contable</h1>
+        <div style="display:flex; gap:10px; align-items:center;">
+            <div class="mat-dropdown" style="position:relative;">
+                <button onclick="toggleDropdownExportar(event)" style="background:#8e44ad; color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer; font-weight:bold;">
+                    <i class="fas fa-file-export"></i> Exportar <i class="fas fa-caret-down" style="margin-left:4px;"></i>
+                </button>
+                <div id="dropdownExportar" style="display:none; position:absolute; right:0; top:100%; margin-top:4px; background:white; border:1px solid #ddd; border-radius:4px; box-shadow:0 4px 12px rgba(0,0,0,0.15); z-index:500; min-width:160px;">
+                    <a href="{{ url_for('stockcontable.exportar', formato='csv') }}" style="display:flex; align-items:center; gap:8px; padding:10px 16px; color:#333; text-decoration:none; font-size:0.9rem; border-bottom:1px solid #f0f0f0;" onmouseenter="this.style.background='#f5f5f5'" onmouseleave="this.style.background=''"><i class="fas fa-file-csv" style="color:#27ae60; width:16px;"></i> CSV</a>
+                    <a href="{{ url_for('stockcontable.exportar', formato='xlsx') }}" style="display:flex; align-items:center; gap:8px; padding:10px 16px; color:#333; text-decoration:none; font-size:0.9rem; border-bottom:1px solid #f0f0f0;" onmouseenter="this.style.background='#f5f5f5'" onmouseleave="this.style.background=''"><i class="fas fa-file-excel" style="color:#217346; width:16px;"></i> Excel (XLSX)</a>
+                    <a href="{{ url_for('stockcontable.exportar', formato='json') }}" style="display:flex; align-items:center; gap:8px; padding:10px 16px; color:#333; text-decoration:none; font-size:0.9rem;" onmouseenter="this.style.background='#f5f5f5'" onmouseleave="this.style.background=''"><i class="fas fa-file-code" style="color:#e67e22; width:16px;"></i> JSON</a>
+                </div>
+            </div>
+            <button onclick="openModalImportar()" style="background:#3498db; color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer; font-weight:bold;">
+                <i class="fas fa-file-import"></i> Importar
+            </button>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="filtros-card" style="padding: 8px 14px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+            <button id="btnToggleFiltros" onclick="toggleFiltros()" style="background:none; border:none; cursor:pointer; font-size:.85rem; color:#555; font-weight:600; display:flex; align-items:center; gap:6px; padding:2px 0;">
+                <i class="fas fa-filter" style="color:#888;"></i>
+                <span>Filtros</span>
+                <i id="iconToggleFiltros" class="fas fa-chevron-down" style="font-size:.65rem; color:#888; transition:transform .2s;"></i>
+            </button>
+            <div id="filtros-resumen" style="font-size:.78rem; color:#777; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
+            <button class="btn-limpiar" onclick="limpiarFiltros()" style="flex-shrink:0;">
+                <i class="fas fa-times"></i> Limpiar
+            </button>
+        </div>
+        <div id="filtros-body" style="display:none; margin-top:10px;">
+            <div class="filtros-row">
+
+                <div class="filtro-group">
+                    <label>Búsqueda global</label>
+                    <input type="text" id="f_global" placeholder="Buscar...">
+                </div>
+
+                <!-- Ubicación: multi-select -->
+                <div class="filtro-group" style="position:relative;">
+                    <label>Ubicación</label>
+                    <div class="chk-dropdown-trigger" onclick="toggleStockMenu('menuUbicacion', event)">
+                        <span id="lblUbicacion">Todas</span>
+                        <i class="fas fa-chevron-down" style="font-size:.65rem; color:#888;"></i>
+                    </div>
+                    <div class="chk-dropdown-menu" id="menuUbicacion">
+                        {% for u in ubicaciones %}
+                        <label class="chk-option">
+                            <input type="checkbox" value="{{ u.codigo }}" class="chkUbicacion"> {{ u.codigo }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Material: multi-select -->
+                <div class="filtro-group" style="position:relative;">
+                    <label>Material</label>
+                    <div class="chk-dropdown-trigger" onclick="toggleStockMenu('menuMaterial', event)">
+                        <span id="lblMaterial">Todos</span>
+                        <i class="fas fa-chevron-down" style="font-size:.65rem; color:#888;"></i>
+                    </div>
+                    <div class="chk-dropdown-menu" id="menuMaterial">
+                        {% for m in materiales %}
+                        <label class="chk-option">
+                            <input type="checkbox" value="{{ m.codigo }}" class="chkMaterial"> {{ m.codigo }} — {{ m.nombre }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Tipo de Stock: multi-select -->
+                <div class="filtro-group" style="position:relative;">
+                    <label>Tipo de Stock</label>
+                    <div class="chk-dropdown-trigger" onclick="toggleStockMenu('menuTipo', event)">
+                        <span id="lblTipo">Todos</span>
+                        <i class="fas fa-chevron-down" style="font-size:.65rem; color:#888;"></i>
+                    </div>
+                    <div class="chk-dropdown-menu" id="menuTipo" style="min-width:160px;">
+                        <label class="chk-option"><input type="checkbox" value="Libre Venta" class="chkTipo"> Libre Venta</label>
+                        <label class="chk-option"><input type="checkbox" value="Calidad"     class="chkTipo"> Calidad</label>
+                        <label class="chk-option"><input type="checkbox" value="Bloqueado"   class="chkTipo"> Bloqueado</label>
+                        <label class="chk-option"><input type="checkbox" value="Mal Estado"  class="chkTipo"> Mal Estado</label>
+                    </div>
+                </div>
+
+                <div class="filtro-group">
+                    <label>Lote</label>
+                    <input type="text" id="f_lote" placeholder="Lote...">
+                </div>
+
+                <div class="filtro-group">
+                    <label>Contenedor</label>
+                    <input type="text" id="f_contenedor" placeholder="ID contenedor...">
+                </div>
+
+                <!-- Estado: multi-select -->
+                <div class="filtro-group" style="position:relative;">
+                    <label>Estado</label>
+                    <div class="chk-dropdown-trigger" onclick="toggleStockMenu('menuEstado', event)">
+                        <span id="lblEstado">Todos</span>
+                        <i class="fas fa-chevron-down" style="font-size:.65rem; color:#888;"></i>
+                    </div>
+                    <div class="chk-dropdown-menu" id="menuEstado" style="min-width:190px;">
+                        <label class="chk-option"><input type="checkbox" value="entrando"   class="chkEstado"> Con Stock Entrando</label>
+                        <label class="chk-option"><input type="checkbox" value="disponible" class="chkEstado"> Con Stock Disponible</label>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabla -->
+    <div class="table-card" style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); flex: 1; min-height: 0; overflow: auto;">
+        <table id="tablaStock" class="display cell-border hover stripe" style="width:100%">
+            <thead>
+                <tr>
+                    <th class="no-sort" style="width:40px;">Acc.</th>
+                    <th style="width:120px;">Ubicación</th>
+                    <th style="width:170px;">Material</th>
+                    <th style="width:100px;">Contenedor</th>
+                    <th style="width:95px;">Tipo Stock</th>
+                    <th style="width:90px;">Lote</th>
+                    <th style="width:90px;">Vencimiento</th>
+                    <th style="width:60px;">Total</th>
+                    <th style="width:75px;">Disponible</th>
+                    <th style="width:70px;">Entrando</th>
+                    <th style="width:70px;">Saliendo</th>
+                    <th style="width:115px;">Últ. Entrada</th>
+                    <th style="width:115px;">Últ. Salida</th>
+                    <th style="width:120px;">Últ. Movimiento</th>
+                    <th style="width:80px;">Usuario</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in stocks %}
+                {% set tiene_entrando   = s.StockEntrando   is not none and s.StockEntrando   > 0 %}
+                {% set tiene_disponible = s.StockDisponible is not none and s.StockDisponible > 0 %}
+                {% if tiene_entrando %}
+                <tr style="background:#fffde7;" data-entrando="1" data-disponible="0">
+                {% elif tiene_disponible %}
+                <tr style="background:#f0fdf4;" data-entrando="0" data-disponible="1">
+                {% else %}
+                <tr data-entrando="0" data-disponible="0">
+                {% endif %}
+                    <td style="text-align:center;">
+                        <button class="btn-edit-row" title="Editar"
+                            data-id="{{ s.ID }}"
+                            data-tipo="{{ s.TipoStock }}"
+                            data-lote="{{ s.Lote }}"
+                            data-venc="{{ s.FechaVencimiento.strftime('%Y-%m-%d') if s.FechaVencimiento else '' }}"
+                            onclick="abrirEdicion(this)">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                    </td>
+                    <td data-filter="{{ s.ubicacion_codigo or '' }}">
+                        <strong>{{ s.ubicacion_codigo or '-' }}</strong><br>
+                        <small>{{ s.ubicacion_descripcion or '' }}</small>
+                    </td>
+                    <td data-filter="{{ s.material_codigo or '' }}">
+                        <strong>{{ s.material_codigo or '-' }}</strong><br>
+                        <small>{{ s.material_nombre or '' }}</small>
+                    </td>
+                    <td>{{ s.IDContenedor }}</td>
+                    <td class="celda-tipo">
+                        {% if s.TipoStock == 'Libre Venta' %}
+                            <span class="badge badge-success">{{ s.TipoStock }}</span>
+                        {% elif s.TipoStock == 'Calidad' %}
+                            <span class="badge badge-warning">{{ s.TipoStock }}</span>
+                        {% elif s.TipoStock == 'Bloqueado' %}
+                            <span class="badge badge-danger">{{ s.TipoStock }}</span>
+                        {% else %}
+                            <span class="badge badge-secondary">{{ s.TipoStock }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="celda-lote">{{ s.Lote }}</td>
+                    <td class="celda-venc">{{ s.FechaVencimiento.strftime('%d/%m/%Y') if s.FechaVencimiento else '-' }}</td>
+                    <td class="text-right">{{ '%g' % (s.StockTotal | float) }}</td>
+                    <td class="text-right">{{ '%g' % (s.StockDisponible | float) }}</td>
+                    <td class="text-right">
+                        {% if tiene_entrando %}
+                        <strong style="color:#e67e22;">
+                            <i class="fas fa-arrow-down" style="font-size:0.75rem;"></i>
+                            {{ '%g' % (s.StockEntrando | float) }}
+                        </strong>
+                        {% else %}
+                        {{ '%g' % (s.StockEntrando | float) }}
+                        {% endif %}
+                    </td>
+                    <td class="text-right">{{ '%g' % (s.StockSaliendo | float) }}</td>
+                    <td>{{ s.UltimaEntrada.strftime('%d/%m/%Y %H:%M') if s.UltimaEntrada else '-' }}</td>
+                    <td>{{ s.UltimaSalida.strftime('%d/%m/%Y %H:%M') if s.UltimaSalida else '-' }}</td>
+                    <td class="celda-ultmov">{{ s.UltimoMovimiento.strftime('%d/%m/%Y %H:%M') if s.UltimoMovimiento else '-' }}</td>
+                    <td class="celda-usuario">{{ s.UsuarioUltimoMov or '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% include "partials/_modal_importar_stock.html" %}
+
+<!-- Modal edición stock -->
+<div id="modalEditStock">
+    <div class="modal-box">
+        <h3><i class="fas fa-edit"></i> Editar posición de stock</h3>
+        <div id="modalError"></div>
+
+        <div class="modal-field">
+            <label>Tipo de Stock</label>
+            <select id="edit_tipo">
+                <option value="Libre Venta">Libre Venta</option>
+                <option value="Calidad">Calidad</option>
+                <option value="Bloqueado">Bloqueado</option>
+                <option value="Mal Estado">Mal Estado</option>
+            </select>
+        </div>
+
+        <div class="modal-field">
+            <label>Lote</label>
+            <input type="text" id="edit_lote" maxlength="100">
+        </div>
+
+        <div class="modal-field">
+            <label>Fecha de Vencimiento</label>
+            <input type="date" id="edit_venc">
+        </div>
+
+        <div class="modal-actions">
+            <button class="btn-cancelar" onclick="cerrarModal()">Cancelar</button>
+            <button class="btn-guardar" onclick="guardarEdicion()">
+                <i class="fas fa-save"></i> Guardar
+            </button>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="{{ url_for('static', filename='js/batch_ui.js') }}"></script>
+<script>
+var tabla;
+var filaEditando = null;   // fila <tr> del DOM
+var idEditando   = null;   // ID de la posición
+
+// Índices de columna para cada filtro
+var COL_UBICACION  = 1;
+var COL_MATERIAL   = 2;
+var COL_CONTENEDOR = 3;
+var COL_TIPO       = 4;
+var COL_LOTE       = 5;
+
+$(document).ready(function () {
+    tabla = $('#tablaStock').DataTable({
+        language: {
+            sProcessing:   "Procesando...",
+            sLengthMenu:   "Mostrar _MENU_ registros",
+            sZeroRecords:  "No se encontraron resultados",
+            sEmptyTable:   "Ningún dato disponible",
+            sInfo:         "Mostrando _START_ a _END_ de _TOTAL_ registros",
+            sInfoEmpty:    "Mostrando 0 a 0 de 0 registros",
+            sInfoFiltered: "(filtrado de _MAX_ registros totales)",
+            sSearch:       "Buscar:",
+            sLoadingRecords: "Cargando...",
+            oPaginate: {
+                sFirst:    "Primero",
+                sLast:     "Último",
+                sNext:     "Siguiente",
+                sPrevious: "Anterior"
+            }
+        },
+        pageLength: 25,
+        order: [[1, 'asc']],
+        scrollX: true,
+        autoWidth: false,
+        columnDefs: [
+            {
+                targets: [1, 2, 4],
+                render: function(data, type, row, meta) {
+                    if (type === 'filter' || type === 'sort') {
+                        var tmp = document.createElement('div');
+                        tmp.innerHTML = data;
+                        return tmp.textContent || tmp.innerText || '';
+                    }
+                    return data;
+                }
+            },
+            { targets: [7, 8, 9, 10], className: 'text-right' },
+            { targets: [0], orderable: false, searchable: false }
+        ]
+    });
+
+    $('#f_global').on('keyup', function () {
+        tabla.search(this.value).draw();
+    });
+
+    $('#f_lote').on('keyup', function () {
+        tabla.column(COL_LOTE).search(this.value).draw();
+    });
+
+    $('#f_contenedor').on('keyup', function () {
+        tabla.column(COL_CONTENEDOR).search(this.value).draw();
+    });
+
+    // Eventos checkboxes → redibujar
+    $(document).on('change', '.chkUbicacion', function () {
+        actualizarLabel('chkUbicacion', 'lblUbicacion', 'Todas');
+        tabla.draw();
+    });
+    $(document).on('change', '.chkMaterial', function () {
+        actualizarLabel('chkMaterial', 'lblMaterial', 'Todos');
+        tabla.draw();
+    });
+    $(document).on('change', '.chkTipo', function () {
+        actualizarLabel('chkTipo', 'lblTipo', 'Todos');
+        tabla.draw();
+    });
+    $(document).on('change', '.chkEstado', function () {
+        actualizarLabel('chkEstado', 'lblEstado', 'Todos', 2);
+        tabla.draw();
+    });
+
+    // Cerrar menús al hacer clic fuera
+    $(document).on('click', function(e) {
+        if (!$(e.target).closest('.chk-dropdown-trigger, .chk-dropdown-menu').length) {
+            $('.chk-dropdown-menu').hide();
+        }
+    });
+
+    // Cerrar modal al hacer clic fuera del cuadro
+    $('#modalEditStock').on('click', function(e) {
+        if (e.target === this) cerrarModal();
+    });
+});
+
+// ── Helpers dropdowns ────────────────────────────────────────────────────────
+
+window.toggleStockMenu = function(menuId, e) {
+    e.stopPropagation();
+    var menus = ['menuUbicacion','menuMaterial','menuTipo','menuEstado'];
+    menus.forEach(function(id) {
+        if (id !== menuId) $('#' + id).hide();
+    });
+    var $m = $('#' + menuId);
+    $m.toggle();
+};
+
+function getCheckedValues(cls) {
+    return Array.from(document.querySelectorAll('.' + cls + ':checked')).map(function(c) { return c.value; });
+}
+
+function actualizarLabel(cls, lblId, allText, total) {
+    var sel = getCheckedValues(cls);
+    var tot = total || document.querySelectorAll('.' + cls).length;
+    var span = document.getElementById(lblId);
+    if (sel.length === 0)        span.textContent = allText;
+    else if (sel.length === tot) span.textContent = allText;
+    else                         span.textContent = sel.join(', ');
+}
+
+// ── Filtro personalizado (checkboxes) ────────────────────────────────────────
+
+$.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
+    if (settings.nTable.id !== 'tablaStock') return true;
+
+    // Ubicación (col 1, data-filter = codigo)
+    var ubics = getCheckedValues('chkUbicacion');
+    if (ubics.length > 0 && !ubics.includes(data[COL_UBICACION].trim())) return false;
+
+    // Material (col 2, data-filter = codigo)
+    var mats = getCheckedValues('chkMaterial');
+    if (mats.length > 0 && !mats.includes(data[COL_MATERIAL].trim())) return false;
+
+    // Tipo de Stock (col 4)
+    var tipos = getCheckedValues('chkTipo');
+    if (tipos.length > 0 && !tipos.some(function(v) { return data[COL_TIPO].indexOf(v) !== -1; })) return false;
+
+    // Estado entrando/disponible
+    var estados = getCheckedValues('chkEstado');
+    if (estados.length > 0) {
+        var fila = tabla.row(dataIndex).node();
+        if (!fila) return true;
+        var ok = estados.some(function(v) {
+            if (v === 'entrando')   return fila.dataset.entrando   === '1';
+            if (v === 'disponible') return fila.dataset.disponible === '1';
+            return false;
+        });
+        if (!ok) return false;
+    }
+
+    return true;
+});
+
+function limpiarFiltros() {
+    $('#f_global, #f_lote, #f_contenedor').val('');
+    document.querySelectorAll('.chkUbicacion, .chkMaterial, .chkTipo, .chkEstado').forEach(function(c) {
+        c.checked = false;
+    });
+    ['lblUbicacion','lblMaterial','lblTipo','lblEstado'].forEach(function(id) {
+        var defaults = {lblUbicacion:'Todas', lblMaterial:'Todos', lblTipo:'Todos', lblEstado:'Todos'};
+        document.getElementById(id).textContent = defaults[id];
+    });
+    document.getElementById('filtros-resumen').textContent = '';
+    tabla.search('').columns().search('').draw();
+}
+
+// ── Edición inline ──────────────────────────────────────────────────────────
+
+function abrirEdicion(btn) {
+    idEditando   = btn.dataset.id;
+    filaEditando = btn.closest('tr');
+
+    $('#edit_tipo').val(btn.dataset.tipo);
+    $('#edit_lote').val(btn.dataset.lote);
+    $('#edit_venc').val(btn.dataset.venc);
+    $('#modalError').hide().text('');
+
+    $('#modalEditStock').addClass('open');
+    $('#edit_lote').focus();
+}
+
+function cerrarModal() {
+    $('#modalEditStock').removeClass('open');
+    filaEditando = null;
+    idEditando   = null;
+}
+
+function badgeHtml(tipo) {
+    var clases = {
+        'Libre Venta': 'badge-success',
+        'Calidad':     'badge-warning',
+        'Bloqueado':   'badge-danger'
+    };
+    var cls = clases[tipo] || 'badge-secondary';
+    return '<span class="badge ' + cls + '">' + tipo + '</span>';
+}
+
+function guardarEdicion() {
+    var tipo  = $('#edit_tipo').val();
+    var lote  = $('#edit_lote').val().trim();
+    var venc  = $('#edit_venc').val();
+
+    if (!lote) {
+        mostrarError('El lote no puede estar vacío.');
+        return;
+    }
+
+    $.ajax({
+        url: '/stockcontable/editar/' + idEditando,
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ tipo_stock: tipo, lote: lote, fecha_vencimiento: venc }),
+        success: function(resp) {
+            if (!resp.ok) {
+                mostrarError(resp.error || 'Error desconocido.');
+                return;
+            }
+
+            // Actualizar celdas de la fila en el DOM
+            var fila = $(filaEditando);
+            fila.find('.celda-tipo').html(badgeHtml(resp.tipo_stock));
+            fila.find('.celda-lote').text(resp.lote);
+            fila.find('.celda-venc').text(resp.fecha_vencimiento);
+            fila.find('.celda-ultmov').text(resp.ultimo_movimiento);
+            fila.find('.celda-usuario').text(resp.usuario);
+
+            // Actualizar data-* del botón para que próxima edición tenga valores frescos
+            var btnEdit = fila.find('.btn-edit-row')[0];
+            btnEdit.dataset.tipo = resp.tipo_stock;
+            btnEdit.dataset.lote = resp.lote;
+            btnEdit.dataset.venc = $('#edit_venc').val();  // formato YYYY-MM-DD
+
+            // Invalidar fila en DataTables para que sort/search refleje los nuevos valores
+            tabla.row(filaEditando).invalidate().draw(false);
+
+            cerrarModal();
+        },
+        error: function(xhr) {
+            var msg = 'Error al guardar.';
+            try { msg = xhr.responseJSON.error || msg; } catch(e) {}
+            mostrarError(msg);
+        }
+    });
+}
+
+function mostrarError(msg) {
+    $('#modalError').text(msg).show();
+}
+
+// ── Panel de filtros colapsable ──────────────────────────────────────────────
+
+var filtrosAbiertos = false;
+
+window.toggleFiltros = function() {
+    filtrosAbiertos = !filtrosAbiertos;
+    var body  = document.getElementById('filtros-body');
+    var icono = document.getElementById('iconToggleFiltros');
+    if (filtrosAbiertos) {
+        body.style.display = 'block';
+        icono.style.transform = 'rotate(180deg)';
+    } else {
+        body.style.display = 'none';
+        icono.style.transform = 'rotate(0deg)';
+    }
+    tabla.columns.adjust().draw(false);
+};
+
+function actualizarResumen() {
+    var partes = [];
+    var global = $('#f_global').val().trim();
+    if (global) partes.push('Búsqueda: "' + global + '"');
+    var ubs = getCheckedValues('chkUbicacion');
+    if (ubs.length) partes.push('Ubic: ' + ubs.join(', '));
+    var mats = getCheckedValues('chkMaterial');
+    if (mats.length) partes.push('Mat: ' + mats.join(', '));
+    var tipos = getCheckedValues('chkTipo');
+    if (tipos.length) partes.push('Tipo: ' + tipos.join(', '));
+    var lote = $('#f_lote').val().trim();
+    if (lote) partes.push('Lote: ' + lote);
+    var cont = $('#f_contenedor').val().trim();
+    if (cont) partes.push('Cont: ' + cont);
+    var estados = getCheckedValues('chkEstado');
+    if (estados.length) partes.push(estados.join(', '));
+    document.getElementById('filtros-resumen').textContent = partes.length ? partes.join(' · ') : '';
+}
+
+// Actualizar resumen al cambiar filtros
+$(document).on('keyup', '#f_global, #f_lote, #f_contenedor', actualizarResumen);
+$(document).on('change', '.chkUbicacion, .chkMaterial, .chkTipo, .chkEstado', actualizarResumen);
+</script>
+{% endblock %}

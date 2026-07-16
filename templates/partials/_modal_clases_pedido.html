@@ -1,0 +1,32 @@
+<div id="modalClasesPedido" class="modal-overlay">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3 id="modalClaseTitle">Nueva Clase de Pedido</h3>
+            <button class="close-btn" onclick="closeModalClase()">&times;</button>
+        </div>
+        <form action="{{ url_for('clases_pedido.guardar') }}" method="POST" id="formClasesPedido">
+            <input type="hidden" name="id_clase" id="form_id_clase">
+
+            <div class="modal-scroll-body">
+                <div class="form-section">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Nombre *</label>
+                            <input type="text" name="nombre" id="form_clase_nombre" required maxlength="100">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label><input type="checkbox" name="activo" id="form_clase_activo" checked> Activa</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn-sec" onclick="closeModalClase()">Cancelar</button>
+                <button type="submit" class="btn-pri">Guardar</button>
+            </div>
+        </form>
+    </div>
+</div>

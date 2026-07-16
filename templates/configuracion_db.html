@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block title %}Configuración de Base de Datos{% endblock %}
+
+{% block content %}
+<div class="parametros-container">
+    <!-- Sidebar de configuración -->
+    <aside class="params-sidebar">
+        <div class="params-sidebar-header">
+            <i class="fas fa-cogs"></i>
+            <span>Configuración</span>
+        </div>
+        <nav class="params-nav">
+            <a href="{{ url_for('index') }}" class="params-nav-link">
+                <i class="fas fa-tachometer-alt"></i>
+                Panel de Control
+            </a>
+            <a href="{{ url_for('parametros') }}" class="params-nav-link">
+                <i class="fas fa-sliders-h"></i>
+                Configuración general
+            </a>
+            <a href="{{ url_for('configuracion_db') }}" class="params-nav-link active">
+                <i class="fas fa-database"></i>
+                Configuración de Base de Datos
+            </a>
+        </nav>
+    </aside>
+
+    <!-- Contenido principal -->
+    <main class="params-content">
+        <header class="params-header">
+            <h1><i class="fas fa-database"></i> Configuración de Base de Datos</h1>
+            <p>Visualiza la configuración actual de la conexión a la base de datos MySQL.</p>
+        </header>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash flash-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="params-form">
+            <!-- Sección: Parámetros de Conexión -->
+            <section class="params-section">
+                <h3><i class="fas fa-plug"></i> Parámetros de Conexión MySQL</h3>
+                <div class="params-grid">
+                    <div class="params-field view-only">
+                        <label for="db_host">
+                            <i class="fas fa-server"></i> Host / Servidor
+                        </label>
+                        <input type="text" id="db_host" value="{{ db_config.DB_HOST }}" readonly>
+                        <small class="field-hint">Valor del archivo .env</small>
+                    </div>
+                    <div class="params-field view-only">
+                        <label for="db_port">
+                            <i class="fas fa-plug"></i> Puerto
+                        </label>
+                        <input type="text" id="db_port" value="{{ db_config.DB_PORT }}" readonly>
+                        <small class="field-hint">Valor del archivo .env</small>
+                    </div>
+                    <div class="params-field view-only">
+                        <label for="db_name">
+                            <i class="fas fa-database"></i> Nombre de Base de Datos
+                        </label>
+                        <input type="text" id="db_name" value="{{ db_config.DB_NAME }}" readonly>
+                        <small class="field-hint">Valor del archivo .env</small>
+                    </div>
+                    <div class="params-field view-only">
+                        <label for="db_user">
+                            <i class="fas fa-user"></i> Usuario
+                        </label>
+                        <input type="text" id="db_user" value="{{ db_config.DB_USER }}" readonly>
+                        <small class="field-hint">Valor del archivo .env</small>
+                    </div>
+
+                    <!-- CAMPO DE CONTRASEÑA ELIMINADO - No se muestra -->
+
+                    <div class="params-field view-only">
+                        <label for="db_charset">
+                            <i class="fas fa-language"></i> Charset
+                        </label>
+                        <input type="text" id="db_charset" value="{{ db_config.DB_CHARSET }}" readonly>
+                        <small class="field-hint">Valor del archivo .env</small>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Sección: Prueba de Conexión -->
+            <section class="params-section">
+                <h3><i class="fas fa-vial"></i> Prueba de Conexión</h3>
+                <div class="db-test-container">
+                    <button type="button" id="test-db-connection" class="btn btn-test">
+                        <i class="fas fa-play"></i> Probar Conexión Actual
+                    </button>
+                    <div id="db-test-result" class="db-test-result">
+                        <!-- Resultado de la prueba aparecerá aquí -->
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+</div>
+
+<!-- Incluir el JavaScript externo -->
+<script src="{{ url_for('static', filename='js/configuracion_db.js') }}"></script>
+{% endblock %}

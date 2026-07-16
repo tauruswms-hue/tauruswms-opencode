@@ -1,0 +1,366 @@
+{
+  "tarea_picking": {
+    "fecha_generacion": "2026-04-20 21:13:01",
+    "modo": "cliente",
+    "usuario": "Admin",
+    "tenant_id": 1,
+    "ids_pedidos": [
+      4,
+      6,
+      5,
+      8
+    ]
+  },
+  "pedidos": [
+    {
+      "id_pedido": 4,
+      "nro_pedido": "PED-TEST-2026-4.000",
+      "fecha_pedido": "2026-04-13",
+      "estado": "Pendiente",
+      "direccion_entrega": "None",
+      "observaciones": "Pedido de prueba 01",
+      "cliente_codigo": "00001",
+      "cliente_nombre": "Taurus S.A.",
+      "nombre_ruta": "Zona Centro",
+      "transporte_nombre": "Transporte del Sur S.R.L.",
+      "clase_nombre": "Venta",
+      "detalle": [
+        {
+          "id_material": 1,
+          "material_codigo": "TOR-001",
+          "material_nombre": "Tornillo Phillips 4x40mm",
+          "unidad_nombre": "Unidad",
+          "cantidad": 50.0,
+          "tipo_stock": "Libre Venta"
+        },
+        {
+          "id_material": 2,
+          "material_codigo": "TOR-002",
+          "material_nombre": "Tornillo Allen 6x50mm",
+          "unidad_nombre": "Unidad",
+          "cantidad": 30.0,
+          "tipo_stock": "Libre Venta"
+        },
+        {
+          "id_material": 3,
+          "material_codigo": "TOR-003",
+          "material_nombre": "Clavo 2\" x18",
+          "unidad_nombre": "Par",
+          "cantidad": 20.0,
+          "tipo_stock": "Libre Venta"
+        }
+      ]
+    },
+    {
+      "id_pedido": 5,
+      "nro_pedido": "PED-TEST-2026-5.000",
+      "fecha_pedido": "2026-04-12",
+      "estado": "Pendiente",
+      "direccion_entrega": "None",
+      "observaciones": "Pedido de prueba 02",
+      "cliente_codigo": "CLI-001",
+      "cliente_nombre": "Supermercado El Ahorro S.A.",
+      "nombre_ruta": "Zona Centro",
+      "transporte_nombre": "Transporte del Sur S.R.L.",
+      "clase_nombre": "Venta",
+      "detalle": [
+        {
+          "id_material": 2,
+          "material_codigo": "TOR-002",
+          "material_nombre": "Tornillo Allen 6x50mm",
+          "unidad_nombre": "Unidad",
+          "cantidad": 100.0,
+          "tipo_stock": "Libre Venta"
+        },
+        {
+          "id_material": 4,
+          "material_codigo": "TOR-004",
+          "material_nombre": "Tarugo plástico 6mm",
+          "unidad_nombre": "Unidad",
+          "cantidad": 45.0,
+          "tipo_stock": "Libre Venta"
+        }
+      ]
+    },
+    {
+      "id_pedido": 6,
+      "nro_pedido": "PED-TEST-2026-6.000",
+      "fecha_pedido": "2026-04-12",
+      "estado": "Pendiente",
+      "direccion_entrega": null,
+      "observaciones": "Pedido de prueba 03",
+      "cliente_codigo": "CLI-002",
+      "cliente_nombre": "Mini Market Los Álamos",
+      "nombre_ruta": "Zona Centro",
+      "transporte_nombre": "Transporte del Sur S.R.L.",
+      "clase_nombre": "Venta",
+      "detalle": [
+        {
+          "id_material": 5,
+          "material_codigo": "HER-001",
+          "material_nombre": "Martillo 500g",
+          "unidad_nombre": "Unidad",
+          "cantidad": 80.0,
+          "tipo_stock": "Libre Venta"
+        },
+        {
+          "id_material": 1,
+          "material_codigo": "TOR-001",
+          "material_nombre": "Tornillo Phillips 4x40mm",
+          "unidad_nombre": "Unidad",
+          "cantidad": 25.0,
+          "tipo_stock": "Libre Venta"
+        },
+        {
+          "id_material": 2,
+          "material_codigo": "TOR-002",
+          "material_nombre": "Tornillo Allen 6x50mm",
+          "unidad_nombre": "Unidad",
+          "cantidad": 60.0,
+          "tipo_stock": "Libre Venta"
+        },
+        {
+          "id_material": 3,
+          "material_codigo": "TOR-003",
+          "material_nombre": "Clavo 2\" x18",
+          "unidad_nombre": "Par",
+          "cantidad": 15.0,
+          "tipo_stock": "Libre Venta"
+        }
+      ]
+    },
+    {
+      "id_pedido": 8,
+      "nro_pedido": "PED-TEST-2026-8.000",
+      "fecha_pedido": "2026-04-11",
+      "estado": "Pendiente",
+      "direccion_entrega": null,
+      "observaciones": "Pedido de prueba 05",
+      "cliente_codigo": "CLI-004",
+      "cliente_nombre": "Distribuidora del Sur S.R.L.",
+      "nombre_ruta": "NorOeste (San Miguel, Bella Vista, Don Torcuato)",
+      "transporte_nombre": null,
+      "clase_nombre": "Venta",
+      "detalle": [
+        {
+          "id_material": 5,
+          "material_codigo": "HER-001",
+          "material_nombre": "Martillo 500g",
+          "unidad_nombre": "Unidad",
+          "cantidad": 55.0,
+          "tipo_stock": "Libre Venta"
+        },
+        {
+          "id_material": 1,
+          "material_codigo": "TOR-001",
+          "material_nombre": "Tornillo Phillips 4x40mm",
+          "unidad_nombre": "Unidad",
+          "cantidad": 120.0,
+          "tipo_stock": "Libre Venta"
+        },
+        {
+          "id_material": 4,
+          "material_codigo": "TOR-004",
+          "material_nombre": "Tarugo plástico 6mm",
+          "unidad_nombre": "Unidad",
+          "cantidad": 35.0,
+          "tipo_stock": "Libre Venta"
+        }
+      ]
+    }
+  ],
+  "ubicaciones_picking": [
+    {
+      "id": 4,
+      "codigo": "A-01-02",
+      "descripcion": "Pasillo A, Rack 01, Nivel 2",
+      "tipo_ubicacion": "Rack selectivo",
+      "id_tipo": 6,
+      "zona_codigo": "ZONA_A",
+      "zona_nombre": "ZONA_A",
+      "orden_picking": null
+    },
+    {
+      "id": 5,
+      "codigo": "A-02-01",
+      "descripcion": "Pasillo A, Rack 02, Nivel 1",
+      "tipo_ubicacion": "Rack selectivo",
+      "id_tipo": 6,
+      "zona_codigo": "ZONA_A",
+      "zona_nombre": "ZONA_A",
+      "orden_picking": null
+    },
+    {
+      "id": 6,
+      "codigo": "B-01-01",
+      "descripcion": "Pasillo B, Rack 01, Nivel 1",
+      "tipo_ubicacion": "Rack selectivo",
+      "id_tipo": 6,
+      "zona_codigo": "ZONA_B",
+      "zona_nombre": "ZONA_B",
+      "orden_picking": null
+    },
+    {
+      "id": 7,
+      "codigo": "B-01-02",
+      "descripcion": "Pasillo B, Rack 01, Nivel 2",
+      "tipo_ubicacion": "Rack selectivo",
+      "id_tipo": 6,
+      "zona_codigo": "ZONA_B",
+      "zona_nombre": "ZONA_B",
+      "orden_picking": null
+    },
+    {
+      "id": 3,
+      "codigo": "A-01-01",
+      "descripcion": "Pasillo A, Rack 01, Nivel 1",
+      "tipo_ubicacion": "Rack selectivo",
+      "id_tipo": 6,
+      "zona_codigo": "ZONA_A",
+      "zona_nombre": "ZONA_A",
+      "orden_picking": 0
+    }
+  ],
+  "stock_picking": [
+    {
+      "id_ubicacion": 4,
+      "ubicacion_codigo": "A-01-02",
+      "ubicacion_descripcion": "Pasillo A, Rack 01, Nivel 2",
+      "id_material": 2,
+      "material_codigo": "TOR-002",
+      "material_nombre": "Tornillo Allen 6x50mm",
+      "id_contenedor": "CONT-A102",
+      "lote": "UNICO",
+      "tipo_stock": "Libre Venta",
+      "stock_total": 250.0,
+      "stock_disponible": 250.0,
+      "fecha_vencimiento": null
+    },
+    {
+      "id_ubicacion": 4,
+      "ubicacion_codigo": "A-01-02",
+      "ubicacion_descripcion": "Pasillo A, Rack 01, Nivel 2",
+      "id_material": 3,
+      "material_codigo": "TOR-003",
+      "material_nombre": "Clavo 2\" x18",
+      "id_contenedor": "CONT-A102",
+      "lote": "UNICO",
+      "tipo_stock": "Libre Venta",
+      "stock_total": 300.0,
+      "stock_disponible": 300.0,
+      "fecha_vencimiento": null
+    },
+    {
+      "id_ubicacion": 5,
+      "ubicacion_codigo": "A-02-01",
+      "ubicacion_descripcion": "Pasillo A, Rack 02, Nivel 1",
+      "id_material": 3,
+      "material_codigo": "TOR-003",
+      "material_nombre": "Clavo 2\" x18",
+      "id_contenedor": "CONT-A201",
+      "lote": "UNICO",
+      "tipo_stock": "Libre Venta",
+      "stock_total": 300.0,
+      "stock_disponible": 300.0,
+      "fecha_vencimiento": null
+    },
+    {
+      "id_ubicacion": 5,
+      "ubicacion_codigo": "A-02-01",
+      "ubicacion_descripcion": "Pasillo A, Rack 02, Nivel 1",
+      "id_material": 4,
+      "material_codigo": "TOR-004",
+      "material_nombre": "Tarugo plástico 6mm",
+      "id_contenedor": "CONT-A201",
+      "lote": "UNICO",
+      "tipo_stock": "Libre Venta",
+      "stock_total": 300.0,
+      "stock_disponible": 300.0,
+      "fecha_vencimiento": null
+    },
+    {
+      "id_ubicacion": 6,
+      "ubicacion_codigo": "B-01-01",
+      "ubicacion_descripcion": "Pasillo B, Rack 01, Nivel 1",
+      "id_material": 5,
+      "material_codigo": "HER-001",
+      "material_nombre": "Martillo 500g",
+      "id_contenedor": "CONT-B101",
+      "lote": "UNICO",
+      "tipo_stock": "Libre Venta",
+      "stock_total": 300.0,
+      "stock_disponible": 300.0,
+      "fecha_vencimiento": null
+    },
+    {
+      "id_ubicacion": 6,
+      "ubicacion_codigo": "B-01-01",
+      "ubicacion_descripcion": "Pasillo B, Rack 01, Nivel 1",
+      "id_material": 4,
+      "material_codigo": "TOR-004",
+      "material_nombre": "Tarugo plástico 6mm",
+      "id_contenedor": "CONT-B101",
+      "lote": "UNICO",
+      "tipo_stock": "Libre Venta",
+      "stock_total": 250.0,
+      "stock_disponible": 250.0,
+      "fecha_vencimiento": null
+    },
+    {
+      "id_ubicacion": 7,
+      "ubicacion_codigo": "B-01-02",
+      "ubicacion_descripcion": "Pasillo B, Rack 01, Nivel 2",
+      "id_material": 5,
+      "material_codigo": "HER-001",
+      "material_nombre": "Martillo 500g",
+      "id_contenedor": "CONT-B102",
+      "lote": "UNICO",
+      "tipo_stock": "Libre Venta",
+      "stock_total": 200.0,
+      "stock_disponible": 200.0,
+      "fecha_vencimiento": null
+    },
+    {
+      "id_ubicacion": 7,
+      "ubicacion_codigo": "B-01-02",
+      "ubicacion_descripcion": "Pasillo B, Rack 01, Nivel 2",
+      "id_material": 1,
+      "material_codigo": "TOR-001",
+      "material_nombre": "Tornillo Phillips 4x40mm",
+      "id_contenedor": "CONT-B102",
+      "lote": "UNICO",
+      "tipo_stock": "Libre Venta",
+      "stock_total": 150.0,
+      "stock_disponible": 150.0,
+      "fecha_vencimiento": null
+    },
+    {
+      "id_ubicacion": 3,
+      "ubicacion_codigo": "A-01-01",
+      "ubicacion_descripcion": "Pasillo A, Rack 01, Nivel 1",
+      "id_material": 1,
+      "material_codigo": "TOR-001",
+      "material_nombre": "Tornillo Phillips 4x40mm",
+      "id_contenedor": "CONT-A101",
+      "lote": "UNICO",
+      "tipo_stock": "Libre Venta",
+      "stock_total": 500.0,
+      "stock_disponible": 500.0,
+      "fecha_vencimiento": null
+    },
+    {
+      "id_ubicacion": 3,
+      "ubicacion_codigo": "A-01-01",
+      "ubicacion_descripcion": "Pasillo A, Rack 01, Nivel 1",
+      "id_material": 2,
+      "material_codigo": "TOR-002",
+      "material_nombre": "Tornillo Allen 6x50mm",
+      "id_contenedor": "CONT-A101",
+      "lote": "UNICO",
+      "tipo_stock": "Libre Venta",
+      "stock_total": 250.0,
+      "stock_disponible": 250.0,
+      "fecha_vencimiento": null
+    }
+  ]
+}

@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block content %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+
+<div style="padding: 20px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2><i class="fas fa-truck"></i> Transportes y Expresos</h2>
+        <div style="display:flex; gap:10px; align-items:center;">
+            <div class="mat-dropdown" style="position:relative;">
+                <button onclick="toggleDropdownExportar(event)" style="background:#8e44ad; color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer; font-weight:bold;">
+                    <i class="fas fa-file-export"></i> Exportar <i class="fas fa-caret-down" style="margin-left:4px;"></i>
+                </button>
+                <div id="dropdownExportar" style="display:none; position:absolute; right:0; top:100%; margin-top:4px; background:white; border:1px solid #ddd; border-radius:4px; box-shadow:0 4px 12px rgba(0,0,0,0.15); z-index:500; min-width:160px;">
+                    <a href="{{ url_for('transportes.exportar', formato='csv') }}" style="display:flex; align-items:center; gap:8px; padding:10px 16px; color:#333; text-decoration:none; font-size:0.9rem; border-bottom:1px solid #f0f0f0;" onmouseenter="this.style.background='#f5f5f5'" onmouseleave="this.style.background=''"><i class="fas fa-file-csv" style="color:#27ae60; width:16px;"></i> CSV</a>
+                    <a href="{{ url_for('transportes.exportar', formato='xlsx') }}" style="display:flex; align-items:center; gap:8px; padding:10px 16px; color:#333; text-decoration:none; font-size:0.9rem; border-bottom:1px solid #f0f0f0;" onmouseenter="this.style.background='#f5f5f5'" onmouseleave="this.style.background=''"><i class="fas fa-file-excel" style="color:#217346; width:16px;"></i> Excel (XLSX)</a>
+                    <a href="{{ url_for('transportes.exportar', formato='json') }}" style="display:flex; align-items:center; gap:8px; padding:10px 16px; color:#333; text-decoration:none; font-size:0.9rem;" onmouseenter="this.style.background='#f5f5f5'" onmouseleave="this.style.background=''"><i class="fas fa-file-code" style="color:#e67e22; width:16px;"></i> JSON</a>
+                </div>
+            </div>
+            <button onclick="openModalImportar()" style="background:#3498db; color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer; font-weight:bold;">
+                <i class="fas fa-file-import"></i> Importar
+            </button>
+            <button class="btn-add" onclick="openModal()" style="background: #27ae60; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                <i class="fas fa-plus"></i> Nuevo Transporte
+            </button>
+        </div>
+    </div>
+
+    <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+        <table id="tablaTransportes" class="display cell-border hover stripe" style="width:100%">
+            <thead>
+                <tr>
+                    <th>Código</th>
+                    <th>Razón Social</th>
+                    <th>CUIT</th>
+                    <th>Contacto</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in transportes %}
+                <tr>
+                    <td><code>{{ t.codigo }}</code></td>
+                    <td><strong>{{ t.razonsocial }}</strong></td>
+                    <td>{{ t.cuit or '-' }}</td>
+                    <td>{{ t.telefono or '' }} <br> <small>{{ t.email or '' }}</small></td>
+                    <td>
+                        <span style="padding: 4px 8px; border-radius: 12px; font-size: 0.8rem; background: {{ '#d4edda' if t.activo else '#f8d7da' }}; color: {{ '#155724' if t.activo else '#721c24' }};">
+                            {{ 'Activo' if t.activo else 'Inactivo' }}
+                        </span>
+                    </td>
+                    <td style="text-align: center;">
+                        <button onclick='editTransporte({{ t | tojson }})' style="color: #3498db; background: none; border: none; cursor: pointer; font-size: 1.1rem;">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% include "partials/_modal_transportes.html" %}
+{% include "partials/_modal_importar_transportes.html" %}
+
+<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script>
+    const listaRutasDB = {{ rutas_lista | tojson }};
+    const relacionesExistentes = {{ relaciones | tojson }};
+    const muelles = {{ muelles | tojson }};
+</script>
+<script src="{{ url_for('static', filename='js/transportes.js') }}"></script>
+<script src="{{ url_for('static', filename='js/batch_ui.js') }}"></script>
+{% endblock %}

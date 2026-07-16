@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block content %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/fixedheader/3.4.0/css/fixedHeader.dataTables.min.css">
+<style>
+#tablaClientes_wrapper .dataTables_scrollHead thead th { background: #f8f9fa; }
+        #tablaClientes_wrapper .dataTables_scrollBody td,
+        #tablaClientes_wrapper .dataTables_scrollHead th { font-size: 0.9rem; padding: 3px 5px; }
+</style>
+
+<div class="clientes-container" style="padding: 0 20px 20px 20px; height: calc(100vh - 50px); display: flex; flex-direction: column;">
+    <div class="header-actions" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-shrink: 0; position: sticky; top: 0; z-index: 10; background: #f8f9fa; margin: -20px -20px 20px -20px; padding: 10px 20px 8px 20px;">
+        <h1><i class="fas fa-users"></i> Gestión de Clientes</h1>
+        <div style="display:flex; gap:10px; align-items:center;">
+            <div class="mat-dropdown" style="position:relative;">
+                <button onclick="toggleDropdownExportar(event)" style="background:#8e44ad; color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer; font-weight:bold;">
+                    <i class="fas fa-file-export"></i> Exportar <i class="fas fa-caret-down" style="margin-left:4px;"></i>
+                </button>
+                <div id="dropdownExportar" style="display:none; position:absolute; right:0; top:100%; margin-top:4px; background:white; border:1px solid #ddd; border-radius:4px; box-shadow:0 4px 12px rgba(0,0,0,0.15); z-index:500; min-width:160px;">
+                    <a href="{{ url_for('clientes.exportar', formato='csv') }}" style="display:flex; align-items:center; gap:8px; padding:10px 16px; color:#333; text-decoration:none; font-size:0.9rem; border-bottom:1px solid #f0f0f0;" onmouseenter="this.style.background='#f5f5f5'" onmouseleave="this.style.background=''"><i class="fas fa-file-csv" style="color:#27ae60; width:16px;"></i> CSV</a>
+                    <a href="{{ url_for('clientes.exportar', formato='xlsx') }}" style="display:flex; align-items:center; gap:8px; padding:10px 16px; color:#333; text-decoration:none; font-size:0.9rem; border-bottom:1px solid #f0f0f0;" onmouseenter="this.style.background='#f5f5f5'" onmouseleave="this.style.background=''"><i class="fas fa-file-excel" style="color:#217346; width:16px;"></i> Excel (XLSX)</a>
+                    <a href="{{ url_for('clientes.exportar', formato='json') }}" style="display:flex; align-items:center; gap:8px; padding:10px 16px; color:#333; text-decoration:none; font-size:0.9rem;" onmouseenter="this.style.background='#f5f5f5'" onmouseleave="this.style.background=''"><i class="fas fa-file-code" style="color:#e67e22; width:16px;"></i> JSON</a>
+                </div>
+            </div>
+            <button onclick="openModalImportar()" style="background:#3498db; color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer; font-weight:bold;">
+                <i class="fas fa-file-import"></i> Importar
+            </button>
+            <button onclick="openModalCliente()" style="background: #27ae60; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                <i class="fas fa-plus"></i> Nuevo Cliente
+            </button>
+        </div>
+    </div>
+
+    <div class="table-card" style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); flex: 1; min-height: 0; overflow: auto;">
+        <table id="tablaClientes" class="display cell-border hover stripe" style="width:100%; min-width: 700px;">
+            <thead>
+                <tr>
+                    <th>Código</th>
+                    <th>Razón Social</th>
+                    <th>Ruta / Zona</th>
+                    <th>Transporte</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in clientes %}
+                <tr>
+                    <td><code>{{ c.codigo }}</code></td>
+                    <td><strong>{{ c.razonsocial }}</strong></td>
+                    <td>{{ c.nombre_ruta or 'Sin asignar' }}</td>
+                    <td>{{ c.nombre_transporte or '-' }}</td>
+                    <td style="text-align: center;">
+                        {% if c.activo %}
+                            <span style="color: #27ae60; font-weight: bold;"><i class="fas fa-check"></i> Activo</span>
+                        {% else %}
+                            <span style="color: #e74c3c; font-weight: bold;"><i class="fas fa-times"></i> Inactivo</span>
+                        {% endif %}
+                    </td>
+                    <td style="text-align: center;">
+                        <button onclick='editCliente({{ c | tojson }})' style="color: #3498db; background: none; border: none; cursor: pointer; font-size: 1.1rem;">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% include "partials/_modal_clientes.html" %}
+{% include "partials/_modal_importar_clientes.html" %}
+
+<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/fixedheader/3.4.0/js/dataTables.fixedHeader.min.js"></script>
+<script src="{{ url_for('static', filename='js/batch_ui.js') }}"></script>
+<script>
+    // Variables globales para el JS externo
+    const transportesDB = {{ transportes_all | tojson }};
+    const relTransporteRutas = {{ rel_transp_rutas | tojson }};
+</script>
+<script src="{{ url_for('static', filename='js/clientes.js') }}"></script>
+{% endblock %}

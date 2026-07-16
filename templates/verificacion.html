@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verificación del Sistema - Taurus WMS</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+        .header { background: #1a365d; color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+        .resultado { padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid; }
+        .ok { background: #d4edda; border-color: #28a745; }
+        .error { background: #f8d7da; border-color: #dc3545; }
+        .warning { background: #fff3cd; border-color: #ffc107; }
+        .btn { display: inline-block; padding: 10px 20px; background: #1a365d; color: white; text-decoration: none; border-radius: 4px; margin: 5px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔍 Verificación del Sistema - Taurus WMS</h1>
+        <p>Estado de la base de datos y configuración</p>
+    </div>
+
+    <div class="resultado {% if todo_ok %}ok{% else %}error{% endif %}">
+        <h2>{% if todo_ok %}✅ Sistema Verificado{% else %}❌ Sistema No Verificado{% endif %}</h2>
+    </div>
+
+    <h3>Resultados de Verificación:</h3>
+    {% for titulo, ok, mensaje in resultados %}
+    <div class="resultado {% if ok %}ok{% else %}error{% endif %}">
+        <strong>{{ titulo }}:</strong> {{ mensaje }}
+    </div>
+    {% endfor %}
+
+    <div style="margin-top: 30px;">
+        {% if todo_ok %}
+            <a href="/" class="btn">✅ Ingresar al Sistema</a>
+            <a href="/login" class="btn">🔐 Iniciar Sesión</a>
+        {% else %}
+            <a href="/diagnostico-completo" class="btn">🔧 Diagnóstico Detallado</a>
+        {% endif %}
+        <a href="/verificar-sistema" class="btn">🔄 Re-verificar</a>
+    </div>
+
+    <div style="margin-top: 20px; font-size: 0.9em; color: #666;">
+        <p><strong>Configuración actual:</strong><br>
+        Base de datos: {{ db_config.database }}<br>
+        Usuario: {{ db_config.user }}<br>
+        Host: {{ db_config.host }}</p>
+    </div>
+</body>
+</html>

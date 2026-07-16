@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Taurus Suite - Auditoría</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root { --primary-color: #1a365d; }
+        body { background: #f8f9fa; }
+        .admin-header {
+            background: var(--primary-color);
+            color: white;
+            padding: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-header">
+        <div class="container">
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-2">
+                    <img src="{{ url_for('static', filename='logo/Taurussuite.jpg') }}" alt="Taurus Suite" style="height: 40px;">
+                    <h4 class="mb-0">Taurus Suite</h4>
+                </div>
+                <div class="d-flex align-items-center gap-3">
+                    <span><i class="fas fa-user me-1"></i>{{ session.admin_nombre }} ({{ session.admin_rol }})</span>
+                    <a href="{{ url_for('admin.logout') }}" class="btn btn-outline-light btn-sm">
+                        <i class="fas fa-sign-out-alt"></i> Salir
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="container py-4">
+        <ul class="nav nav-pills mb-4">
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('admin.tenants') }}">
+                    <i class="fas fa-building me-1"></i>Empresas
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('admin.usuarios') }}">
+                    <i class="fas fa-users me-1"></i>Usuarios Admin
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link active" href="{{ url_for('admin.audit') }}">
+                    <i class="fas fa-clipboard-list me-1"></i>Auditoría
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('admin.configuracion') }}">
+                    <i class="fas fa-cog me-1"></i>Configuración
+                </a>
+            </li>
+
+        </ul>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    {% if category == 'error' %}
+                    <div class="alert alert-danger alert-dismissible fade show">
+                    {% else %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show">
+                    {% endif %}
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-clipboard-list me-2"></i>Logs de Auditoría</h5>
+            </div>
+            <div class="card-body">
+                <form method="GET" class="row g-3 mb-3">
+                    <div class="col-md-2">
+                        <label class="form-label">Desde</label>
+                        <input type="date" name="desde" class="form-control" value="{{ filtro_desde }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Hasta</label>
+                        <input type="date" name="hasta" class="form-control" value="{{ filtro_hasta }}">
+                        <small class="text-muted">Mín. 1 semana</small>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Acción</label>
+                        <select name="accion" class="form-select">
+                            <option value="">Todas</option>
+                            <option value="LOGIN" {% if filtro_accion == 'LOGIN' %}selected{% endif %}>LOGIN</option>
+                            <option value="LOGOUT" {% if filtro_accion == 'LOGOUT' %}selected{% endif %}>LOGOUT</option>
+                            <option value="LOGIN_FAILED" {% if filtro_accion == 'LOGIN_FAILED' %}selected{% endif %}>LOGIN_FAILED</option>
+                            <option value="ACCESS" {% if filtro_accion == 'ACCESS' %}selected{% endif %}>ACCESS</option>
+                            <option value="CREATE" {% if filtro_accion == 'CREATE' %}selected{% endif %}>CREATE</option>
+                            <option value="UPDATE" {% if filtro_accion == 'UPDATE' %}selected{% endif %}>UPDATE</option>
+                            <option value="DELETE" {% if filtro_accion == 'DELETE' %}selected{% endif %}>DELETE</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Módulo</label>
+                        <select name="modulo" class="form-select">
+                            <option value="">Todos</option>
+                            <option value="auth" {% if filtro_modulo == 'auth' %}selected{% endif %}>Auth</option>
+                            <option value="tenants" {% if filtro_modulo == 'tenants' %}selected{% endif %}>Tenants</option>
+                            <option value="usuarios" {% if filtro_modulo == 'usuarios' %}selected{% endif %}>Usuarios</option>
+                            <option value="configuracion" {% if filtro_modulo == 'configuracion' %}selected{% endif %}>Configuración</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary me-2">
+                            <i class="fas fa-search"></i> Filtrar
+                        </button>
+                        <a href="{{ url_for('admin.audit') }}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Limpiar
+                        </a>
+                    </div>
+                </form>
+                
+                <div class="alert alert-info mb-3">
+                    <i class="fas fa-info-circle me-1"></i>
+                    Mostrando registros desde <strong>{{ filtro_desde }}</strong> hasta <strong>{{ filtro_hasta }}</strong>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr>
+                                <th>Fecha/Hora</th>
+                                <th>Usuario</th>
+                                <th>Acción</th>
+                                <th>Módulo</th>
+                                <th>IP</th>
+                                <th>Detalle</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in logs %}
+                            <tr>
+                                <td>{{ log.created_at.strftime('%d/%m/%Y %H:%M') if log.created_at else '-' }}</td>
+                                <td>{{ log.usuario_nombre or '-' }}</td>
+                                <td>
+                                    {% if log.accion == 'LOGIN' %}
+                                        <span class="badge bg-success">{{ log.accion }}</span>
+                                    {% elif log.accion == 'LOGIN_FAILED' %}
+                                        <span class="badge bg-danger">{{ log.accion }}</span>
+                                    {% elif log.accion in ['CREATE', 'UPDATE', 'DELETE'] %}
+                                        <span class="badge bg-warning text-dark">{{ log.accion }}</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">{{ log.accion }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ log.modulo }}</td>
+                                <td><small>{{ log.ip_address or '-' }}</small></td>
+                                <td><small>{{ log.detalle or '-' }}</small></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                {% if total_paginas > 1 %}
+                <nav>
+                    <ul class="pagination justify-content-center">
+                        {% if page > 1 %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('admin.audit', page=page-1, desde=filtro_desde, hasta=filtro_hasta, accion=filtro_accion, modulo=filtro_modulo) }}">Anterior</a>
+                        </li>
+                        {% endif %}
+                        
+                        {% for p in range(1, total_paginas + 1) %}
+                            {% if p >= page - 2 and p <= page + 2 %}
+                                <li class="page-item {% if p == page %}active{% endif %}">
+                                    <a class="page-link" href="{{ url_for('admin.audit', page=p, desde=filtro_desde, hasta=filtro_hasta, accion=filtro_accion, modulo=filtro_modulo) }}">{{ p }}</a>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if page < total_paginas %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('admin.audit', page=page+1, desde=filtro_desde, hasta=filtro_hasta, accion=filtro_accion, modulo=filtro_modulo) }}">Siguiente</a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

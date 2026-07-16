@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}Gestión de Empresas{% endblock %}
+
+{% block content %}
+<div style="padding: 20px; max-width: 1200px; margin: auto;">
+    
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+        <h2><i class="fas fa-building"></i> Gestión de Empresas</h2>
+        <a href="{{ url_for('index') }}" class="btn-sec" style="background: #95a5a6; color: white; padding: 10px 15px; border-radius: 4px; text-decoration: none;">
+            <i class="fas fa-arrow-left"></i> Volver
+        </a>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div style="padding: 12px; margin-bottom: 20px; border-radius: 6px; 
+                     background: {% if category == 'error' %}#f8d7da{% elif category == 'success' %}#d4edda{% else %}#fff3cd{% endif %};
+                     color: {% if category == 'error' %}#721c24{% elif category == 'success' %}#155724{% else %}#856404{% endif %};">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div style="background: white; border-radius: 8px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); margin-bottom: 20px;">
+        <h4 style="margin: 0 0 20px; padding-bottom: 12px; border-bottom: 2px solid #3498db;">
+            <i class="fas fa-plus-circle"></i> Nueva Empresa
+        </h4>
+        <form action="{{ url_for('tenants_guardar') }}" method="POST">
+            <input type="hidden" name="id" id="tenant_id_edit">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                <div>
+                    <label style="display: block; font-weight: bold; margin-bottom: 6px;">Nombre *</label>
+                    <input type="text" name="nombre" id="tenant_nombre" required 
+                           placeholder="Nombre de la empresa" style="width: 100%; padding: 9px; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+                <div>
+                    <label style="display: block; font-weight: bold; margin-bottom: 6px;">Razón Social</label>
+                    <input type="text" name="razon_social" id="tenant_razon" 
+                           placeholder="Razón social completa" style="width: 100%; padding: 9px; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+                <div>
+                    <label style="display: block; font-weight: bold; margin-bottom: 6px;">NIT</label>
+                    <input type="text" name="nit" id="tenant_nit" 
+                           placeholder="NIT/CI/RUC" style="width: 100%; padding: 9px; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+                <div style="grid-column: 1 / -1;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 6px;">Dirección</label>
+                    <input type="text" name="direccion" id="tenant_direccion" 
+                           placeholder="Dirección de la empresa" style="width: 100%; padding: 9px; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+                <div>
+                    <label style="display: block; font-weight: bold; margin-bottom: 6px;">Teléfono</label>
+                    <input type="text" name="telefono" id="tenant_telefono" 
+                           placeholder="Teléfono" style="width: 100%; padding: 9px; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+                <div>
+                    <label style="display: block; font-weight: bold; margin-bottom: 6px;">Email</label>
+                    <input type="email" name="email" id="tenant_email" 
+                           placeholder="email@empresa.com" style="width: 100%; padding: 9px; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+            </div>
+            <div style="margin-top: 20px; display: flex; gap: 10px;">
+                <button type="submit" class="btn-pri" style="background: #27ae60; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer;">
+                    <i class="fas fa-save"></i> Guardar
+                </button>
+                <button type="button" onclick="resetForm()" class="btn-sec" style="background: #95a5a6; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer;">
+                    <i class="fas fa-undo"></i> Cancelar
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <div style="background: white; border-radius: 8px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.08);">
+        <h4 style="margin: 0 0 20px; padding-bottom: 12px; border-bottom: 2px solid #f39c12;">
+            <i class="fas fa-list"></i> Empresas Registradas
+        </h4>
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background: #f8f9fa;">
+                    <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">ID</th>
+                    <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Nombre</th>
+                    <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Razón Social</th>
+                    <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">NIT</th>
+                    <th style="padding: 12px; text-align: center; border-bottom: 2px solid #dee2e6;">Estado</th>
+                    <th style="padding: 12px; text-align: center; border-bottom: 2px solid #dee2e6;">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in tenants %}
+                <tr style="border-bottom: 1px solid #dee2e6;">
+                    <td style="padding: 12px;">{{ t.id }}</td>
+                    <td style="padding: 12px;">{{ t.nombre }}</td>
+                    <td style="padding: 12px;">{{ t.razon_social or '-' }}</td>
+                    <td style="padding: 12px;">{{ t.nit or '-' }}</td>
+                    <td style="padding: 12px; text-align: center;">
+                        {% if t.activo %}
+                        <span style="background: #d4edda; color: #155724; padding: 4px 10px; border-radius: 12px; font-size: 0.85rem;">Activo</span>
+                        {% else %}
+                        <span style="background: #f8d7da; color: #721c24; padding: 4px 10px; border-radius: 12px; font-size: 0.85rem;">Inactivo</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 12px; text-align: center;">
+                        <button onclick="editarTenant({{ t|tojson }})" 
+                                style="background: #3498db; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; margin-right: 5px;">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        {% if session.get('tenant_id') != t.id %}
+                        <a href="{{ url_for('tenants_eliminar', tenant_id=t.id) }}" 
+                           onclick="return confirm('¿Está seguro de eliminar esta empresa?')"
+                           style="background: #e74c3c; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; text-decoration: none;">
+                            <i class="fas fa-trash"></i>
+                        </a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+function editarTenant(data) {
+    document.getElementById('tenant_id_edit').value = data.id;
+    document.getElementById('tenant_nombre').value = data.nombre || '';
+    document.getElementById('tenant_razon').value = data.razon_social || '';
+    document.getElementById('tenant_nit').value = data.nit || '';
+    document.getElementById('tenant_direccion').value = data.direccion || '';
+    document.getElementById('tenant_telefono').value = data.telefono || '';
+    document.getElementById('tenant_email').value = data.email || '';
+}
+
+function resetForm() {
+    document.getElementById('tenant_id_edit').value = '';
+    document.querySelector('form').reset();
+}
+</script>
+{% endblock %}

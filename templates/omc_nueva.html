@@ -1,0 +1,442 @@
+{% extends "base.html" %}
+{% block title %}Nueva OMC{% endblock %}
+
+{% block content %}
+<div style="padding:20px; max-width:860px; margin:auto;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
+        <h2 style="margin:0;"><i class="fas fa-exchange-alt"></i> Nueva Orden de Movimiento de Contenedor</h2>
+        <a href="{{ url_for('omc.listar') }}"
+           style="background:#95a5a6; color:white; padding:10px 15px; border-radius:4px; text-decoration:none;">
+            <i class="fas fa-arrow-left"></i> Volver
+        </a>
+    </div>
+
+    <div style="background:white; border-radius:8px; padding:28px; box-shadow:0 4px 12px rgba(0,0,0,0.08);">
+        <form method="POST" action="{{ url_for('omc.guardar') }}" id="formNuevaOmc">
+
+            <!-- ══ SECCIÓN: CONTENEDORES DE ORIGEN ══ -->
+            <div style="margin-bottom:24px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <label style="font-size:0.9rem; font-weight:bold;">
+                        <i class="fas fa-boxes"></i> Contenedores de Origen
+                        <span style="color:red;">*</span>
+                        <small style="font-weight:normal; color:#666;">(stock disponible y sin movimientos pendientes)</small>
+                    </label>
+                    <button type="button" id="btn_agregar_cont"
+                            style="padding:5px 12px; background:#3498db; color:white; border:none; border-radius:4px; cursor:pointer; font-size:0.85rem;">
+                        <i class="fas fa-plus"></i> Agregar contenedor
+                    </button>
+                </div>
+
+                <!-- Panel de filtros en cascada: Zona → Tipo → Ubicación -->
+                <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:8px 12px; background:#f0f4f8; border:1px solid #dde3eb; border-radius:6px; margin-bottom:10px;">
+                    <span style="font-size:0.8rem; color:#555; font-weight:bold; white-space:nowrap;"><i class="fas fa-filter"></i> Filtrar:</span>
+                    <select id="omc_filtro_zona" style="padding:6px 8px; border:1px solid #ccc; border-radius:4px; font-size:0.85rem; min-width:140px; background:#fff;">
+                        <option value="">Todas las zonas</option>
+                    </select>
+                    <select id="omc_filtro_tipo" style="padding:6px 8px; border:1px solid #ccc; border-radius:4px; font-size:0.85rem; min-width:160px; background:#fff;">
+                        <option value="">Todos los tipos picking</option>
+                    </select>
+                    <select id="omc_filtro_ubi" style="padding:6px 8px; border:1px solid #ccc; border-radius:4px; font-size:0.85rem; min-width:200px; background:#fff;">
+                        <option value="">Todas las ubicaciones</option>
+                    </select>
+                    <button type="button" id="btn_limpiar_filtros"
+                            style="padding:6px 10px; background:#95a5a6; color:white; border:none; border-radius:4px; font-size:0.82rem; cursor:pointer; white-space:nowrap;">
+                        <i class="fas fa-times"></i> Limpiar
+                    </button>
+                    <span id="omc_filtro_hint" style="font-size:0.78rem; color:#666; margin-left:4px; white-space:nowrap;">
+                        <i class="fas fa-info-circle"></i> Seleccione al menos un filtro para ver contenedores
+                    </span>
+                </div>
+
+                <div id="lista_contenedores_omc">
+                    <!-- filas dinámicas -->
+                </div>
+                <div id="msg_sin_contenedores" style="color:#e74c3c; font-size:0.85rem; display:none; margin-top:6px;">
+                    <i class="fas fa-exclamation-circle"></i> Agregue al menos un contenedor.
+                </div>
+            </div>
+
+            <!-- ══ SECCIÓN: TIPO DE DESTINO ══ -->
+            <div style="margin-bottom:14px; border-top:1px solid #eee; padding-top:20px;">
+                <label style="display:block; font-size:0.9rem; font-weight:bold; margin-bottom:8px;">
+                    Tipo de Destino <span style="color:red;">*</span>
+                </label>
+                <div style="display:flex; gap:0; border:1px solid #ddd; border-radius:4px; overflow:hidden; width:fit-content;">
+                    <button type="button" id="btn_tipo_ubi" onclick="setTipoDestino('ubicacion')"
+                            style="padding:8px 20px; border:none; background:#3498db; color:white; cursor:pointer; font-size:0.88rem; font-weight:bold;">
+                        <i class="fas fa-map-marker-alt"></i> Ubicación
+                    </button>
+                    <button type="button" id="btn_tipo_cont" onclick="setTipoDestino('contenedor')"
+                            style="padding:8px 20px; border:none; background:#f0f0f0; color:#555; cursor:pointer; font-size:0.88rem; font-weight:bold; border-left:1px solid #ddd;">
+                        <i class="fas fa-box"></i> Contenedor
+                    </button>
+                </div>
+            </div>
+
+            <!-- Destino: UBICACIÓN -->
+            <div id="bloque_dest_ubi" style="margin-bottom:20px;">
+                <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:6px;">
+                    Ubicación Destino <span style="color:red;">*</span>
+                </label>
+                <div style="position:relative;">
+                    <span style="position:absolute; left:9px; top:50%; transform:translateY(-50%); color:#aaa;"><i class="fas fa-search"></i></span>
+                    <input type="text" id="buscar_destino_ubi" placeholder="Buscar ubicación destino..." autocomplete="off"
+                           style="width:100%; padding:9px 9px 9px 32px; border:1px solid #ddd; border-radius:4px; box-sizing:border-box;">
+                    <div id="dropdown_destino_ubi"
+                         style="display:none; position:absolute; top:100%; left:0; right:0; background:white; border:1px solid #ddd; border-top:none; border-radius:0 0 4px 4px; z-index:1000; max-height:220px; overflow-y:auto; box-shadow:0 4px 8px rgba(0,0,0,0.12);"></div>
+                </div>
+                <div id="dest_ubi_seleccionado" style="display:none; margin-top:8px; padding:10px 14px; background:#eaf4fb; border:1px solid #bee3f8; border-radius:4px; font-size:0.9rem;">
+                    <strong id="dest_ubi_texto"></strong>
+                    <button type="button" onclick="limpiarDestinoUbi()" style="float:right; border:none; background:none; cursor:pointer; color:#e74c3c; font-size:1rem;">&#x2715;</button>
+                </div>
+            </div>
+
+            <!-- Destino: CONTENEDOR -->
+            <div id="bloque_dest_cont" style="display:none; margin-bottom:20px;">
+                <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:6px;">
+                    Contenedor Destino <span style="color:red;">*</span>
+                    <small style="font-weight:normal; color:#666;">(sin movimientos pendientes)</small>
+                </label>
+                <div style="position:relative;">
+                    <span style="position:absolute; left:9px; top:50%; transform:translateY(-50%); color:#aaa;"><i class="fas fa-search"></i></span>
+                    <input type="text" id="buscar_destino_cont" placeholder="Buscar contenedor destino..." autocomplete="off"
+                           style="width:100%; padding:9px 9px 9px 32px; border:1px solid #ddd; border-radius:4px; box-sizing:border-box;">
+                    <div id="dropdown_destino_cont"
+                         style="display:none; position:absolute; top:100%; left:0; right:0; background:white; border:1px solid #ddd; border-top:none; border-radius:0 0 4px 4px; z-index:1000; max-height:220px; overflow-y:auto; box-shadow:0 4px 8px rgba(0,0,0,0.12);"></div>
+                </div>
+                <div id="dest_cont_seleccionado" style="display:none; margin-top:8px; padding:10px 14px; background:#eaf4fb; border:1px solid #bee3f8; border-radius:4px; font-size:0.9rem;">
+                    <strong id="dest_cont_texto"></strong>
+                    <span id="dest_cont_info" style="color:#666; margin-left:8px;"></span>
+                    <button type="button" onclick="limpiarDestinoCont()" style="float:right; border:none; background:none; cursor:pointer; color:#e74c3c; font-size:1rem;">&#x2715;</button>
+                </div>
+            </div>
+
+            <!-- Campos ocultos destino -->
+            <input type="hidden" name="id_ubicacion_destino"  id="id_ubicacion_destino">
+            <input type="hidden" name="id_contenedor_destino" id="id_contenedor_destino">
+
+            <!-- Observaciones -->
+            <div style="margin-bottom:24px;">
+                <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:6px;">Observaciones</label>
+                <textarea name="observaciones" rows="3"
+                          style="width:100%; padding:9px; border:1px solid #ddd; border-radius:4px; box-sizing:border-box; resize:vertical;"
+                          placeholder="Observaciones opcionales..."></textarea>
+            </div>
+
+            <div style="display:flex; gap:12px;">
+                <button type="submit" id="btnGuardar" disabled
+                        style="background:#27ae60; color:white; border:none; padding:11px 28px; border-radius:4px; font-weight:bold; cursor:not-allowed; font-size:1rem; opacity:0.5;">
+                    <i class="fas fa-save"></i> Crear OMC
+                </button>
+                <a href="{{ url_for('omc.listar') }}"
+                   style="background:#95a5a6; color:white; padding:11px 20px; border-radius:4px; text-decoration:none;">
+                    Cancelar
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+<script>
+let tipoDestino = 'ubicacion';
+let timerDestUbi = null, timerDestCont = null;
+
+// ── Filtros en cascada: Zona → Tipo → Ubicación ──
+let omcFiltroZona = '', omcFiltroTipo = '', omcFiltroUbi = '';
+
+function _setSelectOmc($sel, data, valField, labelFn, keepVal) {
+    const prev = keepVal !== undefined ? keepVal : $sel.val();
+    $sel.find('option:not(:first)').remove();
+    data.forEach(item => {
+        $sel.append(`<option value="${item[valField]}">${labelFn(item)}</option>`);
+    });
+    const exists = data.some(item => String(item[valField]) === String(prev));
+    $sel.val(exists ? prev : '');
+    return exists ? prev : '';
+}
+
+function cargarZonasOmc() {
+    $.get('/pedidos/filtros/zonas', function(data) {
+        _setSelectOmc($('#omc_filtro_zona'), data, 'id', z => `${z.codigo} — ${z.nombre}`);
+    });
+}
+
+function cargarTiposOmc(keepVal) {
+    $.get('/pedidos/filtros/tipos', {zona: omcFiltroZona}, function(data) {
+        omcFiltroTipo = _setSelectOmc($('#omc_filtro_tipo'), data, 'id', t => t.nombre, keepVal);
+    });
+}
+
+function cargarUbicacionesOmc(keepVal) {
+    $.get('/pedidos/filtros/ubicaciones', {tipo: omcFiltroTipo, zona: omcFiltroZona}, function(data) {
+        omcFiltroUbi = _setSelectOmc($('#omc_filtro_ubi'), data, 'id', u => `${u.codigo} — ${u.nombre}`, keepVal);
+    });
+}
+
+function cargarContenedoresEnFilasOmc() {
+    const hayFiltro = omcFiltroZona || omcFiltroTipo || omcFiltroUbi;
+    $('#omc_filtro_hint').toggle(!hayFiltro);
+    if (!hayFiltro) {
+        $('.select-cont-omc').each(function() {
+            $(this).find('option:not(:first)').remove();
+            $(this).val('');
+        });
+        $('.val-origen-row').val('');
+        actualizarBoton();
+        return;
+    }
+    $.get('/pedidos/filtros/contenedores', {ubi: omcFiltroUbi, tipo: omcFiltroTipo, zona: omcFiltroZona}, function(data) {
+        $('#omc_filtro_hint').text(`${data.length} contenedor(es) disponible(s)`).show();
+        $('.select-cont-omc').each(function() {
+            const prev = $(this).val();
+            $(this).find('option:not(:first)').remove();
+            data.forEach(c => {
+                $(this).append(`<option value="${c.IDContenedor}" data-ubi-id="${c.ubicacion_id}">${c.IDContenedor} &nbsp; ${c.ubicacion_codigo} (${parseFloat(c.total_disponible).toFixed(0)} u.)</option>`);
+            });
+            const stillValid = data.some(c => c.IDContenedor === prev);
+            if (stillValid) {
+                $(this).val(prev);
+            } else {
+                $(this).val('');
+                $(this).closest('.omc-cont-row').find('.val-origen-row').val('');
+            }
+        });
+        actualizarBoton();
+    }).fail(function(xhr) {
+        $('#omc_filtro_hint').text(`Error al cargar contenedores: ${xhr.status}`).show();
+    });
+}
+
+$('#omc_filtro_zona').on('change', function() {
+    omcFiltroZona = $(this).val();
+    omcFiltroTipo = ''; omcFiltroUbi = '';
+    $('#omc_filtro_tipo').val(''); $('#omc_filtro_ubi').val('');
+    cargarTiposOmc();
+    cargarUbicacionesOmc();
+    cargarContenedoresEnFilasOmc();
+});
+$('#omc_filtro_tipo').on('change', function() {
+    omcFiltroTipo = $(this).val();
+    omcFiltroUbi = ''; $('#omc_filtro_ubi').val('');
+    cargarUbicacionesOmc();
+    cargarContenedoresEnFilasOmc();
+});
+$('#omc_filtro_ubi').on('change', function() {
+    omcFiltroUbi = $(this).val();
+    cargarContenedoresEnFilasOmc();
+});
+$('#btn_limpiar_filtros').on('click', function() {
+    omcFiltroZona = omcFiltroTipo = omcFiltroUbi = '';
+    $('#omc_filtro_zona').val('');
+    $('#omc_filtro_tipo').val('');
+    $('#omc_filtro_ubi').val('');
+    cargarTiposOmc();
+    cargarUbicacionesOmc();
+    cargarContenedoresEnFilasOmc();
+});
+
+cargarZonasOmc();
+cargarTiposOmc();
+cargarUbicacionesOmc();
+
+// ══ CONTENEDORES DINÁMICOS ══
+function crearFilaContenedor() {
+    const $fila = $(`
+        <div class="omc-cont-row"
+             style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+            <select name="contenedores_origen[]" class="select-cont-omc"
+                    style="flex:1; padding:7px 8px; border:1px solid #dde3eb; border-radius:4px; background:#fff; font-size:0.9rem;">
+                <option value="">— seleccione contenedor —</option>
+            </select>
+            <input type="hidden" name="origenes[]" class="val-origen-row">
+            <button type="button" class="btn-remove-cont-row"
+                    style="padding:7px 10px; background:#e74c3c; color:white; border:none; border-radius:4px; cursor:pointer; flex-shrink:0;">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    `);
+
+    const $select    = $fila.find('.select-cont-omc');
+    const $valOrigen = $fila.find('.val-origen-row');
+
+    // Poblar con los contenedores actuales del filtro
+    const hayFiltro = omcFiltroZona || omcFiltroTipo || omcFiltroUbi;
+    if (hayFiltro) {
+        $.get('/pedidos/filtros/contenedores', {ubi: omcFiltroUbi, tipo: omcFiltroTipo, zona: omcFiltroZona}, function(data) {
+            data.forEach(c => {
+                $select.append(`<option value="${c.IDContenedor}" data-ubi-id="${c.ubicacion_id}">${c.IDContenedor} &nbsp; ${c.ubicacion_codigo} (${parseFloat(c.total_disponible).toFixed(0)} u.)</option>`);
+            });
+        });
+    }
+
+    $select.on('change', function() {
+        const $opt = $(this).find('option:selected');
+        $valOrigen.val($opt.data('ubi-id') || '');
+        // Duplicados: marcar si ya está seleccionado en otra fila
+        const val = $(this).val();
+        let dup = false;
+        if (val) {
+            $('.select-cont-omc').not(this).each(function() {
+                if ($(this).val() === val) { dup = true; }
+            });
+        }
+        if (dup) {
+            alert(`El contenedor ${val} ya fue agregado en esta OMC.`);
+            $(this).val('');
+            $valOrigen.val('');
+        }
+        actualizarBoton();
+    });
+
+    $fila.find('.btn-remove-cont-row').on('click', function() {
+        $fila.remove();
+        actualizarBoton();
+        if ($('.omc-cont-row').length === 0) crearFilaContenedor();
+    });
+
+    $('#lista_contenedores_omc').append($fila);
+    actualizarBoton();
+    return $fila;
+}
+
+$('#btn_agregar_cont').on('click', function() { crearFilaContenedor(); });
+
+// ══ TIPO DESTINO ══
+function setTipoDestino(tipo) {
+    if (tipoDestino === tipo) return;
+    tipoDestino = tipo;
+    $('#bloque_dest_ubi').toggle(tipo === 'ubicacion');
+    $('#bloque_dest_cont').toggle(tipo === 'contenedor');
+    $('#btn_tipo_ubi').css({background: tipo==='ubicacion' ? '#3498db':'#f0f0f0', color: tipo==='ubicacion' ? 'white':'#555'});
+    $('#btn_tipo_cont').css({background: tipo==='contenedor' ? '#3498db':'#f0f0f0', color: tipo==='contenedor' ? 'white':'#555'});
+    if (tipo === 'ubicacion') limpiarDestinoCont(); else limpiarDestinoUbi();
+    actualizarBoton();
+}
+
+// ══ DESTINO UBICACIÓN ══
+$('#buscar_destino_ubi').on('input', function() {
+    clearTimeout(timerDestUbi);
+    const q = $(this).val().trim();
+    if (!q) { $('#dropdown_destino_ubi').hide(); return; }
+    timerDestUbi = setTimeout(() => buscarDestinoUbi(q), 280);
+});
+
+function buscarDestinoUbi(q) {
+    $.get('/omc/buscar_ubicaciones', {q}, function(data) {
+        const $dd = $('#dropdown_destino_ubi').empty().show();
+        if (!data.length) { $dd.append('<div style="padding:10px; color:#999; font-size:0.88rem;">Sin resultados</div>'); return; }
+        data.forEach(item => {
+            $dd.append(
+                $('<div>').css({padding:'9px 14px', cursor:'pointer', fontSize:'0.9rem', borderBottom:'1px solid #f0f0f0'})
+                .html(`<strong>${item.codigo}</strong> <span style="color:#666; margin-left:8px;">${item.nombre}</span> <span style="float:right; font-size:0.78rem; color:#999;">${item.tipo}</span>`)
+                .on('mouseenter', function() { $(this).css('background','#f0f7ff'); })
+                .on('mouseleave', function() { $(this).css('background',''); })
+                .on('click', function() { seleccionarDestinoUbi(item); })
+            );
+        });
+    });
+}
+
+function seleccionarDestinoUbi(item) {
+    $('#id_ubicacion_destino').val(item.id);
+    $('#id_contenedor_destino').val('');
+    $('#buscar_destino_ubi').val('');
+    $('#dropdown_destino_ubi').hide();
+    $('#dest_ubi_texto').text(`${item.codigo} — ${item.nombre}`);
+    $('#dest_ubi_seleccionado').show();
+    actualizarBoton();
+}
+
+function limpiarDestinoUbi() {
+    $('#id_ubicacion_destino').val('');
+    $('#buscar_destino_ubi').val('');
+    $('#dest_ubi_seleccionado').hide();
+    actualizarBoton();
+}
+
+// ══ DESTINO CONTENEDOR ══
+$('#buscar_destino_cont').on('input', function() {
+    clearTimeout(timerDestCont);
+    const q = $(this).val().trim();
+    if (!q) { $('#dropdown_destino_cont').hide(); return; }
+    timerDestCont = setTimeout(() => buscarDestinoCont(q), 280);
+});
+
+function buscarDestinoCont(q) {
+    $.get('/omc/buscar_contenedores_destino', {q, excluir:''}, function(data) {
+        const $dd = $('#dropdown_destino_cont').empty().show();
+        if (!data.length) { $dd.append('<div style="padding:10px; color:#999; font-size:0.88rem;">Sin resultados sin movimientos pendientes</div>'); return; }
+        data.forEach(item => {
+            const disp = Number(item.total_disponible) > 0
+                ? `Disponible: <strong>${Number(item.total_disponible).toFixed(0)}</strong>`
+                : '<span style="color:#999;">Vacío</span>';
+            $dd.append(
+                $('<div>').css({padding:'9px 14px', cursor:'pointer', fontSize:'0.9rem', borderBottom:'1px solid #f0f0f0'})
+                .html(`<strong>${item.IDContenedor}</strong> <span style="color:#666; margin-left:8px; font-size:0.82rem;">${item.ubicacion_codigo} — ${item.ubicacion_nombre} &nbsp;|&nbsp; ${disp}</span>`)
+                .on('mouseenter', function() { $(this).css('background','#f0f7ff'); })
+                .on('mouseleave', function() { $(this).css('background',''); })
+                .on('click', function() { seleccionarDestinoCont(item); })
+            );
+        });
+    });
+}
+
+function seleccionarDestinoCont(item) {
+    $('#id_contenedor_destino').val(item.IDContenedor);
+    $('#id_ubicacion_destino').val(item.ubicacion_id);
+    $('#buscar_destino_cont').val('');
+    $('#dropdown_destino_cont').hide();
+    $('#dest_cont_texto').text(item.IDContenedor);
+    $('#dest_cont_info').text(`${item.ubicacion_codigo} — ${item.ubicacion_nombre}`);
+    $('#dest_cont_seleccionado').show();
+    actualizarBoton();
+}
+
+function limpiarDestinoCont() {
+    $('#id_contenedor_destino').val('');
+    $('#id_ubicacion_destino').val('');
+    $('#buscar_destino_cont').val('');
+    $('#dest_cont_seleccionado').hide();
+    actualizarBoton();
+}
+
+// ══ HABILITAR BOTÓN ══
+function actualizarBoton() {
+    const tieneContenedor = $('.select-cont-omc').toArray().some(el => el.value.trim() !== '');
+    const tieneDestino = tipoDestino === 'ubicacion'
+        ? !!$('#id_ubicacion_destino').val()
+        : !!$('#id_contenedor_destino').val();
+    const ok = tieneContenedor && tieneDestino;
+    $('#btnGuardar').prop('disabled', !ok).css({opacity: ok ? '1':'0.5', cursor: ok ? 'pointer':'not-allowed'});
+    $('#msg_sin_contenedores').toggle(!tieneContenedor);
+}
+
+// Cerrar dropdowns al clic fuera
+$(document).on('click', function(e) {
+    if (!$(e.target).closest('#buscar_destino_ubi, #dropdown_destino_ubi').length)
+        $('#dropdown_destino_ubi').hide();
+    if (!$(e.target).closest('#buscar_destino_cont, #dropdown_destino_cont').length)
+        $('#dropdown_destino_cont').hide();
+});
+
+// Validación al enviar
+$('#formNuevaOmc').on('submit', function(e) {
+    const vals = [], dups = [];
+    $('.select-cont-omc').each(function() {
+        const v = $(this).val().trim().toUpperCase();
+        if (!v) return;
+        if (vals.includes(v)) { if (!dups.includes(v)) dups.push(v); } else { vals.push(v); }
+    });
+    if (dups.length) {
+        e.preventDefault();
+        alert('Contenedor duplicado: ' + dups.join(', ') + '. Elimine la fila repetida antes de continuar.');
+        return false;
+    }
+});
+
+// Inicializar con una fila
+crearFilaContenedor();
+</script>
+{% endblock %}

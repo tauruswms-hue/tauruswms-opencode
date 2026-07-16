@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Taurus Suite - {{ tenant.nombre }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root { --primary-color: #1a365d; }
+        body { background: #f8f9fa; }
+        .admin-header {
+            background: var(--primary-color);
+            color: white;
+            padding: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-header">
+        <div class="container">
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-2">
+                    <img src="{{ url_for('static', filename='logo/Taurussuite.jpg') }}" alt="Taurus Suite" style="height: 40px;">
+                    <h4 class="mb-0">Taurus Suite</h4>
+                </div>
+                <div class="d-flex align-items-center gap-3">
+                    <span><i class="fas fa-user me-1"></i>{{ session.admin_nombre }} ({{ session.admin_rol }})</span>
+                    <a href="{{ url_for('admin.logout') }}" class="btn btn-outline-light btn-sm">
+                        <i class="fas fa-sign-out-alt"></i> Salir
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="container py-4">
+        <nav aria-label="breadcrumb" class="mb-3">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('admin.tenants') }}">Empresas</a></li>
+                <li class="breadcrumb-item active">{{ tenant.nombre }}</li>
+            </ol>
+        </nav>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    {% if category == 'error' %}
+                    <div class="alert alert-danger alert-dismissible fade show">
+                    {% else %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show">
+                    {% endif %}
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-building me-2"></i>Datos de la Empresa</h5>
+                        <button class="btn btn-outline-primary btn-sm" onclick="editarTenant()">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Nombre:</strong> {{ tenant.nombre }}</p>
+                        <p><strong>Razón Social:</strong> {{ tenant.razon_social or '-' }}</p>
+                        <p><strong>CUIT:</strong> {{ tenant.cuit or '-' }}</p>
+                        <p><strong>Dirección:</strong> {{ tenant.direccion or '-' }}</p>
+                        <p><strong>Teléfono:</strong> {{ tenant.telefono or '-' }}</p>
+                        <p><strong>Email:</strong> {{ tenant.email or '-' }}</p>
+                        <p>
+                            <strong>Estado:</strong> 
+                            {% if tenant.activo %}
+                                <span class="badge bg-success">Activo</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Inactivo</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-users me-2"></i>Usuarios ({{ usuarios|length }})</h5>
+                        <button class="btn btn-primary btn-sm" onclick="nuevoUsuario()">
+                            <i class="fas fa-plus"></i> Nuevo Usuario
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        {% if usuarios %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Usuario</th>
+                                        <th>Nombre</th>
+                                        <th>Email</th>
+                                        <th>Rol</th>
+                                        <th>Último Acceso</th>
+                                        <th>Estado</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for usuario in usuarios %}
+                                    <tr>
+                                        <td><strong>{{ usuario.username }}</strong></td>
+                                        <td>{{ usuario.nombre }}</td>
+                                        <td>{{ usuario.email or '-' }}</td>
+                                        <td>
+                                            {% if usuario.rol == 'ADMIN' %}
+                                                <span class="badge bg-danger">{{ usuario.rol }}</span>
+                                            {% elif usuario.rol == 'OPERADOR' %}
+                                                <span class="badge bg-primary">{{ usuario.rol }}</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">{{ usuario.rol }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ usuario.ultimo_acceso.strftime('%d/%m/%Y %H:%M') if usuario.ultimo_acceso else '-' }}</td>
+                                        <td>
+                                            {% if usuario.activo %}
+                                                <span class="badge bg-success">Activo</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">Inactivo</span>
+                                            {% endif %}
+                                        </td>
+                                        <td style="white-space: nowrap;">
+                                            <button class="btn btn-outline-primary btn-sm" onclick="editarUsuario({{ usuario.id }}, '{{ usuario.username }}', '{{ usuario.nombre }}', '{{ usuario.email or '' }}', '{{ usuario.rol }}', {{ usuario.activo|int }})">
+                                                <i class="fas fa-edit"></i>
+                                            </button>{% if usuario.activo %}
+                                            <a href="{{ url_for('admin.usuarios_eliminar', usuario_id=usuario.id, encoded_tenant_id=tenant.id|encode_id) }}" class="btn btn-outline-danger btn-sm" onclick="return confirm('¿Desactivar este usuario?')">
+                                                <i class="fas fa-ban"></i>
+                                            </a>{% else %}
+                                            <a href="{{ url_for('admin.usuarios_activar', usuario_id=usuario.id, encoded_tenant_id=tenant.id|encode_id) }}" class="btn btn-outline-success btn-sm" onclick="return confirm('¿Activar este usuario?')">
+                                                <i class="fas fa-check"></i>
+                                            </a>{% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <p class="text-muted text-center">No hay usuarios registrados para esta empresa.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal fade" id="modalTenant" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Editar Empresa</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="{{ url_for('admin.tenants_guardar') }}">
+                    <div class="modal-body">
+                        <input type="hidden" name="id" id="tenantId" value="{{ tenant.id }}">
+                        <div class="mb-2">
+                            <label class="form-label">Nombre *</label>
+                            <input type="text" name="nombre" id="tenantNombre" class="form-control" value="{{ tenant.nombre }}" required>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Razón Social</label>
+                            <input type="text" name="razon_social" id="tenantRazon" class="form-control" value="{{ tenant.razon_social or '' }}">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">CUIT</label>
+                            <input type="text" name="cuit" id="tenantCuit" class="form-control" value="{{ tenant.cuit or '' }}">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Dirección</label>
+                            <input type="text" name="direccion" id="tenantDireccion" class="form-control" value="{{ tenant.direccion or '' }}">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Teléfono</label>
+                            <input type="text" name="telefono" id="tenantTelefono" class="form-control" value="{{ tenant.telefono or '' }}">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Email</label>
+                            <input type="email" name="email" id="tenantEmail" class="form-control" value="{{ tenant.email or '' }}">
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" name="activo" id="tenantActivo" class="form-check-input" {% if tenant.activo %}checked{% endif %}>
+                            <label class="form-check-label" for="tenantActivo">Activo</label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Guardar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal fade" id="modalUsuario" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalUsuarioTitulo">Nuevo Usuario</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="{{ url_for('admin.usuarios_guardar') }}">
+                    <div class="modal-body">
+                        <input type="hidden" name="id" id="usuarioId">
+                        <input type="hidden" name="tenant_id" value="{{ tenant.id }}">
+                        <div class="mb-2">
+                            <label class="form-label">Usuario *</label>
+                            <input type="text" name="username" id="usuarioUsername" class="form-control" required>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Nombre *</label>
+                            <input type="text" name="nombre" id="usuarioNombre" class="form-control" required>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Email</label>
+                            <input type="email" name="email" id="usuarioEmail" class="form-control">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Rol *</label>
+                            <select name="rol" id="usuarioRol" class="form-select" required>
+                                <option value="OPERADOR">OPERADOR</option>
+                                <option value="ADMIN">ADMIN</option>
+                                <option value="CONSULTA">CONSULTA</option>
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label" id="labelPassword">Contraseña *</label>
+                            <div class="input-group">
+                                <input type="password" name="password" id="usuarioPassword" class="form-control">
+                                <button type="button" class="btn btn-outline-secondary" onclick="togglePassword('usuarioPassword', 'toggleIconPassword')" title="Mostrar contraseña">
+                                    <i class="fas fa-eye" id="toggleIconPassword"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" name="activo" id="usuarioActivo" class="form-check-input" checked>
+                            <label class="form-check-label" for="usuarioActivo">Activo</label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Guardar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let modalTenant, modalUsuario;
+        document.addEventListener('DOMContentLoaded', () => {
+            modalTenant = new bootstrap.Modal(document.getElementById('modalTenant'));
+            modalUsuario = new bootstrap.Modal(document.getElementById('modalUsuario'));
+        });
+        
+        function togglePassword(inputId, iconId) {
+            var passwordInput = document.getElementById(inputId);
+            var toggleIcon = document.getElementById(iconId);
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                toggleIcon.classList.remove('fa-eye');
+                toggleIcon.classList.add('fa-eye-slash');
+                setTimeout(function() {
+                    passwordInput.type = 'password';
+                    toggleIcon.classList.remove('fa-eye-slash');
+                    toggleIcon.classList.add('fa-eye');
+                }, 3000);
+            }
+        }
+        
+        function editarTenant() {
+            modalTenant.show();
+        }
+        
+        function nuevoUsuario() {
+            document.getElementById('modalUsuarioTitulo').textContent = 'Nuevo Usuario';
+            document.getElementById('usuarioId').value = '';
+            document.getElementById('usuarioUsername').value = '';
+            document.getElementById('usuarioUsername').removeAttribute('readonly');
+            document.querySelector('#modalUsuario form').reset();
+            document.getElementById('usuarioActivo').checked = true;
+            document.getElementById('labelPassword').textContent = 'Contraseña *';
+            document.getElementById('usuarioPassword').required = true;
+            modalUsuario.show();
+        }
+        
+        function editarUsuario(id, username, nombre, email, rol, activo) {
+            document.getElementById('modalUsuarioTitulo').textContent = 'Editar Usuario';
+            document.getElementById('usuarioId').value = id;
+            document.getElementById('usuarioUsername').value = username;
+            document.getElementById('usuarioUsername').setAttribute('readonly', 'readonly');
+            document.getElementById('usuarioNombre').value = nombre;
+            document.getElementById('usuarioEmail').value = email;
+            document.getElementById('usuarioRol').value = rol;
+            document.getElementById('usuarioActivo').checked = activo === 1;
+            document.getElementById('labelPassword').textContent = 'Nueva Contraseña (dejar vacío para no cambiar)';
+            document.getElementById('usuarioPassword').required = false;
+            modalUsuario.show();
+        }
+    </script>
+</body>
+</html>

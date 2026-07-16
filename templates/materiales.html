@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block content %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/fixedheader/3.4.0/css/fixedHeader.dataTables.min.css">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/tipoubicacion.css') }}">
+<style>
+#tablaMateriales_wrapper .dataTables_scrollHead thead th { background: #f8f9fa; }
+        #tablaMateriales_wrapper .dataTables_scrollBody td,
+        #tablaMateriales_wrapper .dataTables_scrollHead th { font-size: 0.9rem; padding: 3px 5px; }
+</style>
+
+<div class="materiales-container" style="padding: 0 20px 20px 20px; height: calc(100vh - 50px); display: flex; flex-direction: column;">
+    <div class="header-actions" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-shrink: 0; position: sticky; top: 0; z-index: 10; background: #f8f9fa; margin: -20px -20px 20px -20px; padding: 10px 20px 8px 20px;">
+        <h1><i class="fas fa-boxes"></i> Gestión de Materiales</h1>
+        <div style="display:flex; gap:10px; align-items:center;">
+
+            <!-- Exportar dropdown -->
+            <div class="mat-dropdown" style="position:relative;">
+                <button onclick="toggleDropdownExportar(event)" style="background:#8e44ad; color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer; font-weight:bold;">
+                    <i class="fas fa-file-export"></i> Exportar <i class="fas fa-caret-down" style="margin-left:4px;"></i>
+                </button>
+                <div id="dropdownExportar" style="display:none; position:absolute; right:0; top:100%; margin-top:4px; background:white; border:1px solid #ddd; border-radius:4px; box-shadow:0 4px 12px rgba(0,0,0,0.15); z-index:500; min-width:150px;">
+                    <a href="{{ url_for('materiales.exportar', formato='csv') }}" style="display:flex; align-items:center; gap:8px; padding:10px 16px; color:#333; text-decoration:none; font-size:0.9rem; border-bottom:1px solid #f0f0f0;" onmouseenter="this.style.background='#f5f5f5'" onmouseleave="this.style.background=''">
+                        <i class="fas fa-file-csv" style="color:#27ae60; width:16px;"></i> CSV
+                    </a>
+                    <a href="{{ url_for('materiales.exportar', formato='xlsx') }}" style="display:flex; align-items:center; gap:8px; padding:10px 16px; color:#333; text-decoration:none; font-size:0.9rem; border-bottom:1px solid #f0f0f0;" onmouseenter="this.style.background='#f5f5f5'" onmouseleave="this.style.background=''">
+                        <i class="fas fa-file-excel" style="color:#217346; width:16px;"></i> Excel (XLSX)
+                    </a>
+                    <a href="{{ url_for('materiales.exportar', formato='json') }}" style="display:flex; align-items:center; gap:8px; padding:10px 16px; color:#333; text-decoration:none; font-size:0.9rem;" onmouseenter="this.style.background='#f5f5f5'" onmouseleave="this.style.background=''">
+                        <i class="fas fa-file-code" style="color:#e67e22; width:16px;"></i> JSON
+                    </a>
+                </div>
+            </div>
+
+            <button class="btn-add" onclick="openModalImportar()" style="background:#3498db; color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer; font-weight:bold;">
+                <i class="fas fa-file-import"></i> Importar
+            </button>
+            <button class="btn-add" onclick="openModal()" style="background:#27ae60; color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer; font-weight:bold;">
+                <i class="fas fa-plus"></i> Nuevo Material
+            </button>
+        </div>
+    </div>
+
+    <div class="table-card" style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); flex: 1; min-height: 0; overflow: auto;">
+        <table id="tablaMateriales" class="display cell-border hover stripe" style="width:100%; min-width: 900px;">
+            <thead>
+                <tr>
+                    <th>Código</th>
+                    <th>Nombre</th>
+                    <th>Categoría</th>
+                    <th>Cód. Barras</th>
+                    <th>Prov. Habitual</th>
+                    <th>Stock Min/Max</th>
+                    <th style="text-align:center;">Lote / Serie</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in materiales %}
+                <tr>
+                    <td><code>{{ m.codigo }}</code></td>
+                    <td><strong>{{ m.nombre }}</strong></td>
+                    <td>{{ m.categoria_nombre or '-' }}</td>
+                    <td>
+                        {% if m.codigo_barras %}
+                            <code style="font-size:0.85em; color:#27ae60;">{{ m.codigo_barras }}</code>
+                        {% else %}
+                            <span style="color:#ccc;">—</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if m.proveedor_habitual %}
+                            <i class="fas fa-star" style="color:#f39c12;" title="Proveedor habitual"></i> {{ m.proveedor_habitual }}
+                        {% else %}
+                            <span style="color:#ccc;">—</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ m.stock_minimo }} / {{ m.stock_maximo }}</td>
+                    <td style="text-align:center;">
+                        {% if m.trazabilidad == 'lote' %}
+                            <i class="fas fa-tags" style="color:#f39c12;" title="Por Lote"></i> Lote
+                        {% elif m.trazabilidad == 'serie' %}
+                            <i class="fas fa-barcode" style="color:#8e44ad;" title="Por Número de Serie"></i> Serie
+                        {% else %}
+                            <span style="color:#ccc;">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="actions-cell" style="text-align: center;">
+                        <button class="btn-icon edit" onclick='editMaterial({{ m | tojson }})' style="color: #3498db; border:none; background:none; cursor:pointer;">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <a href="{{ url_for('materiales.eliminar', id=m.id) }}" class="btn-icon delete" onclick="return confirm('¿Eliminar material?')" style="color: #e74c3c; text-decoration:none;">
+                            <i class="fas fa-trash"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% include "partials/_modal_materiales.html" %}
+{% include "partials/_modal_importar_materiales.html" %}
+
+<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/fixedheader/3.4.0/js/dataTables.fixedHeader.min.js"></script>
+<script>
+    const listaProveedoresDB = {{ proveedores | tojson }};
+    const relacionesExistentes = {{ relaciones | tojson }};
+    const presentacionesExistentes = {{ presentaciones | tojson }};
+</script>
+<script src="{{ url_for('static', filename='js/materiales.js') }}"></script>
+<script src="{{ url_for('static', filename='js/batch_ui.js') }}"></script>
+{% endblock %}

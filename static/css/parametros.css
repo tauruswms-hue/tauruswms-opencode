@@ -1,0 +1,228 @@
+/* =========================================
+   Estilos Generales de Contenedores
+   ========================================= */
+.parametros-container {
+    display: flex;
+    gap: 20px;
+    padding: 20px;
+    background-color: #f8fafc;
+    min-height: 80vh;
+}
+
+/* =========================================
+   Sidebar de Configuración
+   ========================================= */
+.params-sidebar {
+    width: 250px;
+    background: white;
+    border-radius: 8px;
+    padding: 15px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    height: fit-content;
+}
+
+.params-sidebar-header {
+    font-size: 1.1rem;
+    font-weight: bold;
+    color: #1e293b;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #e2e8f0;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.params-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.params-nav-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    color: #475569;
+    text-decoration: none;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    transition: all 0.2s;
+}
+
+.params-nav-link:hover {
+    background-color: #f1f5f9;
+    color: #1e293b;
+}
+
+.params-nav-link.active {
+    background-color: #e0f2fe;
+    color: #0284c7;
+    font-weight: 500;
+}
+
+/* =========================================
+   Estilos Específicos para Dropdown Sidebar
+   ========================================= */
+.params-nav-dropdown {
+    width: 100%;
+}
+
+/* Oculto por defecto para que funcione JS slideToggle */
+.params-dropdown-menu {
+    display: none;
+    background-color: #f8fafc;
+    border-radius: 0 0 6px 6px;
+    padding-left: 10px;
+}
+
+/* Indentación para sub-items */
+.params-dropdown-menu .params-nav-link {
+    padding-left: 35px;
+    font-size: 0.9rem;
+}
+
+.toggle-icon {
+    font-size: 0.8rem;
+    transition: transform 0.3s ease;
+    margin-left: auto;
+}
+
+/* Clase que rotará el icono con JS */
+.rotate-icon {
+    transform: rotate(180deg);
+}
+
+/* =========================================
+   Formularios de Parámetros
+   ========================================= */
+.params-form-container {
+    flex: 1;
+    background: white;
+    border-radius: 8px;
+    padding: 25px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.params-section {
+    background: #fdfdfd;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border: 1px solid #e2e8f0;
+}
+
+.border-orange { border-top: 3px solid #f39c12; }
+.border-blue { border-top: 3px solid #3498db; }
+.border-purple { border-top: 3px solid #8e44ad; }
+
+.params-section-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #334155;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.params-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.params-field {
+    display: flex;
+    flex-direction: column;
+}
+
+.params-field.full-width,
+.params-field--full {
+    grid-column: span 2;
+}
+
+.params-field label {
+    font-size: 0.85rem;
+    color: #475569;
+    margin-bottom: 6px;
+    font-weight: 500;
+}
+
+.params-field input,
+.params-field select,
+.params-field textarea {
+    padding: 10px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    background-color: white;
+}
+
+.params-field input:focus,
+.params-field select:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+.params-submit-container {
+    margin-top: 20px;
+    text-align: right;
+}
+
+.btn-save {
+    background-color: #27ae60;
+    color: white;
+    border: none;
+    padding: 10px 25px;
+    border-radius: 6px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.btn-save:hover {
+    background-color: #219150;
+}
+
+/* --- ESTILOS DE NIVELES --- */
+
+/* Menú de Nivel 1 (Personalización) */
+.params-dropdown-menu {
+    display: none;
+    background-color: rgba(0, 0, 0, 0.02);
+    border-left: 2px solid #e2e8f0;
+    margin-left: 10px;
+}
+
+/* Menú de Nivel 2 (Layout / General) */
+.params-dropdown-menu.sub-menu {
+    background-color: rgba(0, 0, 0, 0.03);
+    margin-left: 15px; /* Más indentación para el tercer nivel */
+    border-left: 2px solid #cbd5e1;
+}
+
+/* Ajuste de los links internos */
+.params-dropdown-menu .params-nav-link {
+    font-size: 0.9rem;
+    padding: 8px 15px;
+}
+
+/* Iconos de flecha */
+.toggle-icon {
+    font-size: 0.7rem;
+    transition: transform 0.3s ease;
+    margin-left: auto; /* Empuja la flecha a la derecha */
+}
+
+.rotate-icon {
+    transform: rotate(180deg);
+}
+
+/* Estilo para los toggles cuando están abiertos (opcional) */
+.params-nav-dropdown.active > .dropdown-toggle {
+    color: #3498db;
+    font-weight: 600;
+}

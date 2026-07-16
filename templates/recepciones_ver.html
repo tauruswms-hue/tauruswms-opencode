@@ -1,0 +1,725 @@
+{% extends "base.html" %}
+{% block title %}Recepción {{ recepcion.numero }}{% endblock %}
+
+{% block content %}
+{% set total_recibido = detalle | sum(attribute='cantidad_recibida') %}
+<div style="padding:20px; max-width:1200px; margin:auto;">
+
+    <!-- ENCABEZADO -->
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <div>
+            <h2 style="margin:0;">
+                <i class="fas fa-warehouse"></i> {{ recepcion.numero }}
+                {% if recepcion.estado == 'Abierta' %}
+                <span style="background:#f39c12; color:white; padding:3px 12px; border-radius:12px; font-size:0.75rem; vertical-align:middle;">Abierta</span>
+                {% elif recepcion.estado == 'Cerrada' %}
+                <span style="background:#27ae60; color:white; padding:3px 12px; border-radius:12px; font-size:0.75rem; vertical-align:middle;">Cerrada</span>
+                {% elif recepcion.estado == 'Confirmada' %}
+                <span style="background:#1a365d; color:white; padding:3px 12px; border-radius:12px; font-size:0.75rem; vertical-align:middle;">Confirmada</span>
+                {% else %}
+                <span style="background:#e74c3c; color:white; padding:3px 12px; border-radius:12px; font-size:0.75rem; vertical-align:middle;">Anulada</span>
+                {% endif %}
+            </h2>
+            <div style="color:#666; font-size:0.9rem; margin-top:4px;">
+                {{ recepcion.proveedor_codigo }} — {{ recepcion.proveedor_nombre }}
+            </div>
+        </div>
+        <div style="display:flex; gap:10px; align-items:center;">
+            {% if recepcion.estado == 'Abierta' %}
+            <button onclick="abrirModalCerrar()"
+                    {% if total_recibido == 0 %}disabled title="Agregue ítems con cantidad recibida mayor a cero antes de cerrar"{% else %}title="Cerrar y registrar Stock Saliendo en la ubicación de recepción"{% endif %}
+                    style="background:{% if total_recibido > 0 %}#27ae60{% else %}#95a5a6{% endif %}; color:white; border:none; padding:10px 18px; border-radius:4px; cursor:{% if total_recibido > 0 %}pointer{% else %}not-allowed{% endif %}; font-weight:bold; opacity:{% if total_recibido > 0 %}1{% else %}0.65{% endif %};">
+                <i class="fas fa-lock"></i> Cerrar Recepción
+            </button>
+            <button onclick="confirmarAnular()"
+                    style="background:#e74c3c; color:white; border:none; padding:10px 18px; border-radius:4px; cursor:pointer;">
+                <i class="fas fa-ban"></i> Anular
+            </button>
+            {% if detalle | length == 0 %}
+            <button onclick="confirmarEliminar()"
+                    style="background:#6c3a3a; color:white; border:none; padding:10px 18px; border-radius:4px; cursor:pointer;"
+                    title="Eliminar recepción (sin materiales)">
+                <i class="fas fa-trash"></i> Eliminar
+            </button>
+            {% endif %}
+            {% elif recepcion.estado == 'Cerrada' %}
+            {% if omc_relacionada %}
+            <a href="{{ url_for('omc.ver', id_omc=omc_relacionada.id_omc) }}"
+               style="background:#1a365d; color:white; padding:10px 18px; border-radius:4px; text-decoration:none; font-weight:bold; display:inline-flex; align-items:center; gap:6px;">
+                <i class="fas fa-exchange-alt"></i>
+                Ver OMC {{ omc_relacionada.numero }}
+                {% if omc_relacionada.estado == 'Pendiente' %}
+                <span style="background:#f39c12; padding:1px 7px; border-radius:10px; font-size:0.72rem;">Pendiente</span>
+                {% elif omc_relacionada.estado == 'Confirmada' %}
+                <span style="background:#27ae60; padding:1px 7px; border-radius:10px; font-size:0.72rem;">Confirmada</span>
+                {% endif %}
+            </a>
+            {% else %}
+            <button onclick="confirmarEntrada()"
+                    title="Mueve el Stock Saliendo de la ubicación de recepción al Stock Disponible en la ubicación destino"
+                    style="background:#1a365d; color:white; border:none; padding:10px 18px; border-radius:4px; cursor:pointer; font-weight:bold;">
+                <i class="fas fa-check-double"></i> Confirmar Entrada al Stock
+            </button>
+            {% endif %}
+            {% endif %}
+            <a href="{{ url_for('recepciones.listar') }}"
+               style="background:#95a5a6; color:white; padding:10px 15px; border-radius:4px; text-decoration:none;">
+                <i class="fas fa-arrow-left"></i> Volver
+            </a>
+        </div>
+    </div>
+
+    <!-- PANEL DE INFORMACIÓN -->
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:20px;">
+        <div style="background:white; border-radius:8px; padding:20px; box-shadow:0 2px 8px rgba(0,0,0,0.07);">
+            <h5 style="margin:0 0 14px; color:#1a365d; border-bottom:2px solid #f6ad55; padding-bottom:8px;">
+                <i class="fas fa-info-circle"></i> Datos Generales
+            </h5>
+            <table style="width:100%; font-size:0.9rem; border-collapse:collapse;">
+                <tr>
+                    <td style="color:#666; padding:5px 0; width:40%;">Contenedor</td>
+                    <td><code style="background:#f0f0f0; padding:3px 8px; border-radius:4px; font-size:1rem; font-weight:bold;">{{ recepcion.id_contenedor }}</code></td>
+                </tr>
+                <tr>
+                    <td style="color:#666; padding:5px 0;">Ubic. Recepción</td>
+                    <td>{{ recepcion.ubicacion_recep_codigo }} — {{ recepcion.ubicacion_recep_nombre }}</td>
+                </tr>
+                <tr>
+                    <td style="color:#666; padding:5px 0;">Ubic. Destino</td>
+                    <td>
+                        {% if recepcion.ubicacion_dest_codigo %}
+                        {{ recepcion.ubicacion_dest_codigo }} — {{ recepcion.ubicacion_dest_nombre }}
+                        {% else %}
+                        <em style="color:#aaa;">Se define al cerrar</em>
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <td style="color:#666; padding:5px 0;">Observaciones</td>
+                    <td>{{ recepcion.observaciones or '—' }}</td>
+                </tr>
+            </table>
+        </div>
+        <div style="background:white; border-radius:8px; padding:20px; box-shadow:0 2px 8px rgba(0,0,0,0.07);">
+            <h5 style="margin:0 0 14px; color:#1a365d; border-bottom:2px solid #f6ad55; padding-bottom:8px;">
+                <i class="fas fa-clock"></i> Trazabilidad
+            </h5>
+            <table style="width:100%; font-size:0.9rem; border-collapse:collapse;">
+                <tr>
+                    <td style="color:#666; padding:5px 0; width:40%;">Fecha apertura</td>
+                    <td>{{ recepcion.fecha_recepcion.strftime('%d/%m/%Y %H:%M') if recepcion.fecha_recepcion else '—' }}</td>
+                </tr>
+                <tr>
+                    <td style="color:#666; padding:5px 0;">Usuario apertura</td>
+                    <td>{{ recepcion.usuario_creacion }}</td>
+                </tr>
+                <tr>
+                    <td style="color:#666; padding:5px 0;">Fecha cierre</td>
+                    <td>{{ recepcion.fecha_cierre.strftime('%d/%m/%Y %H:%M') if recepcion.fecha_cierre else '—' }}</td>
+                </tr>
+                <tr>
+                    <td style="color:#666; padding:5px 0;">Usuario cierre</td>
+                    <td>{{ recepcion.usuario_cierre or '—' }}</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <!-- PANEL AGREGAR ÍTEM (solo si está Abierta) -->
+    {% if recepcion.estado == 'Abierta' %}
+    <div id="panelAgregarItem" style="background:white; border-radius:8px; padding:22px; box-shadow:0 2px 8px rgba(0,0,0,0.07); margin-bottom:20px; border-left:4px solid #3498db;">
+        <h5 style="margin:0 0 16px; color:#1a365d;">
+            <i class="fas fa-plus-circle" style="color:#3498db;"></i>
+            <span id="tituloPanel">Agregar material</span>
+        </h5>
+
+        <input type="hidden" id="edit_id_detalle" value="">
+        <!-- ID del proveedor para los endpoints AJAX -->
+        <input type="hidden" id="id_proveedor_rec" value="{{ recepcion.id_proveedor }}">
+
+        <!-- ── BUSCADOR DE MATERIAL ── -->
+        <div style="margin-bottom:14px;">
+            <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:6px;">
+                Material <span style="color:red;">*</span>
+            </label>
+
+            <!-- Fila: lector de código de barras -->
+            <div id="filaScannerWrapper" style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+                <div style="position:relative; flex:1;">
+                    <span style="position:absolute; left:9px; top:50%; transform:translateY(-50%); color:#f39c12;">
+                        <i class="fas fa-barcode"></i>
+                    </span>
+                    <input type="text" id="inp_scanner"
+                           placeholder="Foco aquí para leer código de barras y presionar Enter..."
+                           autocomplete="off"
+                           style="width:100%; padding:8px 8px 8px 32px; border:2px dashed #f39c12; border-radius:4px; background:#fffbf0; box-sizing:border-box;">
+                </div>
+                <button type="button" onclick="document.getElementById('inp_scanner').value=''"
+                        title="Limpiar scanner"
+                        style="padding:8px 12px; background:#ffeeba; border:1px solid #f39c12; border-radius:4px; cursor:pointer; color:#856404;">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <!-- Cuadro de búsqueda por texto -->
+            <div style="position:relative;">
+                <span style="position:absolute; left:9px; top:50%; transform:translateY(-50%); color:#aaa;">
+                    <i class="fas fa-search"></i>
+                </span>
+                <input type="text" id="inp_buscar_mat"
+                       placeholder="Buscar por código, descripción o código de barras..."
+                       autocomplete="off"
+                       style="width:100%; padding:8px 8px 8px 32px; border:1px solid #ddd; border-radius:4px; box-sizing:border-box;">
+                <!-- Dropdown de resultados -->
+                <div id="dropdown_mat" style="display:none; position:absolute; top:100%; left:0; right:0;
+                     background:white; border:1px solid #ddd; border-top:none; border-radius:0 0 4px 4px;
+                     z-index:1000; max-height:220px; overflow-y:auto; box-shadow:0 4px 8px rgba(0,0,0,0.12);">
+                </div>
+            </div>
+
+            <!-- Material seleccionado -->
+            <input type="hidden" id="sel_material" value="">
+            <div id="mat_seleccionado" style="display:none; margin-top:8px; padding:8px 12px;
+                 background:#eaf4fb; border:1px solid #bee3f8; border-radius:4px; font-size:0.88rem;">
+                <span id="mat_sel_texto" style="font-weight:bold;"></span>
+                <span id="mat_sel_unidad" style="color:#666; margin-left:8px;"></span>
+                <button type="button" onclick="limpiarMaterial()"
+                        style="float:right; border:none; background:none; cursor:pointer; color:#e74c3c; font-size:1rem;"
+                        title="Cambiar material">✕</button>
+            </div>
+
+            {% if not materiales %}
+            <small style="color:#e74c3c; display:block; margin-top:4px;">
+                <i class="fas fa-exclamation-triangle"></i>
+                Este proveedor no tiene materiales asignados.
+                <a href="{{ url_for('materiales.listar') }}">Asignar materiales</a>
+            </small>
+            {% endif %}
+        </div>
+
+        <!-- Resto de campos -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:14px;">
+            <div>
+                <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:4px;">Lote</label>
+                <input type="text" id="inp_lote" placeholder="UNICO" maxlength="100"
+                       style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px; box-sizing:border-box;">
+            </div>
+            <div>
+                <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:4px;">Fecha vencimiento</label>
+                <input type="date" id="inp_fecha_venc"
+                       style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px; box-sizing:border-box;">
+            </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr 2fr; gap:16px; align-items:end;">
+            <div>
+                <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:4px;">Cant. Esperada</label>
+                <input type="number" id="inp_cant_esp" placeholder="0" min="0" step="0.0001"
+                       style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px; box-sizing:border-box;">
+            </div>
+            <div>
+                <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:4px;">Cant. Recibida *</label>
+                <input type="number" id="inp_cant_rec" placeholder="0" min="0" step="0.0001"
+                       style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px; border-color:#27ae60; box-sizing:border-box;">
+            </div>
+            <div>
+                <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:4px;">Tipo Stock</label>
+                <select id="sel_tipo_stock" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;">
+                    <option value="Libre Venta">Libre Venta</option>
+                    <option value="Calidad">Calidad</option>
+                    <option value="Bloqueado">Bloqueado</option>
+                    <option value="Mal Estado">Mal Estado</option>
+                </select>
+            </div>
+            <div>
+                <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:4px;">Observaciones</label>
+                <input type="text" id="inp_obs" placeholder="Opcional..."
+                       style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px; box-sizing:border-box;">
+            </div>
+        </div>
+
+        <div style="display:flex; gap:10px; margin-top:16px;">
+            <button onclick="guardarItem()"
+                    style="background:#3498db; color:white; border:none; padding:10px 22px; border-radius:4px; cursor:pointer; font-weight:bold;">
+                <i class="fas fa-plus"></i> <span id="btnItemTexto">Agregar</span>
+            </button>
+            <button onclick="limpiarPanel()"
+                    style="background:#bdc3c7; color:white; border:none; padding:10px 16px; border-radius:4px; cursor:pointer;">
+                <i class="fas fa-times"></i> Limpiar
+            </button>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- TABLA DE DETALLE -->
+    <div style="background:white; border-radius:8px; padding:22px; box-shadow:0 2px 8px rgba(0,0,0,0.07);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <h5 style="margin:0; color:#1a365d;">
+                <i class="fas fa-list"></i> Materiales Recibidos
+                <span id="contadorItems" style="background:#1a365d; color:white; padding:2px 8px; border-radius:10px; font-size:0.8rem; margin-left:6px;">{{ detalle|length }}</span>
+            </h5>
+            <div id="totalUnidades" style="font-size:0.9rem; color:#555;">
+                {% if total_recibido > 0 %}
+                <span style="color:#1a365d; font-weight:bold;">
+                    {{ detalle | length }} ítem(s) —
+                    {{ '{:,.4f}'.format(total_recibido | float).rstrip('0').rstrip('.').replace(',', '.') }}
+                    unidades recibidas
+                </span>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if detalle %}
+        <div style="overflow-x:auto;">
+            <table id="tablaDetalle" style="width:100%; border-collapse:collapse; font-size:0.9rem;">
+                <thead>
+                    <tr style="background:#f8f9fa; border-bottom:2px solid #dee2e6;">
+                        <th style="padding:10px; text-align:left;">Material</th>
+                        <th style="padding:10px; text-align:left;">Lote</th>
+                        <th style="padding:10px; text-align:left;">Tipo Stock</th>
+                        <th style="padding:10px; text-align:right;">Esperada</th>
+                        <th style="padding:10px; text-align:right;">Recibida</th>
+                        <th style="padding:10px; text-align:center;">Vencimiento</th>
+                        <th style="padding:10px; text-align:left;">Observ.</th>
+                        {% if recepcion.estado == 'Abierta' %}
+                        <th style="padding:10px; text-align:center;">Acciones</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody id="tbodyDetalle">
+                    {% for d in detalle %}
+                    <tr id="fila-{{ d.id_detalle }}" style="border-bottom:1px solid #eee;">
+                        <td style="padding:10px;">
+                            <strong>{{ d.material_codigo }}</strong> — {{ d.material_nombre }}<br>
+                            {% if d.codigo_referencia_prov %}
+                            <small style="color:#888;">Ref. proveedor: {{ d.codigo_referencia_prov }}</small>
+                            {% endif %}
+                        </td>
+                        <td style="padding:10px;">
+                            <code style="font-size:0.85rem;">{{ d.lote }}</code>
+                        </td>
+                        <td style="padding:10px;">
+                            {% if d.tipo_stock == 'Libre Venta' %}
+                            <span style="color:#27ae60; font-weight:bold;">● {{ d.tipo_stock }}</span>
+                            {% elif d.tipo_stock == 'Calidad' %}
+                            <span style="color:#f39c12; font-weight:bold;">● {{ d.tipo_stock }}</span>
+                            {% elif d.tipo_stock == 'Bloqueado' %}
+                            <span style="color:#e74c3c; font-weight:bold;">● {{ d.tipo_stock }}</span>
+                            {% else %}
+                            <span style="color:#95a5a6; font-weight:bold;">● {{ d.tipo_stock }}</span>
+                            {% endif %}
+                        </td>
+                        <td style="padding:10px; text-align:right; color:#888;">
+                            {% if d.cantidad_esperada %} {{ '{:,.4f}'.format(d.cantidad_esperada).rstrip('0').rstrip('.').replace(',', '.') }} {% else %}—{% endif %}
+                        </td>
+                        <td style="padding:10px; text-align:right; font-weight:bold; color:#1a365d;">
+                            {{ '{:,.4f}'.format(d.cantidad_recibida).rstrip('0').rstrip('.').replace(',', '.') }}
+                        </td>
+                        <td style="padding:10px; text-align:center; color:#666;">
+                            {{ d.fecha_vencimiento.strftime('%d/%m/%Y') if d.fecha_vencimiento else '—' }}
+                        </td>
+                        <td style="padding:10px; color:#666; font-size:0.85rem;">{{ d.observaciones or '—' }}</td>
+                        {% if recepcion.estado == 'Abierta' %}
+                        <td style="padding:10px; text-align:center; white-space:nowrap;">
+                            <button onclick="editarItem({{ d.id_detalle }}, {{ d.id_material }}, '{{ d.lote }}', '{{ d.fecha_vencimiento or '' }}', {{ d.cantidad_esperada }}, {{ d.cantidad_recibida }}, '{{ d.tipo_stock }}', '{{ d.observaciones or '' }}', '{{ d.material_codigo }}', '{{ d.material_nombre|replace("'", "\\'") }}', '{{ d.unidad_nombre or '' }}')"
+                                    style="background:none; border:none; cursor:pointer; color:#f39c12; margin:0 4px;" title="Editar">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button onclick="eliminarItem({{ d.id_detalle }})"
+                                    style="background:none; border:none; cursor:pointer; color:#e74c3c; margin:0 4px;" title="Eliminar">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr style="background:#f8f9fa; font-weight:bold; border-top:2px solid #dee2e6;">
+                        <td colspan="3" style="padding:10px; color:#1a365d;">TOTAL</td>
+                        <td style="padding:10px; text-align:right; color:#888;" id="footEsperada">
+                            {{ '{:,.4f}'.format(detalle|sum(attribute='cantidad_esperada')).rstrip('0').rstrip('.').replace(',','.') }}
+                        </td>
+                        <td style="padding:10px; text-align:right; color:#1a365d;" id="footRecibida">
+                            {{ '{:,.4f}'.format(detalle|sum(attribute='cantidad_recibida')).rstrip('0').rstrip('.').replace(',','.') }}
+                        </td>
+                        <td colspan="{{ 3 if recepcion.estado == 'Abierta' else 2 }}"></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        {% else %}
+        <div id="mensajeVacio" style="text-align:center; padding:40px; color:#aaa;">
+            <i class="fas fa-inbox" style="font-size:3rem; margin-bottom:12px; display:block;"></i>
+            No hay materiales cargados aún.
+            {% if recepcion.estado == 'Abierta' %}
+            <br><span style="font-size:0.9rem;">Use el panel de arriba para agregar materiales.</span>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- MODAL CERRAR RECEPCIÓN -->
+{% if recepcion.estado == 'Abierta' %}
+<div id="modalCerrar" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
+    <div style="background:white; border-radius:10px; padding:30px; max-width:600px; width:90%; box-shadow:0 10px 40px rgba(0,0,0,0.2);">
+        <h3 style="margin:0 0 6px; color:#1a365d;"><i class="fas fa-lock"></i> Cerrar Recepción</h3>
+        <p style="color:#666; margin-bottom:20px; font-size:0.9rem;">
+            Al cerrar, el stock del contenedor <strong>{{ recepcion.id_contenedor }}</strong>
+            quedará en <strong>Stock Entrando</strong> en la ubicación destino hasta ser confirmado.
+        </p>
+
+        <form action="{{ url_for('recepciones.cerrar', id_recepcion=recepcion.id_recepcion) }}" method="POST">
+
+            <!-- Resumen de lo que se va a comprometer -->
+            <div style="background:#f8f9fa; border-radius:6px; padding:12px 16px; margin-bottom:18px; font-size:0.88rem; border:1px solid #dee2e6;">
+                <div style="display:flex; justify-content:space-between;">
+                    <span style="color:#555;"><i class="fas fa-boxes" style="margin-right:6px;"></i>Ítems a registrar</span>
+                    <strong>{{ detalle | length }}</strong>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-top:6px;">
+                    <span style="color:#555;"><i class="fas fa-cubes" style="margin-right:6px;"></i>Unidades recibidas</span>
+                    <strong>{{ '{:,.4f}'.format(total_recibido | float).rstrip('0').rstrip('.').replace(',', '.') }}</strong>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-top:6px;">
+                    <span style="color:#555;"><i class="fas fa-map-marker-alt" style="margin-right:6px;"></i>Stock quedará en</span>
+                    <strong>{{ recepcion.ubicacion_recep_codigo }} (Stock Saliendo)</strong>
+                </div>
+            </div>
+
+            <div style="margin-bottom:18px;">
+                <label style="display:block; font-weight:bold; margin-bottom:8px;">
+                    Ubicación Destino <span style="color:red;">*</span>
+                </label>
+
+                <!-- Buscador de ubicación destino -->
+                <div style="position:relative; margin-bottom:8px;">
+                    <span style="position:absolute; left:9px; top:50%; transform:translateY(-50%); color:#aaa;">
+                        <i class="fas fa-search"></i>
+                    </span>
+                    <input type="text" id="buscar_ubic_destino"
+                           placeholder="Filtrar por código o nombre..."
+                           autocomplete="off"
+                           style="width:100%; padding:8px 8px 8px 32px; border:1px solid #ddd; border-radius:4px; box-sizing:border-box;"
+                           oninput="filtrarUbicaciones('sel_ubicacion_destino', this.value)">
+                </div>
+
+                <select name="id_ubicacion_destino" id="sel_ubicacion_destino" required
+                        style="width:100%; padding:9px; border:1px solid #ddd; border-radius:4px; max-height:180px;">
+                    <option value="">Seleccione ubicación destino...</option>
+                    {% for u in ubicaciones_destino %}
+                    <option value="{{ u.id }}"
+                            data-texto="{{ u.codigo }} {{ u.nombre }} {{ u.tipo }}"
+                            {% if recepcion.ubicacion_dest_id == u.id %}selected{% endif %}>
+                        {{ u.codigo }} — {{ u.nombre }} ({{ u.tipo }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div style="background:#d4edda; border-radius:6px; padding:12px 16px; margin-bottom:20px; font-size:0.85rem; color:#155724;">
+                <i class="fas fa-info-circle"></i>
+                El stock quedará en estado <strong>Entrando</strong> y deberá confirmarse para estar disponible.
+            </div>
+
+            <div style="background:#fff3cd; border-radius:6px; padding:12px 16px; margin-bottom:20px; font-size:0.85rem; color:#856404;">
+                <i class="fas fa-exclamation-triangle"></i>
+                Esta acción no se puede deshacer. Solo se impactarán los ítems con cantidad recibida mayor a cero.
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:12px;">
+                <button type="button" onclick="cerrarModal()"
+                        style="background:#95a5a6; color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer;">
+                    Cancelar
+                </button>
+                <button type="submit"
+                        style="background:#27ae60; color:white; border:none; padding:10px 24px; border-radius:4px; cursor:pointer; font-weight:bold;">
+                    <i class="fas fa-lock"></i> Confirmar Cierre
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- FORM ANULAR (oculto) -->
+<form id="formAnular" action="{{ url_for('recepciones.anular', id_recepcion=recepcion.id_recepcion) }}" method="POST" style="display:none;"></form>
+<!-- FORM ELIMINAR (oculto) -->
+<form id="formEliminar" action="{{ url_for('recepciones.eliminar', id_recepcion=recepcion.id_recepcion) }}" method="POST" style="display:none;"></form>
+{% endif %}
+
+{% if recepcion.estado == 'Cerrada' %}
+<form id="formConfirmarEntrada" action="{{ url_for('recepciones.confirmar_stock', id_recepcion=recepcion.id_recepcion) }}" method="POST" style="display:none;"></form>
+{% endif %}
+
+<script>
+const ID_RECEPCION = {{ recepcion.id_recepcion }};
+const ID_PROVEEDOR = {{ recepcion.id_proveedor }};
+
+// ── Modal cerrar ──────────────────────────────────────────
+function abrirModalCerrar() {
+    document.getElementById('modalCerrar').style.display = 'flex';
+}
+function cerrarModal() {
+    document.getElementById('modalCerrar').style.display = 'none';
+}
+
+// ── Confirmar entrada al stock ────────────────────────────
+function confirmarEntrada() {
+    if (!confirm('¿Confirmar la entrada al stock?\nEl stock en estado "Entrando" pasará a "Disponible". Esta acción no se puede deshacer.')) return;
+    document.getElementById('formConfirmarEntrada').submit();
+}
+
+// ── Anular ───────────────────────────────────────────────
+function confirmarAnular() {
+    if (!confirm('¿Desea anular esta recepción?\nEsta acción no se puede deshacer.')) return;
+    document.getElementById('formAnular').submit();
+}
+
+// ── Eliminar ─────────────────────────────────────────────
+function confirmarEliminar() {
+    if (!confirm('¿Desea ELIMINAR esta recepción?\nSe borrará permanentemente de la base de datos.')) return;
+    document.getElementById('formEliminar').submit();
+}
+
+// ── Filtrar <select> de ubicaciones ──────────────────────
+function filtrarUbicaciones(selectId, texto) {
+    const sel = document.getElementById(selectId);
+    const t = texto.toLowerCase();
+    Array.from(sel.options).forEach(opt => {
+        if (!opt.value) return; // placeholder
+        const datos = (opt.dataset.texto || opt.text).toLowerCase();
+        opt.style.display = datos.includes(t) ? '' : 'none';
+    });
+}
+
+// ── Buscador de material (AJAX) ───────────────────────────
+let debounceTimer = null;
+
+document.getElementById('inp_buscar_mat')?.addEventListener('input', function() {
+    clearTimeout(debounceTimer);
+    const q = this.value.trim();
+    if (q.length < 1) { cerrarDropdown(); return; }
+    debounceTimer = setTimeout(() => buscarMaterialAjax(q), 300);
+});
+
+document.getElementById('inp_buscar_mat')?.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') cerrarDropdown();
+});
+
+function buscarMaterialAjax(q) {
+    fetch(`/recepciones/buscar_materiales/${ID_PROVEEDOR}?q=${encodeURIComponent(q)}`)
+        .then(r => r.json())
+        .then(lista => mostrarDropdown(lista))
+        .catch(() => {});
+}
+
+function mostrarDropdown(lista) {
+    const dd = document.getElementById('dropdown_mat');
+    if (!lista.length) {
+        dd.innerHTML = '<div style="padding:10px; color:#999; font-size:0.88rem;">Sin resultados</div>';
+        dd.style.display = 'block';
+        return;
+    }
+    dd.innerHTML = lista.map(m => {
+        const barras = m.codigo_barras ? `<span style="color:#888; font-size:0.8rem;"> | CB: ${m.codigo_barras}</span>` : '';
+        const refprov = m.codigo_referencia_prov ? `<span style="color:#888; font-size:0.8rem;"> | Ref. prov: ${m.codigo_referencia_prov}</span>` : '';
+        const unidad = m.unidad_nombre ? `<span style="color:#27ae60; font-size:0.8rem;"> [${m.unidad_nombre}]</span>` : '';
+        return `<div onclick="seleccionarMaterial(${m.id}, '${escJS(m.codigo)}', '${escJS(m.nombre)}', '${escJS(m.unidad_nombre || '')}')"
+                     style="padding:10px 12px; cursor:pointer; border-bottom:1px solid #f0f0f0; font-size:0.88rem;"
+                     onmouseover="this.style.background='#f0f7ff'" onmouseout="this.style.background=''">
+                    <strong>${escHTML(m.codigo)}</strong> — ${escHTML(m.nombre)}${unidad}${barras}${refprov}
+                </div>`;
+    }).join('');
+    dd.style.display = 'block';
+}
+
+function cerrarDropdown() {
+    const dd = document.getElementById('dropdown_mat');
+    if (dd) dd.style.display = 'none';
+}
+
+function seleccionarMaterial(id, codigo, nombre, unidad) {
+    document.getElementById('sel_material').value = id;
+    document.getElementById('inp_buscar_mat').value = '';
+    cerrarDropdown();
+    document.getElementById('mat_sel_texto').textContent = `${codigo} — ${nombre}`;
+    document.getElementById('mat_sel_unidad').textContent = unidad ? `[${unidad}]` : '';
+    document.getElementById('mat_seleccionado').style.display = 'block';
+    document.getElementById('inp_cant_rec').focus();
+}
+
+function limpiarMaterial() {
+    document.getElementById('sel_material').value = '';
+    document.getElementById('mat_seleccionado').style.display = 'none';
+    document.getElementById('mat_sel_texto').textContent = '';
+    document.getElementById('inp_buscar_mat').value = '';
+    document.getElementById('inp_buscar_mat').focus();
+}
+
+// Cerrar dropdown al hacer clic fuera
+document.addEventListener('click', function(e) {
+    const wrap = document.getElementById('inp_buscar_mat')?.parentElement;
+    if (wrap && !wrap.contains(e.target)) cerrarDropdown();
+});
+
+// ── Lector de código de barras ────────────────────────────
+document.getElementById('inp_scanner')?.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        const barcode = this.value.trim();
+        if (!barcode) return;
+        fetch(`/recepciones/buscar_barcode/${ID_PROVEEDOR}?barcode=${encodeURIComponent(barcode)}`)
+            .then(r => r.json())
+            .then(mat => {
+                if (mat && mat.id) {
+                    seleccionarMaterial(mat.id, mat.codigo, mat.nombre, mat.unidad_nombre || '');
+                    this.value = '';
+                    this.style.borderColor = '#27ae60';
+                    setTimeout(() => this.style.borderColor = '#f39c12', 1500);
+                } else {
+                    this.style.borderColor = '#e74c3c';
+                    this.select();
+                    alert(`Código "${barcode}" no encontrado entre los materiales del proveedor.`);
+                    setTimeout(() => this.style.borderColor = '#f39c12', 2000);
+                }
+            })
+            .catch(() => alert('Error de conexión.'));
+    }
+});
+
+// ── Limpiar panel ────────────────────────────────────────
+function limpiarPanel() {
+    document.getElementById('edit_id_detalle').value = '';
+    limpiarMaterial();
+    document.getElementById('inp_lote').value = '';
+    document.getElementById('inp_fecha_venc').value = '';
+    document.getElementById('inp_cant_esp').value = '';
+    document.getElementById('inp_cant_rec').value = '';
+    document.getElementById('sel_tipo_stock').value = 'Libre Venta';
+    document.getElementById('inp_obs').value = '';
+    document.getElementById('tituloPanel').textContent = 'Agregar material';
+    document.getElementById('btnItemTexto').textContent = 'Agregar';
+    // Re-habilitar buscador en modo edición
+    document.getElementById('inp_buscar_mat').disabled = false;
+    document.getElementById('inp_scanner').disabled = false;
+    document.getElementById('filaScannerWrapper').style.display = 'flex';
+}
+
+// ── Editar ítem ──────────────────────────────────────────
+function editarItem(id_det, id_mat, lote, fvenc, cant_esp, cant_rec, tipo, obs, mat_codigo, mat_nombre, mat_unidad) {
+    document.getElementById('edit_id_detalle').value = id_det;
+    // Mostrar material como seleccionado (no se puede cambiar en edición)
+    document.getElementById('sel_material').value = id_mat;
+    document.getElementById('mat_sel_texto').textContent = `${mat_codigo} — ${mat_nombre}`;
+    document.getElementById('mat_sel_unidad').textContent = mat_unidad ? `[${mat_unidad}]` : '';
+    document.getElementById('mat_seleccionado').style.display = 'block';
+    // Deshabilitar campos de búsqueda en modo edición
+    document.getElementById('inp_buscar_mat').disabled = true;
+    document.getElementById('inp_scanner').disabled = true;
+    document.getElementById('filaScannerWrapper').style.display = 'none';
+
+    document.getElementById('inp_lote').value        = lote === 'UNICO' ? '' : lote;
+    document.getElementById('inp_fecha_venc').value  = fvenc;
+    document.getElementById('inp_cant_esp').value    = cant_esp || '';
+    document.getElementById('inp_cant_rec').value    = cant_rec || '';
+    document.getElementById('sel_tipo_stock').value  = tipo;
+    document.getElementById('inp_obs').value         = obs;
+    document.getElementById('tituloPanel').textContent = 'Editar material';
+    document.getElementById('btnItemTexto').textContent = 'Actualizar';
+    document.getElementById('panelAgregarItem').scrollIntoView({behavior: 'smooth'});
+}
+
+// ── Guardar ítem (AJAX) ──────────────────────────────────
+function guardarItem() {
+    const id_mat   = document.getElementById('sel_material').value;
+    const cant_rec = parseFloat(document.getElementById('inp_cant_rec').value || 0);
+    const id_det   = document.getElementById('edit_id_detalle').value;
+
+    if (!id_det && !id_mat) {
+        alert('Seleccione un material.'); return;
+    }
+    if (cant_rec <= 0) {
+        alert('La cantidad recibida debe ser mayor a cero.'); return;
+    }
+
+    const btnTexto = document.getElementById('btnItemTexto');
+    const btnGuardar = btnTexto.closest('button');
+    const textoOriginal = btnTexto.textContent;
+    btnGuardar.disabled = true;
+    btnTexto.textContent = 'Guardando...';
+
+    const payload = {
+        id_recepcion:       ID_RECEPCION,
+        id_material:        id_mat || null,
+        id_detalle:         id_det || null,
+        lote:               document.getElementById('inp_lote').value.trim() || 'UNICO',
+        fecha_vencimiento:  document.getElementById('inp_fecha_venc').value || null,
+        cantidad_esperada:  document.getElementById('inp_cant_esp').value || 0,
+        cantidad_recibida:  cant_rec,
+        tipo_stock:         document.getElementById('sel_tipo_stock').value,
+        observaciones:      document.getElementById('inp_obs').value.trim() || null
+    };
+
+    fetch('/recepciones/guardar_item', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+    })
+    .then(r => r.json())
+    .then(resp => {
+        if (resp.ok) {
+            location.reload();
+        } else {
+            btnGuardar.disabled = false;
+            btnTexto.textContent = textoOriginal;
+            alert('Error: ' + resp.msg);
+        }
+    })
+    .catch(() => {
+        btnGuardar.disabled = false;
+        btnTexto.textContent = textoOriginal;
+        alert('Error de conexión.');
+    });
+}
+
+// ── Eliminar ítem (AJAX) ─────────────────────────────────
+function eliminarItem(id_det) {
+    if (!confirm('¿Eliminar este material de la recepción?')) return;
+    fetch('/recepciones/eliminar_item/' + id_det, {method: 'POST'})
+    .then(r => r.json())
+    .then(resp => {
+        if (resp.ok) {
+            document.getElementById('fila-' + id_det)?.remove();
+            actualizarContador();
+        } else {
+            alert('Error: ' + resp.msg);
+        }
+    })
+    .catch(() => alert('Error de conexión.'));
+}
+
+function actualizarContador() {
+    const filas = document.querySelectorAll('#tbodyDetalle tr').length;
+    const contador = document.getElementById('contadorItems');
+    if (contador) contador.textContent = filas;
+    if (filas === 0) {
+        const vacio = document.getElementById('mensajeVacio');
+        if (vacio) vacio.style.display = 'block';
+    }
+}
+
+// ── Helpers ──────────────────────────────────────────────
+function escJS(s) { return (s || '').replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
+function escHTML(s) {
+    const d = document.createElement('div');
+    d.textContent = s || '';
+    return d.innerHTML;
+}
+
+// Cerrar modal al hacer click fuera
+document.getElementById('modalCerrar')?.addEventListener('click', function(e) {
+    if (e.target === this) cerrarModal();
+});
+</script>
+{% endblock %}

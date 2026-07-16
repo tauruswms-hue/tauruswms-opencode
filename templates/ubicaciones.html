@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+
+{% block content %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/tipoubicacion.css') }}">
+<style>
+#tablaUbicaciones_wrapper .dataTables_scrollHead thead th { background: #f8f9fa; }
+#tablaUbicaciones_wrapper .dataTables_scrollBody td,
+#tablaUbicaciones_wrapper .dataTables_scrollHead th { font-size: 0.7rem; padding: 1px 5px; }
+</style>
+
+<div class="materiales-container" style="padding: 0 20px 20px 20px; height: calc(100vh - 50px); display: flex; flex-direction: column;">
+    <div class="header-actions" style="display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; position: sticky; top: 0; z-index: 10; background: #f8f9fa; margin: -20px -20px 20px -20px; padding: 10px 20px 8px 20px;">
+        <h1><i class="fas fa-warehouse"></i> Gestión de Ubicaciones</h1>
+        <div style="display:flex; gap:10px; align-items:center;">
+            <div class="mat-dropdown" style="position:relative;">
+                <button onclick="toggleDropdownExportar(event)" style="background:#8e44ad; color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer; font-weight:bold;">
+                    <i class="fas fa-file-export"></i> Exportar <i class="fas fa-caret-down" style="margin-left:4px;"></i>
+                </button>
+                <div id="dropdownExportar" style="display:none; position:absolute; right:0; top:100%; margin-top:4px; background:white; border:1px solid #ddd; border-radius:4px; box-shadow:0 4px 12px rgba(0,0,0,0.15); z-index:500; min-width:160px;">
+                    <a href="{{ url_for('ubicaciones.exportar', formato='csv') }}" style="display:flex; align-items:center; gap:8px; padding:10px 16px; color:#333; text-decoration:none; font-size:0.9rem; border-bottom:1px solid #f0f0f0;" onmouseenter="this.style.background='#f5f5f5'" onmouseleave="this.style.background=''"><i class="fas fa-file-csv" style="color:#27ae60; width:16px;"></i> CSV</a>
+                    <a href="{{ url_for('ubicaciones.exportar', formato='xlsx') }}" style="display:flex; align-items:center; gap:8px; padding:10px 16px; color:#333; text-decoration:none; font-size:0.9rem; border-bottom:1px solid #f0f0f0;" onmouseenter="this.style.background='#f5f5f5'" onmouseleave="this.style.background=''"><i class="fas fa-file-excel" style="color:#217346; width:16px;"></i> Excel (XLSX)</a>
+                    <a href="{{ url_for('ubicaciones.exportar', formato='json') }}" style="display:flex; align-items:center; gap:8px; padding:10px 16px; color:#333; text-decoration:none; font-size:0.9rem;" onmouseenter="this.style.background='#f5f5f5'" onmouseleave="this.style.background=''"><i class="fas fa-file-code" style="color:#e67e22; width:16px;"></i> JSON</a>
+                </div>
+            </div>
+            <button class="btn-add" onclick="openModalImportar()" style="background:#3498db; color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer; font-weight:bold;">
+                <i class="fas fa-file-import"></i> Importar
+            </button>
+            <button class="btn-add" onclick="openModal()">
+                <i class="fas fa-plus"></i> Nueva Ubicación
+            </button>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div style="background:#f8f9fa; padding:14px 16px; border-radius:8px; margin-bottom:16px; display:grid; grid-template-columns:1.5fr 1fr 1fr 1fr; gap:14px; border:1px solid #e0e0e0;">
+
+        <!-- Código: texto libre -->
+        <div>
+            <label style="font-size:0.8rem; font-weight:bold; display:block; margin-bottom:3px;">Código:</label>
+            <input type="text" id="filtroCodigo" placeholder="Buscar código..."
+                   style="width:100%; padding:5px 8px; border:1px solid #ccc; border-radius:4px; font-size:0.9rem; box-sizing:border-box;">
+        </div>
+
+        <!-- Tipo: multi-select -->
+        <div style="position:relative;">
+            <label style="font-size:0.8rem; font-weight:bold; display:block; margin-bottom:3px;">Tipo:</label>
+            <div id="tipoDropdown" onclick="toggleFiltroMenu('tipoMenu', event)"
+                 style="padding:5px 8px; background:white; border:1px solid #ccc; border-radius:4px; cursor:pointer; user-select:none; display:flex; justify-content:space-between; align-items:center; font-size:0.9rem;">
+                <span id="tipoLabel">Todos</span>
+                <i class="fas fa-chevron-down" style="font-size:0.7rem; color:#666;"></i>
+            </div>
+            <div id="tipoMenu" style="display:none; position:absolute; top:100%; left:0; right:0; background:white; border:1px solid #ccc; border-radius:4px; box-shadow:0 4px 12px rgba(0,0,0,0.12); z-index:1000; padding:6px 0; max-height:220px; overflow-y:auto;">
+                {% for t in tipos %}
+                <label style="display:flex; align-items:center; gap:8px; padding:5px 12px; cursor:pointer; font-size:0.85rem;" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">
+                    <input type="checkbox" value="{{ t['descipción'] }}" class="chkTipo"> {{ t['descipción'] }}
+                </label>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Zona: multi-select -->
+        <div style="position:relative;">
+            <label style="font-size:0.8rem; font-weight:bold; display:block; margin-bottom:3px;">Zona:</label>
+            <div id="zonaDropdown" onclick="toggleFiltroMenu('zonaMenu', event)"
+                 style="padding:5px 8px; background:white; border:1px solid #ccc; border-radius:4px; cursor:pointer; user-select:none; display:flex; justify-content:space-between; align-items:center; font-size:0.9rem;">
+                <span id="zonaLabel">Todas</span>
+                <i class="fas fa-chevron-down" style="font-size:0.7rem; color:#666;"></i>
+            </div>
+            <div id="zonaMenu" style="display:none; position:absolute; top:100%; left:0; right:0; background:white; border:1px solid #ccc; border-radius:4px; box-shadow:0 4px 12px rgba(0,0,0,0.12); z-index:1000; padding:6px 0; max-height:220px; overflow-y:auto;">
+                {% for z in zonas %}
+                <label style="display:flex; align-items:center; gap:8px; padding:5px 12px; cursor:pointer; font-size:0.85rem;" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">
+                    <input type="checkbox" value="{{ z.codigo }}" class="chkZona"> {{ z.codigo }}{% if z.nombre %} — {{ z.nombre }}{% endif %}
+                </label>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Estado: multi-select -->
+        <div style="position:relative;">
+            <label style="font-size:0.8rem; font-weight:bold; display:block; margin-bottom:3px;">Estado:</label>
+            <div id="estadoDropdown" onclick="toggleFiltroMenu('estadoMenu', event)"
+                 style="padding:5px 8px; background:white; border:1px solid #ccc; border-radius:4px; cursor:pointer; user-select:none; display:flex; justify-content:space-between; align-items:center; font-size:0.9rem;">
+                <span id="estadoLabel">Todos</span>
+                <i class="fas fa-chevron-down" style="font-size:0.7rem; color:#666;"></i>
+            </div>
+            <div id="estadoMenu" style="display:none; position:absolute; top:100%; left:0; right:0; background:white; border:1px solid #ccc; border-radius:4px; box-shadow:0 4px 12px rgba(0,0,0,0.12); z-index:1000; padding:6px 0;">
+                <label style="display:flex; align-items:center; gap:8px; padding:5px 12px; cursor:pointer; font-size:0.85rem;" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">
+                    <input type="checkbox" value="Activa"   class="chkEstado" checked> Activa
+                </label>
+                <label style="display:flex; align-items:center; gap:8px; padding:5px 12px; cursor:pointer; font-size:0.85rem;" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">
+                    <input type="checkbox" value="Inactiva" class="chkEstado" checked> Inactiva
+                </label>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="table-card" style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); flex: 1; min-height: 0; overflow: auto;">
+        <table id="tablaUbicaciones" class="display cell-border hover stripe" style="width:100%">
+            <thead>
+                <tr>
+                    <th>Código</th>
+                    <th>Descripción</th>
+                    <th>Tipo</th>
+                    <th>Zona</th>
+                    <th>Orden Picking</th>
+                    <th>Coordenadas</th>
+                    <th>Capacidad</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in ubicaciones %}
+                <tr>
+                    <td><strong>{{ u.codigo }}</strong></td>
+                    <td>{{ u.descipcion or '-' }}</td>
+                    <td>{{ u.tipo_nombre or '-' }}</td>
+                    <td>
+                        {% if u.zona_codigo %}
+                        <span style="background:#eaf4fb; border:1px solid #bee3f8; padding:2px 8px; border-radius:10px; font-size:0.85rem;">
+                            {{ u.zona_codigo }}
+                        </span>
+                        {% else %}-{% endif %}
+                    </td>
+                    <td style="text-align:center;">
+                        {% if u.orden_picking %}
+                        <span style="font-weight:bold; color:#1a365d;">{{ u.orden_picking }}</span>
+                        {% else %}-{% endif %}
+                    </td>
+                    <td>
+                        <small>
+                            A:{{ u.coordenadaA or '-' }} |
+                            B:{{ u.coordenadaB or '-' }} |
+                            C:{{ u.coordenadaC or '-' }} |
+                            D:{{ u.coordenadaD or '-' }}
+                        </small>
+                    </td>
+                    <td>{{ u.capacidad_maxima }}</td>
+                    <td>
+                        {% if u.disponible_entrada %}
+                            <span class="badge badge-success">Activa</span>
+                        {% else %}
+                            <span class="badge badge-danger">Inactiva</span>
+                        {% endif %}
+                    </td>
+                    <td class="actions-cell">
+                        <button class="btn-icon edit" onclick='editUbicacion({{ u | tojson }})'>
+                            <i class="fas fa-edit"></i>
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% include "partials/_modal_ubicaciones.html" %}
+{% include "partials/_modal_importar_ubicaciones.html" %}
+
+<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script>const listaZonas = {{ zonas | tojson }};</script>
+<script src="{{ url_for('static', filename='js/ubicaciones.js') }}"></script>
+<script src="{{ url_for('static', filename='js/batch_ui.js') }}"></script>
+<script>
+(function() {
+    // Espera a que ubicaciones.js inicialice DataTables
+    $(document).ready(function() {
+        const table = $('#tablaUbicaciones').DataTable();
+
+        // ── Helpers ──────────────────────────────────────────────
+        function getChecked(cls) {
+            return [...document.querySelectorAll('.' + cls + ':checked')].map(c => c.value);
+        }
+
+        function updateLabel(spanId, values, totalCount, allText) {
+            const span = document.getElementById(spanId);
+            if (values.length === 0)             span.textContent = 'Ninguno';
+            else if (values.length === totalCount) span.textContent = allText;
+            else                                   span.textContent = values.join(', ');
+        }
+
+        // ── Toggle menú ──────────────────────────────────────────
+        window.toggleFiltroMenu = function(menuId, e) {
+            e.stopPropagation();
+            ['tipoMenu','zonaMenu','estadoMenu'].forEach(id => {
+                if (id !== menuId) document.getElementById(id).style.display = 'none';
+            });
+            const m = document.getElementById(menuId);
+            m.style.display = m.style.display === 'none' ? 'block' : 'none';
+        };
+
+        $(document).on('click', function(e) {
+            if (!$(e.target).closest('[id$="Dropdown"],[id$="Menu"]').length) {
+                ['tipoMenu','zonaMenu','estadoMenu'].forEach(id => {
+                    document.getElementById(id).style.display = 'none';
+                });
+            }
+        });
+
+        // ── Filtro personalizado ─────────────────────────────────
+        const totalTipos  = document.querySelectorAll('.chkTipo').length;
+        const totalZonas  = document.querySelectorAll('.chkZona').length;
+        const totalEstado = 2;
+
+        $.fn.dataTable.ext.search.push(function(settings, data) {
+            if (settings.nTable.id !== 'tablaUbicaciones') return true;
+
+            const tipos   = getChecked('chkTipo');
+            const zonas   = getChecked('chkZona');
+            const estados = getChecked('chkEstado');
+
+            // Tipo (col 2): si hay selección, la celda debe coincidir
+            if (tipos.length > 0 && !tipos.some(v => data[2].trim() === v)) return false;
+
+            // Zona (col 3): si hay selección, la celda debe incluir el código
+            if (zonas.length > 0 && !zonas.some(v => data[3].includes(v))) return false;
+
+            // Estado (col 7)
+            if (estados.length === 0) return false;
+            if (!estados.some(v => data[7].includes(v))) return false;
+
+            return true;
+        });
+
+        // ── Eventos ──────────────────────────────────────────────
+        $('#filtroCodigo').on('keyup', function() {
+            table.column(0).search(this.value).draw();
+        });
+
+        $(document).on('change', '.chkTipo', function() {
+            updateLabel('tipoLabel', getChecked('chkTipo'), totalTipos, 'Todos');
+            table.draw();
+        });
+
+        $(document).on('change', '.chkZona', function() {
+            updateLabel('zonaLabel', getChecked('chkZona'), totalZonas, 'Todas');
+            table.draw();
+        });
+
+        $(document).on('change', '.chkEstado', function() {
+            updateLabel('estadoLabel', getChecked('chkEstado'), totalEstado, 'Todos');
+            table.draw();
+        });
+
+        // Aplicar filtro inicial
+        table.draw();
+    });
+})();
+</script>
+{% endblock %}

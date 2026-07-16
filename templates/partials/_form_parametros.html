@@ -1,0 +1,47 @@
+<main class="params-content">
+    <form action="{{ url_for('parametros.actualizar') }}" method="POST" class="params-form">
+        <section class="params-section border-orange">
+            <h3><i class="fas fa-warehouse"></i> Ajustes del Almacén</h3>
+            <div class="params-grid">
+                <div class="params-field">
+                    <label>Nombre del Almacén</label>
+                    <input type="text" name="nombredelalmacen" value="{{ config.nombredelalmacen or '' }}">
+                </div>
+            </div>
+        </section>
+
+        <section class="params-section border-blue">
+            <h3><i class="fas fa-clipboard-list"></i> Lógica de Operación</h3>
+            <div class="params-grid">
+                <div class="params-field">
+                    <label>Método de Picking</label>
+                    <select name="metodosdepicking">
+                        <option value="fifo" {% if config.metodosdepicking == 'fifo' %}selected{% endif %}>FIFO (Primero en entrar, primero en salir)</option>
+                        <option value="lifo" {% if config.metodosdepicking == 'lifo' %}selected{% endif %}>LIFO (Último en entrar, primero en salir)</option>
+                        <option value="fefo" {% if config.metodosdepicking == 'fefo' %}selected{% endif %}>FEFO (Próximo a vencer)</option>
+                    </select>
+                </div>
+                <div class="params-field">
+                    <label>Alerta de Stock Bajo (%)</label>
+                    <input type="number" step="0.01" name="bajostock" value="{{ config.bajostock or 0 }}" class="input-standard-height">
+                </div>
+                <div class="params-field">
+                    <label>Días por defecto en filtros de fecha</label>
+                    <input type="number" min="1" max="3650" name="dias_filtro_fechas" value="{{ config.dias_filtro_fechas or 30 }}" class="input-standard-height">
+                </div>
+            </div>
+        </section>
+
+<div class="params-actions">
+            <button type="submit" class="btn-save">
+                <i class="fas fa-save"></i> Guardar Cambios
+            </button>
+            <button type="reset" class="btn-discard">
+                <i class="fas fa-undo"></i> Descartar
+            </button>
+            <button type="button" class="btn-discard" onclick="window.location.href='{{ url_for('index') }}'">
+                <i class="fas fa-arrow-left"></i> Volver
+            </button>
+        </div>
+    </form>
+</main>

@@ -1,0 +1,270 @@
+{% extends "base.html" %}
+{% block title %}Recepciones{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+
+<div style="padding: 20px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <h2><i class="fas fa-warehouse"></i> Recepciones de Materiales</h2>
+        <div style="display:flex; gap:10px;">
+            <button onclick="openModalImportar()" style="background:#3498db; color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer; font-weight:bold;">
+                <i class="fas fa-file-import"></i> Importar
+            </button>
+            <a href="{{ url_for('recepciones.nueva') }}"
+               style="background:#27ae60; color:white; padding:10px 20px; border-radius:4px; text-decoration:none; font-weight:bold;">
+                <i class="fas fa-plus"></i> Nueva Recepción
+            </a>
+        </div>
+    </div>
+
+    <!-- Resumen de estados (clickeables para filtrar) -->
+    <div style="display:flex; gap:12px; margin-bottom:16px;">
+        {% set abiertas    = recepciones | selectattr('estado','equalto','Abierta')    | list | length %}
+        {% set confirmadas = recepciones | selectattr('estado','equalto','Confirmada') | list | length %}
+        <div onclick="filtrarPorEstado('Abierta')"
+             title="Filtrar por Abiertas"
+             style="background:white; border-radius:8px; padding:10px 18px; box-shadow:0 2px 8px rgba(0,0,0,0.07); border-left:4px solid #f39c12; cursor:pointer; transition:box-shadow .15s; display:flex; align-items:center; gap:12px;"
+             onmouseover="this.style.boxShadow='0 4px 16px rgba(243,156,18,0.25)'" onmouseout="this.style.boxShadow='0 2px 8px rgba(0,0,0,0.07)'">
+            <div style="font-size:1.5rem; font-weight:bold; color:#f39c12;">{{ abiertas }}</div>
+            <div style="color:#666; font-size:0.82rem;">Abiertas <i class="fas fa-filter" style="font-size:0.65rem; opacity:0.5;"></i></div>
+        </div>
+        <div onclick="filtrarPorEstado('Confirmada')"
+             title="Filtrar por Confirmadas"
+             style="background:white; border-radius:8px; padding:10px 18px; box-shadow:0 2px 8px rgba(0,0,0,0.07); border-left:4px solid #1a365d; cursor:pointer; transition:box-shadow .15s; display:flex; align-items:center; gap:12px;"
+             onmouseover="this.style.boxShadow='0 4px 16px rgba(26,54,93,0.25)'" onmouseout="this.style.boxShadow='0 2px 8px rgba(0,0,0,0.07)'">
+            <div style="font-size:1.5rem; font-weight:bold; color:#1a365d;">{{ confirmadas }}</div>
+            <div style="color:#666; font-size:0.82rem;">Confirmadas <i class="fas fa-filter" style="font-size:0.65rem; opacity:0.5;"></i></div>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div style="background:#f8f9fa; padding:15px; border-radius:8px; margin-bottom:20px; display:grid; grid-template-columns:2fr 1fr 1fr 1fr; gap:15px; border:1px solid #e0e0e0;">
+        <div>
+            <label style="font-size:0.8rem; font-weight:bold;">Proveedor:</label>
+            <input type="text" id="filtroProveedor" placeholder="Nombre del proveedor..."
+                   style="width:100%; padding:5px; margin-top:3px;">
+        </div>
+        <div style="position:relative;">
+            <label style="font-size:0.8rem; font-weight:bold;">Estado:</label>
+            <div id="estadoDropdown" onclick="toggleEstadoMenu(event)"
+                 style="width:100%; padding:5px 8px; margin-top:3px; background:white; border:1px solid #ccc; border-radius:4px; cursor:pointer; user-select:none; display:flex; justify-content:space-between; align-items:center; font-size:0.9rem;">
+                <span id="estadoLabel">Abierta, Confirmada</span>
+                <i class="fas fa-chevron-down" style="font-size:0.7rem; color:#666;"></i>
+            </div>
+            <div id="estadoMenu" style="display:none; position:absolute; top:100%; left:0; right:0; background:white; border:1px solid #ccc; border-radius:4px; box-shadow:0 4px 12px rgba(0,0,0,0.12); z-index:1000; padding:6px 0;">
+                <label style="display:flex; align-items:center; gap:8px; padding:5px 12px; cursor:pointer; font-size:0.85rem;" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">
+                    <input type="checkbox" value="Abierta"    class="chkEstado" checked> Abierta
+                </label>
+                <label style="display:flex; align-items:center; gap:8px; padding:5px 12px; cursor:pointer; font-size:0.85rem;" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">
+                    <input type="checkbox" value="Cerrada"    class="chkEstado"> Cerrada
+                </label>
+                <label style="display:flex; align-items:center; gap:8px; padding:5px 12px; cursor:pointer; font-size:0.85rem;" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">
+                    <input type="checkbox" value="Confirmada" class="chkEstado" checked> Confirmada
+                </label>
+                <label style="display:flex; align-items:center; gap:8px; padding:5px 12px; cursor:pointer; font-size:0.85rem;" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">
+                    <input type="checkbox" value="Anulada"    class="chkEstado"> Anulada
+                </label>
+            </div>
+        </div>
+        <div>
+            <label style="font-size:0.8rem; font-weight:bold;">Desde:</label>
+            <input type="date" id="filtroDesde" style="width:100%; padding:5px; margin-top:3px;">
+        </div>
+        <div>
+            <label style="font-size:0.8rem; font-weight:bold;">Hasta:</label>
+            <input type="date" id="filtroHasta" style="width:100%; padding:5px; margin-top:3px;">
+        </div>
+    </div>
+
+    <!-- Tabla -->
+    <div style="background:white; padding:20px; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.08);">
+        <table id="tablaRecepciones" class="display cell-border hover" style="width:100%">
+            <thead>
+                <tr>
+                    <th>Número</th>
+                    <th>Fecha</th>
+                    <th>Proveedor</th>
+                    <th>Contenedor</th>
+                    <th style="text-align:center;">Ítems</th>
+                    <th style="text-align:right;">Unidades</th>
+                    <th>Ubic. Destino</th>
+                    <th>Estado</th>
+                    <th style="text-align:center;">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in recepciones %}
+                <tr>
+                    <td><strong>{{ r.numero }}</strong></td>
+                    <td>{{ r.fecha_recepcion.strftime('%d/%m/%Y %H:%M') if r.fecha_recepcion else '-' }}</td>
+                    <td>{{ r.proveedor_codigo }} — {{ r.proveedor_nombre }}</td>
+                    <td><code style="background:#f0f0f0; padding:2px 6px; border-radius:4px;">{{ r.id_contenedor }}</code></td>
+                    <td style="text-align:center;">{{ r.total_items }}</td>
+                    <td style="text-align:right;">{{ '{:,.0f}'.format(r.total_unidades).replace(',', '.') }}</td>
+                    <td>{{ r.ubicacion_dest_codigo or '—' }}</td>
+                    <td>
+                        {% if r.estado == 'Abierta' %}
+                        <span style="background:#f39c12; color:white; padding:3px 10px; border-radius:12px; font-size:0.8rem;">Abierta</span>
+                        {% elif r.estado == 'Cerrada' %}
+                        <span style="background:#27ae60; color:white; padding:3px 10px; border-radius:12px; font-size:0.8rem;">Cerrada</span>
+                        {% elif r.estado == 'Confirmada' %}
+                        <span style="background:#1a365d; color:white; padding:3px 10px; border-radius:12px; font-size:0.8rem;">Confirmada</span>
+                        {% else %}
+                        <span style="background:#e74c3c; color:white; padding:3px 10px; border-radius:12px; font-size:0.8rem;">Anulada</span>
+                        {% endif %}
+                    </td>
+                    <td style="text-align:center;">
+                        <a href="{{ url_for('recepciones.ver', id_recepcion=r.id_recepcion) }}"
+                           title="Ver / Gestionar" style="color:#3498db; margin:0 4px;">
+                            <i class="fas fa-eye"></i>
+                        </a>
+                        {% if r.estado == 'Abierta' %}
+                        <a href="javascript:void(0)"
+                           onclick="confirmarAnular({{ r.id_recepcion }}, '{{ r.numero }}')"
+                           title="Anular" style="color:#e74c3c; margin:0 4px;">
+                            <i class="fas fa-ban"></i>
+                        </a>
+                        {% if r.total_items == 0 %}
+                        <a href="javascript:void(0)"
+                           onclick="confirmarEliminar({{ r.id_recepcion }}, '{{ r.numero }}')"
+                           title="Eliminar (sin materiales)" style="color:#6c3a3a; margin:0 4px;">
+                            <i class="fas fa-trash"></i>
+                        </a>
+                        {% endif %}
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Forms ocultos -->
+<form id="formAnular"   method="POST" style="display:none;"></form>
+<form id="formEliminar" method="POST" style="display:none;"></form>
+
+{% include "partials/_modal_importar_recepciones.html" %}
+
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="{{ url_for('static', filename='js/batch_ui.js') }}"></script>
+<script>
+$(document).ready(function() {
+    const table = $('#tablaRecepciones').DataTable({
+        order: [[1, 'desc']],
+        language: {
+            sProcessing:   "Procesando...",
+            sLengthMenu:   "Mostrar _MENU_ registros",
+            sZeroRecords:  "No se encontraron resultados",
+            sEmptyTable:   "Ningún dato disponible",
+            sInfo:         "Mostrando _START_ a _END_ de _TOTAL_ registros",
+            sInfoEmpty:    "Mostrando 0 a 0 de 0 registros",
+            sInfoFiltered: "(filtrado de _MAX_ registros totales)",
+            sSearch:       "Buscar:",
+            sLoadingRecords: "Cargando...",
+            oPaginate: {
+                sFirst:    "Primero",
+                sLast:     "Último",
+                sNext:     "Siguiente",
+                sPrevious: "Anterior"
+            }
+        }
+    });
+
+    $('#filtroProveedor').on('keyup', function() { table.column(2).search(this.value).draw(); });
+
+    function getEstadosSeleccionados() {
+        return [...document.querySelectorAll('.chkEstado:checked')].map(c => c.value);
+    }
+
+    function actualizarLabelEstado() {
+        const sel = getEstadosSeleccionados();
+        const label = document.getElementById('estadoLabel');
+        if (sel.length === 0)      label.textContent = 'Ninguno';
+        else if (sel.length === 4) label.textContent = 'Todos';
+        else                       label.textContent = sel.join(', ');
+    }
+
+    $.fn.dataTable.ext.search.push(function(settings, data) {
+        if (settings.nTable.id !== 'tablaRecepciones') return true;
+        const sel = getEstadosSeleccionados();
+        if (sel.length === 0) return false;
+        // data[7] contiene el texto del badge de estado
+        return sel.some(e => data[7].includes(e));
+    });
+
+    $(document).on('change', '.chkEstado', function() {
+        actualizarLabelEstado();
+        table.draw();
+    });
+
+    // Cerrar menú al hacer click fuera
+    $(document).on('click', function(e) {
+        if (!$(e.target).closest('#estadoDropdown, #estadoMenu').length) {
+            document.getElementById('estadoMenu').style.display = 'none';
+        }
+    });
+
+    window.toggleEstadoMenu = function(e) {
+        e.stopPropagation();
+        const menu = document.getElementById('estadoMenu');
+        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    };
+
+    window.filtrarPorEstado = function(estado) {
+        const chk = document.querySelector(`.chkEstado[value="${estado}"]`);
+        if (!chk) return;
+        // Toggle: si es el único activo lo activa, si ya está lo quita, sino lo activa
+        const sel = getEstadosSeleccionados();
+        if (sel.length === 1 && sel[0] === estado) {
+            chk.checked = false;
+        } else {
+            // Deseleccionar todos y activar solo este
+            document.querySelectorAll('.chkEstado').forEach(c => c.checked = false);
+            chk.checked = true;
+        }
+        actualizarLabelEstado();
+        table.draw();
+        document.getElementById('tablaRecepciones').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+
+    $.fn.dataTable.ext.search.push(function(settings, data) {
+        if (settings.nTable.id !== 'tablaRecepciones') return true;
+        const min = $('#filtroDesde').val(), max = $('#filtroHasta').val();
+        const fecha = data[1].split(' ')[0].split('/').reverse().join('-'); // dd/mm/yyyy → yyyy-mm-dd
+        if (!min && !max) return true;
+        if (!min && fecha <= max) return true;
+        if (!max && fecha >= min) return true;
+        return fecha >= min && fecha <= max;
+    });
+    $('#filtroDesde, #filtroHasta').on('change', function() { table.draw(); });
+
+    // Aplicar rango de fechas por defecto según parámetro configurado
+    const diasFiltro = {{ dias_filtro | default(30) }};
+    const hoy = new Date();
+    const desde = new Date(hoy);
+    desde.setDate(hoy.getDate() - diasFiltro);
+    const toISO = d => d.toISOString().split('T')[0];
+    document.getElementById('filtroDesde').value = toISO(desde);
+    document.getElementById('filtroHasta').value = toISO(hoy);
+
+    // Aplicar filtro de estado inicial (Abierta + Confirmada por defecto)
+    table.draw();
+});
+
+function confirmarAnular(id, numero) {
+    if (!confirm(`¿Desea anular la recepción ${numero}?\nEsta acción no se puede deshacer.`)) return;
+    const form = document.getElementById('formAnular');
+    form.action = `/recepciones/anular/${id}`;
+    form.submit();
+}
+
+function confirmarEliminar(id, numero) {
+    if (!confirm(`¿Desea ELIMINAR la recepción ${numero}?\nSe borrará permanentemente de la base de datos.`)) return;
+    const form = document.getElementById('formEliminar');
+    form.action = `/recepciones/eliminar/${id}`;
+    form.submit();
+}
+</script>
+{% endblock %}

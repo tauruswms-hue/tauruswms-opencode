@@ -1,0 +1,44 @@
+<div id="modalCategorias" class="modal-overlay">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3 id="modalTitle">Nueva Categoría</h3>
+            <button class="close-btn" onclick="closeModal()">&times;</button>
+        </div>
+        <form action="{{ url_for('categorias.guardar') }}" method="POST" id="formCategorias">
+            <input type="hidden" name="id_categoria" id="form_id_cat">
+
+            <div class="modal-scroll-body">
+                <div class="form-section">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Código (Opcional)</label>
+                            <input type="text" name="codigo" id="form_codigo" maxlength="20">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Nombre *</label>
+                            <input type="text" name="nombre" id="form_nombre" required maxlength="100">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Descripción</label>
+                            <textarea name="descripcion" id="form_desc" rows="3" style="width:100%; border:1px solid #ddd; border-radius:4px; padding:8px;"></textarea>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label><input type="checkbox" name="activo" id="form_activo" checked> Categoría Activa</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn-sec" onclick="closeModal()">Cancelar</button>
+                <button type="submit" class="btn-pri">Guardar Categoría</button>
+            </div>
+        </form>
+    </div>
+</div>

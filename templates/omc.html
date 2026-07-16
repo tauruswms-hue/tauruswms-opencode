@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+{% block title %}Movimientos — OMC{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+
+<div style="padding:20px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <h2><i class="fas fa-exchange-alt"></i> Órdenes de Movimiento de Contenedor</h2>
+        <a href="{{ url_for('omc.nueva') }}"
+           style="background:#27ae60; color:white; padding:10px 20px; border-radius:4px; text-decoration:none; font-weight:bold;">
+            <i class="fas fa-plus"></i> Nueva OMC
+        </a>
+    </div>
+
+    <!-- Resumen: solo Pendientes -->
+    {% set pendientes = omcs | selectattr('estado','equalto','Pendiente') | list | length %}
+    <div style="margin-bottom:14px;">
+        <div onclick="filtrarPorEstado('Pendiente')" title="Filtrar Pendientes"
+             style="display:inline-flex; align-items:center; gap:12px; background:white; border-radius:7px; padding:8px 16px; box-shadow:0 2px 6px rgba(0,0,0,0.07); border-left:4px solid #f39c12; cursor:pointer; transition:box-shadow .15s;"
+             onmouseover="this.style.boxShadow='0 4px 14px rgba(243,156,18,0.25)'" onmouseout="this.style.boxShadow='0 2px 6px rgba(0,0,0,0.07)'">
+            <span style="font-size:1.4rem; font-weight:bold; color:#f39c12; line-height:1;">{{ pendientes }}</span>
+            <span style="color:#666; font-size:0.82rem;">Pendientes <i class="fas fa-filter" style="font-size:0.65rem; opacity:0.5;"></i></span>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div style="background:#f8f9fa; padding:15px; border-radius:8px; margin-bottom:20px; display:grid; grid-template-columns:1.2fr 1.2fr 1fr 1fr 1fr; gap:15px; border:1px solid #e0e0e0;">
+
+        <!-- Número: texto libre -->
+        <div>
+            <label style="font-size:0.8rem; font-weight:bold;">Número:</label>
+            <input type="text" id="filtroNumero" placeholder="Buscar número..."
+                   style="width:100%; padding:5px; margin-top:3px; box-sizing:border-box;">
+        </div>
+
+        <!-- Contenedor: multi-select -->
+        <div style="position:relative;">
+            <label style="font-size:0.8rem; font-weight:bold;">Contenedor:</label>
+            <div id="contDropdown" onclick="toggleOmcMenu('contMenu', event)"
+                 style="padding:5px 8px; margin-top:3px; background:white; border:1px solid #ccc; border-radius:4px; cursor:pointer; user-select:none; display:flex; justify-content:space-between; align-items:center; font-size:0.9rem;">
+                <span id="contLabel" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Todos</span>
+                <i class="fas fa-chevron-down" style="font-size:0.65rem; color:#888; flex-shrink:0;"></i>
+            </div>
+            <div id="contMenu" style="display:none; position:absolute; top:100%; left:0; right:0; background:white; border:1px solid #ccc; border-radius:4px; box-shadow:0 4px 12px rgba(0,0,0,0.12); z-index:1000; padding:6px 0; max-height:230px; overflow-y:auto; min-width:180px;">
+                {% for c in contenedores %}
+                <label style="display:flex; align-items:center; gap:8px; padding:5px 12px; cursor:pointer; font-size:0.85rem;" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">
+                    <input type="checkbox" value="{{ c }}" class="chkCont"> {{ c }}
+                </label>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Estado: multi-select, default Pendiente -->
+        <div style="position:relative;">
+            <label style="font-size:0.8rem; font-weight:bold;">Estado:</label>
+            <div id="estadoDropdown" onclick="toggleOmcMenu('estadoMenu', event)"
+                 style="padding:5px 8px; margin-top:3px; background:white; border:1px solid #ccc; border-radius:4px; cursor:pointer; user-select:none; display:flex; justify-content:space-between; align-items:center; font-size:0.9rem;">
+                <span id="estadoLabel">Pendiente</span>
+                <i class="fas fa-chevron-down" style="font-size:0.65rem; color:#888;"></i>
+            </div>
+            <div id="estadoMenu" style="display:none; position:absolute; top:100%; left:0; right:0; background:white; border:1px solid #ccc; border-radius:4px; box-shadow:0 4px 12px rgba(0,0,0,0.12); z-index:1000; padding:6px 0;">
+                <label style="display:flex; align-items:center; gap:8px; padding:5px 12px; cursor:pointer; font-size:0.85rem;" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">
+                    <input type="checkbox" value="Pendiente"  class="chkEstado" checked> Pendiente
+                </label>
+                <label style="display:flex; align-items:center; gap:8px; padding:5px 12px; cursor:pointer; font-size:0.85rem;" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">
+                    <input type="checkbox" value="Confirmada" class="chkEstado"> Confirmada
+                </label>
+                <label style="display:flex; align-items:center; gap:8px; padding:5px 12px; cursor:pointer; font-size:0.85rem;" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">
+                    <input type="checkbox" value="Anulada"    class="chkEstado"> Anulada
+                </label>
+            </div>
+        </div>
+
+        <div>
+            <label style="font-size:0.8rem; font-weight:bold;">Desde:</label>
+            <input type="date" id="filtroDesde" style="width:100%; padding:5px; margin-top:3px;">
+        </div>
+        <div>
+            <label style="font-size:0.8rem; font-weight:bold;">Hasta:</label>
+            <input type="date" id="filtroHasta" style="width:100%; padding:5px; margin-top:3px;">
+        </div>
+    </div>
+
+    <!-- Tabla -->
+    <div style="background:white; padding:20px; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.08);">
+        <table id="tablaOmc" class="display cell-border hover" style="width:100%">
+            <thead>
+                <tr>
+                    <th>Número</th>
+                    <th>Fecha</th>
+                    <th>Contenedor</th>
+                    <th>Origen</th>
+                    <th>Destino</th>
+                    <th>Recepción / Pedido</th>
+                    <th>Estado</th>
+                    <th style="text-align:center;">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for o in omcs %}
+                <tr>
+                    <td><strong>{{ o.numero }}</strong></td>
+                    <td>{{ o.fecha_creacion.strftime('%d/%m/%Y %H:%M') if o.fecha_creacion else '-' }}</td>
+                    <td>
+                        {% if o.num_contenedores and o.num_contenedores > 1 %}
+                        <span style="background:#e8f4fd; color:#2980b9; padding:2px 8px; border-radius:4px; font-size:0.82rem; font-weight:bold;">{{ o.num_contenedores }} contenedores</span>
+                        <small style="color:#666; display:block; margin-top:2px; font-size:0.78rem;">{{ o.contenedores_lista }}</small>
+                        {% else %}
+                        <code style="background:#f0f0f0; padding:2px 6px; border-radius:4px;">{{ o.contenedores_lista or '—' }}</code>
+                        {% endif %}
+                    </td>
+                    <td>{{ o.origen_display or '—' }}</td>
+                    <td>{{ o.destino_codigo }} — {{ o.destino_nombre }}</td>
+                    <td>
+                        {% if o.recepcion_numero %}
+                        <a href="{{ url_for('recepciones.ver', id_recepcion=o.id_recepcion) }}"
+                           style="color:#3498db; font-size:0.85rem;">{{ o.recepcion_numero }}</a>
+                        {% elif o.pedido_numero %}
+                        <a href="{{ url_for('pedidos.ver_detalle', id_pedido=o.id_pedido) }}"
+                           style="color:#8e44ad; font-size:0.85rem;"><i class="fas fa-file-invoice" style="font-size:0.75rem;"></i> {{ o.pedido_numero }}</a>
+                        {% else %}—{% endif %}
+                    </td>
+                    <td>
+                        {% if o.estado == 'Pendiente' %}
+                        <span style="background:#f39c12; color:white; padding:3px 10px; border-radius:12px; font-size:0.8rem;">Pendiente</span>
+                        {% elif o.estado == 'Confirmada' %}
+                        <span style="background:#27ae60; color:white; padding:3px 10px; border-radius:12px; font-size:0.8rem;">Confirmada</span>
+                        {% else %}
+                        <span style="background:#e74c3c; color:white; padding:3px 10px; border-radius:12px; font-size:0.8rem;">Anulada</span>
+                        {% endif %}
+                    </td>
+                    <td style="text-align:center;">
+                        <a href="{{ url_for('omc.ver', id_omc=o.id_omc) }}"
+                           title="Ver / Gestionar" style="color:#3498db; margin:0 4px;">
+                            <i class="fas fa-eye"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script>
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function getChecked(cls) {
+    return [...document.querySelectorAll('.' + cls + ':checked')].map(c => c.value);
+}
+
+function updateLabel(spanId, values, total, allText) {
+    const span = document.getElementById(spanId);
+    if (values.length === 0)           span.textContent = 'Ninguno';
+    else if (values.length === total)  span.textContent = allText;
+    else                               span.textContent = values.join(', ');
+}
+
+window.toggleOmcMenu = function(menuId, e) {
+    e.stopPropagation();
+    ['contMenu', 'estadoMenu'].forEach(id => {
+        if (id !== menuId) document.getElementById(id).style.display = 'none';
+    });
+    const m = document.getElementById(menuId);
+    m.style.display = m.style.display === 'none' ? 'block' : 'none';
+};
+
+$(document).on('click', function(e) {
+    if (!$(e.target).closest('[id$="Dropdown"],[id$="Menu"],[id="contDropdown"],[id="contMenu"]').length) {
+        ['contMenu', 'estadoMenu'].forEach(id => document.getElementById(id).style.display = 'none');
+    }
+});
+
+// ── DataTables + filtros ──────────────────────────────────────────────────────
+$(document).ready(function() {
+    const navH    = document.querySelector('.navbar')?.offsetHeight || 60;
+    const footerH = document.querySelector('.footer')?.offsetHeight || 60;
+    const tableTop = document.getElementById('tablaOmc').getBoundingClientRect().top;
+    const scrollH = Math.max(150, window.innerHeight - tableTop - footerH - 55 - 20);
+
+    const table = $('#tablaOmc').DataTable({
+        scrollY:        scrollH + 'px',
+        scrollCollapse: true,
+        order: [[1, 'desc']],
+        language: {
+            sProcessing:   "Procesando...",
+            sLengthMenu:   "Mostrar _MENU_ registros",
+            sZeroRecords:  "No se encontraron resultados",
+            sEmptyTable:   "Ningún dato disponible",
+            sInfo:         "Mostrando _START_ a _END_ de _TOTAL_ registros",
+            sInfoEmpty:    "Mostrando 0 a 0 de 0 registros",
+            sInfoFiltered: "(filtrado de _MAX_ registros totales)",
+            sSearch:       "Buscar:",
+            sLoadingRecords: "Cargando...",
+            oPaginate: { sFirst:"Primero", sLast:"Último", sNext:"Siguiente", sPrevious:"Anterior" }
+        }
+    });
+
+    // Número: búsqueda en col 0
+    $('#filtroNumero').on('keyup', function() {
+        table.column(0).search(this.value).draw();
+    });
+
+    // Filtro fechas
+    $.fn.dataTable.ext.search.push(function(settings, data) {
+        if (settings.nTable.id !== 'tablaOmc') return true;
+        const min = $('#filtroDesde').val(), max = $('#filtroHasta').val();
+        const raw = data[1].split(' ')[0].split('/');
+        if (raw.length < 3) return true;
+        const fecha = raw.reverse().join('-');
+        if (!min && !max) return true;
+        if (!min) return fecha <= max;
+        if (!max) return fecha >= min;
+        return fecha >= min && fecha <= max;
+    });
+
+    // Filtro contenedor + estado (custom)
+    $.fn.dataTable.ext.search.push(function(settings, data) {
+        if (settings.nTable.id !== 'tablaOmc') return true;
+
+        // Contenedor (col 2): data[2] contiene el texto de la celda (lista separada por coma)
+        const conts = getChecked('chkCont');
+        if (conts.length > 0 && !conts.some(v => data[2].includes(v))) return false;
+
+        // Estado (col 6)
+        const estados = getChecked('chkEstado');
+        if (estados.length === 0) return false;
+        if (!estados.some(v => data[6].includes(v))) return false;
+
+        return true;
+    });
+
+    $('#filtroDesde, #filtroHasta').on('change', function() { table.draw(); });
+
+    const totalConts  = document.querySelectorAll('.chkCont').length;
+    const totalEstado = 3;
+
+    $(document).on('change', '.chkCont', function() {
+        updateLabel('contLabel', getChecked('chkCont'), totalConts, 'Todos');
+        table.draw();
+    });
+    $(document).on('change', '.chkEstado', function() {
+        updateLabel('estadoLabel', getChecked('chkEstado'), totalEstado, 'Todos');
+        table.draw();
+    });
+
+    // Card Pendientes: toggle solo Pendiente
+    window.filtrarPorEstado = function(estado) {
+        const chks = document.querySelectorAll('.chkEstado');
+        const sel = getChecked('chkEstado');
+        if (sel.length === 1 && sel[0] === estado) {
+            // Ya está solo ese → deseleccionar
+            chks.forEach(c => c.checked = false);
+        } else {
+            chks.forEach(c => c.checked = c.value === estado);
+        }
+        updateLabel('estadoLabel', getChecked('chkEstado'), totalEstado, 'Todos');
+        table.draw();
+        document.getElementById('tablaOmc').scrollIntoView({ behavior:'smooth', block:'start' });
+    };
+
+    // Rango de fechas por defecto
+    const diasFiltro = {{ dias_filtro | default(30) }};
+    const hoy = new Date();
+    const desde = new Date(hoy);
+    desde.setDate(hoy.getDate() - diasFiltro);
+    const toISO = d => d.toISOString().split('T')[0];
+    document.getElementById('filtroDesde').value = toISO(desde);
+    document.getElementById('filtroHasta').value = toISO(hoy);
+
+    table.draw();
+});
+</script>
+{% endblock %}

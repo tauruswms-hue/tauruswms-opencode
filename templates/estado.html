@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Estado del Sistema{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="fas fa-heartbeat"></i> Sesión</h1>
+    <p>Información de la sesión actual</p>
+</div>
+
+    <div class="card">
+
+        <div class="card-body">
+            <div class="status-grid">
+                <div class="status-item">
+                    <div class="status-title">MySQL Database</div>
+                    <div class="status-value">{{ info.mysql }}</div>
+                </div>
+                
+                <div class="status-item">
+                    <div class="status-title">Sesión Activa</div>
+                    <div class="status-value">
+                        {% if info.sesion_activa %}
+                            <span class="status-ok">✅ Activa</span>
+                        {% else %}
+                            <span class="status-error">❌ Inactiva</span>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="status-item">
+                    <div class="status-title">Usuario</div>
+                    <div class="status-value">{{ info.usuario }}</div>
+                </div>
+                
+                <div class="status-item">
+                    <div class="status-title">Rol</div>
+                    <div class="status-value">{{ info.rol }}</div>
+                </div>
+
+                <div class="status-item">
+                    <div class="status-title">Inicio de sesión</div>
+                    <div class="status-value">{{ info.inicio }}</div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

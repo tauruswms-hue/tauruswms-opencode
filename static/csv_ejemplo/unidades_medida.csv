@@ -1,0 +1,10 @@
+codigo,nombre,simbolo,tipo_magnitud,conversion_a_base,unidad_base_referencia,decimales_permitidos,activo
+UND,Unidad,U,CANTIDAD,1,U,0,1
+KG,Kilogramo,kg,PESO,1,KG,3,1
+G,Gramo,g,PESO,1000,KG,2,1
+M,Metro,m,LONGITUD,1,M,2,1
+CM,Centímetro,cm,LONGITUD,100,M,1,1
+L,Litro,L,VOLUMEN,1,L,2,1
+ML,Mililitro,ml,VOLUMEN,1000,L,0,1
+PZA,Pieza,PZA,CANTIDAD,1,PZA,0,1
+PAR,Par,PAR,CANTIDAD,1,PAR,0,1

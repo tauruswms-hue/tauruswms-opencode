@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/parametros.css') }}">
+
+<div class="parametros-container">
+
+    {% include "partials/_form_parametros.html" %}
+
+</div>
+{% endblock %}
