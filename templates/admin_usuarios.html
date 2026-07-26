@@ -38,7 +38,7 @@
         <ul class="nav nav-pills mb-4">
             <li class="nav-item">
                 <a class="nav-link" href="{{ url_for('admin.tenants') }}">
-                    <i class="fas fa-building me-1"></i>Empresas
+                    <i class="fas fa-building me-1"></i>Tenants
                 </a>
             </li>
             <li class="nav-item">
@@ -80,9 +80,9 @@
             </div>
             <div class="card-body">
                 <div class="mb-3">
-                    <label class="form-label">Filtrar por Empresa:</label>
+                    <label class="form-label">Filtrar por Tenant:</label>
                     <select class="form-select" onchange="window.location.href='{{ url_for('admin.usuarios') }}?tenant_id=' + this.value" style="max-width: 300px;">
-                        <option value="">Todas las empresas</option>
+                        <option value="">Todos los tenants</option>
                         {% for t in tenants %}
                         <option value="{{ t.id }}" {% if tenant_id == t.id %}selected{% endif %}>{{ t.nombre }}</option>
                         {% endfor %}
@@ -96,7 +96,7 @@
                                 <th>Usuario</th>
                                 <th>Nombre</th>
                                 <th>Email</th>
-                                <th>Empresa</th>
+                                <th>Tenant</th>
                                 <th>Rol</th>
                                 <th>Estado</th>
                             </tr>

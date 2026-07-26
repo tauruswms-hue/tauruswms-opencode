@@ -1,0 +1,8 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+.idea/
+picking_docs/
+*.db
+.DS_Store

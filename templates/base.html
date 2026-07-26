@@ -519,7 +519,7 @@
         </div>
         <div class="navbar-user">
             <div class="user-info">
-                <span class="tenant">{{ session.tenant_nombre or 'Sin empresa' }}</span>
+                <span class="tenant">{{ session.tenant_nombre or 'Sin tenant' }}</span>
                 <span class="name">{{ session.nombre }} ({{ session.rol }})</span>
             </div>
             <a href="{{ url_for('logout') }}" class="btn-logout" title="Cerrar sesión">

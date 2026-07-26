@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Gestión de Empresas{% endblock %}
+{% block title %}Gestión de Tenants{% endblock %}
 
 {% block content %}
 <div style="padding: 20px; max-width: 1200px; margin: auto;">
     
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
-        <h2><i class="fas fa-building"></i> Gestión de Empresas</h2>
+        <h2><i class="fas fa-building"></i> Gestión de Tenants</h2>
         <a href="{{ url_for('index') }}" class="btn-sec" style="background: #95a5a6; color: white; padding: 10px 15px; border-radius: 4px; text-decoration: none;">
             <i class="fas fa-arrow-left"></i> Volver
         </a>
@@ -25,7 +25,7 @@
 
     <div style="background: white; border-radius: 8px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); margin-bottom: 20px;">
         <h4 style="margin: 0 0 20px; padding-bottom: 12px; border-bottom: 2px solid #3498db;">
-            <i class="fas fa-plus-circle"></i> Nueva Empresa
+            <i class="fas fa-plus-circle"></i> Nuevo Tenant
         </h4>
         <form action="{{ url_for('tenants_guardar') }}" method="POST">
             <input type="hidden" name="id" id="tenant_id_edit">
@@ -33,7 +33,7 @@
                 <div>
                     <label style="display: block; font-weight: bold; margin-bottom: 6px;">Nombre *</label>
                     <input type="text" name="nombre" id="tenant_nombre" required 
-                           placeholder="Nombre de la empresa" style="width: 100%; padding: 9px; border: 1px solid #ddd; border-radius: 4px;">
+                           placeholder="Nombre del tenant" style="width: 100%; padding: 9px; border: 1px solid #ddd; border-radius: 4px;">
                 </div>
                 <div>
                     <label style="display: block; font-weight: bold; margin-bottom: 6px;">Razón Social</label>
@@ -48,7 +48,7 @@
                 <div style="grid-column: 1 / -1;">
                     <label style="display: block; font-weight: bold; margin-bottom: 6px;">Dirección</label>
                     <input type="text" name="direccion" id="tenant_direccion" 
-                           placeholder="Dirección de la empresa" style="width: 100%; padding: 9px; border: 1px solid #ddd; border-radius: 4px;">
+                           placeholder="Dirección del tenant" style="width: 100%; padding: 9px; border: 1px solid #ddd; border-radius: 4px;">
                 </div>
                 <div>
                     <label style="display: block; font-weight: bold; margin-bottom: 6px;">Teléfono</label>
@@ -74,7 +74,7 @@
 
     <div style="background: white; border-radius: 8px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.08);">
         <h4 style="margin: 0 0 20px; padding-bottom: 12px; border-bottom: 2px solid #f39c12;">
-            <i class="fas fa-list"></i> Empresas Registradas
+            <i class="fas fa-list"></i> Tenants Registrados
         </h4>
         <table style="width: 100%; border-collapse: collapse;">
             <thead>
@@ -108,7 +108,7 @@
                         </button>
                         {% if session.get('tenant_id') != t.id %}
                         <a href="{{ url_for('tenants_eliminar', tenant_id=t.id) }}" 
-                           onclick="return confirm('¿Está seguro de eliminar esta empresa?')"
+                           onclick="return confirm('¿Está seguro de eliminar este tenant?')"
                            style="background: #e74c3c; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; text-decoration: none;">
                             <i class="fas fa-trash"></i>
                         </a>

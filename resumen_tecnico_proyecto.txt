@@ -1,0 +1,238 @@
+========================================================================
+RESUMEN TECNICO — Taurus WMS
+Estado del proyecto a julio 2026
+========================================================================
+
+1. LO QUE ESTA CONSTRUIDO Y FUNCIONANDO
+========================================================================
+
+1.1 Arquitectura base
+---------------------
+- 2 aplicaciones Flask independientes: app.py (WMS, puerto 5000) y admin.py (admin panel, puerto 5001)
+- 18 blueprints modulares en modules/ (140 rutas totales)
+- Base de datos MySQL via pymysql (sin ORM)
+- 2 bases: taurus_wms (operacional) y taurus_admin (usuarios, tenants, config)
+- Multi-tenancy con filtro WHERE (%s IS NULL OR tenant_id = %s) en la mayoria de modulos
+- Auth basada en sesion con permisos por rol (roles_rutas)
+- Sesiones con expiracion de 8 horas
+
+1.2 Modulos operacionales completos (CRUD + import/export)
+----------------------------------------------------------
+- materiales       — con validacion de codigos de barras (EAN/GTIN-14), presentaciones, pesos
+- categorias       — con borrado logico
+- unidades_medida  — con borrado logico
+- proveedores      — con borrado logico
+- clientes         — CRUD + import/export (sin eliminar)
+- transportes      — CRUD + import/export (sin eliminar), gestion de rutas many-to-many
+- clases_pedido    — con borrado logico
+- rutas            — CRUD + import/export
+- ubicaciones      — CRUD + import/export (sin eliminar)
+- tipoubicacion    — con borrado fisico, columna descipción (tilde incluida)
+- zonas            — con borrado fisico
+- stockcontable    — vista/edicion AJAX, import/export
+
+1.3 Modulos de operaciones de almacen
+--------------------------------------
+- pedidos          — el modulo mas complejo (19 rutas): lista, formulario, detalle, verificacion
+                     de stock masiva, preparacion masiva, picking JSON, cambio de ruta/transporte,
+                     filtros en cascada (cliente/clase/ruta/transporte/estado/fechas), import/export
+- recepciones      — flujo completo (15 rutas): nueva, guardar, agregar/eliminar items AJAX,
+                     buscar materiales/ubicaciones por barcode, cerrar (genera OMC + stock),
+                     confirmar stock, anular, import
+- despacho         — despacho simple y masivo de pedidos en estado "Preparado"
+- inventario       — creacion automatica desde stock, conteo AJAX, cierre y anulacion
+- omc              — ordenes de movimiento de contenedor (11 rutas): nueva, guardar, ver,
+                     confirmar (solo admin con password), modificar destino, anular
+
+1.4 Panel de administracion
+----------------------------
+- Login separado con namespace de sesion propio
+- CRUD de tenants (crear, editar, activar/desactivar)
+- CRUD de usuarios (crear, editar, activar/desactivar) con control SUPERADMIN
+- Log de auditoria con filtros por fecha/accion/modulo, paginacion
+- Configuracion del sistema (key-value en tabla configuracion)
+- Edicion de parametros por tenant (metodo picking, umbral stock bajo, API IA, filtros fecha)
+
+1.5 Frontend
+-------------
+- Layout custom con sidebar colapsable + navbar (sin framework CSS para el WMS)
+- jQuery 3.7 + DataTables 1.13 para todas las listas
+- Font Awesome 6.4 para iconografia
+- 36 templates principales + 24 partials (modales de crear/editar/importar)
+- 13 archivos JS (batch_ui.js compartido para importaciones)
+- 6 archivos CSS (1 principal de 2,287 lineas + 5 por modulo)
+- Dashboard con 5 KPI cards y desglose de stock/estados
+- Login con Bootstrap 5 (standalone, no extiende base.html)
+
+1.6 Import/Export
+-----------------
+- Formatos soportados: CSV, JSON, XLSX
+- Templates de importacion descargables por modulo
+- batch_utils.py como helper compartido (excepto materiales.py que tiene su propia implementacion)
+- Export XLSX con estilos (headers coloreados, auto-filtros)
+
+1.7 Base de datos
+-----------------
+- 45 migraciones procesadas en migrations/procesados/
+- 2 migraciones pendientes: add_api_key_tenant.sql, fix_admin_password.sql
+- Stored procedure sp_guardar_material para guardado atomico
+- Seed data de prueba en migrations/procesados/
+
+
+2. LO QUE FALTA O NECESITA TRABAJO
+========================================================================
+
+2.1 SEGURIDAD — Filtros de tenant ausentes (PRIORIDAD ALTA)
+------------------------------------------------------------
+Estas rutas NO aplican el filtro multi-tenancy, permitiendo acceso cruzado entre tenants:
+
+  RUTA                          MODULO         GRAVEDAD
+  ----------------------------  -------------  --------
+  /ubicaciones/exportar          ubicaciones    ALTA — exporta ubicaciones de todos los tenants
+  /materiales/exportar           materiales     ALTA — exporta materiales de todos los tenants
+  /rutas/eliminar                rutas          ALTA — puede borrar rutas de otros tenants
+  /recepciones/anular            recepciones    ALTA — puede anular recepciones de otros tenants
+  /pedidos/eliminar              pedidos        ALTA — puede anular pedidos de otros tenants
+  /pedidos/preparar_masivo       pedidos        ALTA — cambia estado de pedidos de otros tenants
+  /pedidos/cambiar_ruta_transp.  pedidos        ALTA — modifica pedidos de otros tenants
+  /pedidos/resumen_preparar      pedidos        MEDIA — filtra datos de otros tenants
+  /pedidos/buscar_contenedores   pedidos        MEDIA — expone contenedores de otros tenants
+  /pedidos/filtros_contenedores  pedidos        MEDIA — expone stock de otros tenants
+  /pedidos/contenedor_stock      pedidos        MEDIA — expone stock de otros tenants
+  /omc/buscar_contenedores_dest. omc            MEDIA — expone contenedores de otros tenants
+
+2.2 SEGURIDAD — Otros problemas
+---------------------------------
+- Sin proteccion CSRF en ningun POST
+- Sin rate limiting en login (vulnerabilidad a fuerza bruta)
+- secret_key hardcodeado en app.py ('clave-secreta-simple-taurus') y admin.py ('admin-secret-key-taurus-2024')
+- SECRET_SALT hardcodeado ('taurus-wms-salt-2001')
+- Password por defecto de admin visible en consola al iniciar admin.py (Admin@2024!)
+- Acciones destructivas (eliminar, anular, activar/desactivar) realizadas via GET en vez de POST
+- Enunciado SQL con f-string en pedidos.py (construccion de IN clause) — fragil aunque parametrizado
+
+2.3 SEGURIDAD — Codigo debug en produccion
+--------------------------------------------
+- modules/admin.py lineas 196-198: print("DEBUG: encoded_id recibido = ...")
+- app.py lineas 400-404: prints de depuracion en test_db_connection (marcados como temporales)
+- app.py lineas 439, 455: prints de error
+
+2.4 MODULOS CON OPERACIONES INCOMPLETAS
+-----------------------------------------
+- clientes      — sin ruta de eliminar/desactivar
+- ubicaciones   — sin ruta de eliminar
+- transportes   — sin ruta de eliminar
+- despacho      — sin posibilidad de revertir, sin export/reportes
+- inventario    — sin export de resultados de conteo
+- stockcontable — sin ruta de eliminar (por diseno)
+
+2.5 ADMIN PANEL — Funciones faltantes
+---------------------------------------
+- Sin UI para gestionar roles ni permisos (roles_rutas)
+- Sin provisioning de base de datos por tenant desde el admin
+- Sin cambio de password para usuarios admin
+- Sin import/export masivo de usuarios
+- Sin dashboard o pagina de overview con metricas
+
+2.6 FRONTEND — Problemas de calidad
+-------------------------------------
+- CSS altamente duplicado: clases como .modal-overlay, .modal-card, .btn-add, .table-card
+  copiadas identicamente en 4+ archivos CSS por modulo
+- Inline styles extensivos en pedidos.html y recepciones.html (~100+ declaraciones)
+- Configuracion de DataTables duplicada en cada archivo JS con el mismo objeto de idioma
+- 2 sistemas de diseno coexistentes: Bootstrap 5 (solo login) y CSS custom (todo lo demas)
+- Sin componente reutilizable: botones, modales, badges, filtros redefinidos en cada template
+- Sin framework de validacion de formularios
+- Sin accesibilidad (ARIA, navegacion por teclado, focus management)
+- Sin diseno responsive real: sidebar colapsa pero DataTables es desktop-only
+- Sin loading states ni skeleton loaders — errores AJAX mostrados con alert()
+- Sin sistema de notificaciones — solo flash messages basicos
+- jQuery cargado duplicadamente en multiples templates
+- style.css contiene bloques duplicados (estilos de login, animaciones)
+
+2.7 BASE DE DATOS — Inconsistencias de schema
+-----------------------------------------------
+- 11 tablas no tienen CREATE TABLE en ninguna migracion ni en crear_tablas.py:
+  tipoubicacion, clientes, rutas, transportes, transporte_rutas, pedidos_cabecera,
+  pedidos_detalle, unidades_medida, material_proveedor, roles_rutas
+  (fueron creadas manualmente o por scripts no documentados)
+- crear_tablas.py completamente desactualizado: 2 tablas obsoletas, 1 abandonada,
+  las 4 restantes tan modificadas que el DDL original es irreconocible
+- add_tenant_operational_tables.sql usa USE taurus_admin pero altera tablas de taurus_wms
+- Tabla tenants duplicada en ambas bases de datos
+- 5 archivos de migracion rotos/vacios: 008_inventarios_anulado.sql, add_sidebar_preferences.sql,
+  add_dias_filtro_fechas.sql, seed_pedidos_prueba.sql, add_estado_trabajo_omc_pedidos.sql
+- stockcontable.tenant_id sin constraint FK (a diferencia de las demas tablas)
+- roles_rutas y transporte_rutas: tablas criticas sin migracion documentada
+
+2.8 ARQUITECTURA — Deuda tecnica
+----------------------------------
+- Sin tests (unitarios, integracion, e2e)
+- Sin linter ni formatter configurado
+- Sin .gitignore en raiz (riesgo de commitear .env y __pycache__)
+- requirements.txt incompleto: lista solo 3 paquetes, faltan pymysql, openpyxl, werkzeug
+- Conexiones DB sin pooling — nueva conexion por query
+- Funcion obtener_rutas_por_rol() abre conexion DB en cada request (no usa cache de sesion)
+- Funcion verificar_mysql() abre conexion en cada carga del dashboard
+- Funciones get_db_config_from_table() y get_db_config_from_env() son casi duplicadas
+- Rutas /rentradas y /rsalidas son aliases duplicados de /entradas y /salidas
+- Ruta /dashboard es un redirect muerto a /index
+- Sin variables de entorno para secret_key (hardcodeado en codigo)
+- materiales.py implementa su propio parser de import en vez de usar batch_utils.py
+
+
+3. PRIORIDADES RECOMENDADAS PARA VENTA COMERCIAL
+========================================================================
+
+NIVEL 1 — Bloqueante para produccion:
+  [ ] Corregir los 12+ filtros de tenant ausentes (riesgo de fuga de datos entre clientes)
+  [ ] Mover secret_key y SECRET_SALT a variables de entorno (.env)
+  [ ] Agregar proteccion CSRF (Flask-WTF o manual con tokens)
+  [ ] Agregar rate limiting en login (Flask-Limiter)
+  [ ] Cambiar acciones destructivas de GET a POST
+  [ ] Eliminar codigo debug (prints) de modulos/admin.py y app.py
+  [ ] Ejecutar las 2 migraciones pendientes
+
+NIVEL 2 — Importante para confiabilidad:
+  [ ] Crear tests basicos para los modulos criticos (pedidos, recepciones, stockcontable)
+  [ ] Completar DELETE/DEACTIVATE en clientes, ubicaciones, transportes
+  [ ] Agregar export en inventario y despacho
+  [ ] Agregar UI de gestion de roles en admin panel
+  [ ] Completar las migraciones rotas/vacias
+  [ ] Documentar o recrear las 11 tablas sin CREATE TABLE
+
+NIVEL 3 — Mejoras de calidad y UX:
+  [ ] Unificar CSS: extraer clases compartidas a un base-components.css
+  [ ] Eliminar inline styles de templates complejos
+  [ ] Centralizar configuracion de DataTables
+  [ ] Agregar loading states y mejor manejo de errores AJAX
+  [ ] Agregar responsive design real en vistas de operaciones
+  [ ] Completar .gitignore
+  [ ] Completar requirements.txt
+
+NIVEL 4 — Features futuras:
+  [ ] Modulo de dispositivos moviles (picking, recepcion, inventario con escaneo)
+  [ ] Reportes y dashboards por tenant
+  [ ] Notificaciones en tiempo real
+  [ ] API REST para integraciones externas
+  [ ] Pool de conexiones a base de datos
+
+
+4. ESTADISTICAS RAPIDAS
+========================================================================
+
+  Total de rutas:              140 (18 en app.py + 122 en blueprints)
+  Blueprints registrados:      18
+  Modulos de admin:            14 rutas
+  Templates HTML:              36 pages + 24 partials
+  Archivos JS:                 13
+  Archivos CSS:                6
+  Migraciones procesadas:      45
+  Migraciones pendientes:      2
+  Archivos de migracion rotos: 5
+  Tablas sin CREATE TABLE:     11
+  Rutas sin filtro tenant:     12+
+  Lineas de CSS (total):       ~3,500+
+  Lineas de JS (total):        ~1,200+
+
+========================================================================

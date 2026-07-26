@@ -1,0 +1,90 @@
+Presentación Comercial — Taurus WMS
+====================================
+
+Buenos días. Gracias por su tiempo.
+
+Hoy les presento Taurus WMS, un sistema de gestión de almacenes diseñado para empresas que necesitan control real de su operación logística, sin complicarse con tecnología complicada.
+
+¿Cuál es el problema que resolvemos?
+
+Muchas empresas de logística y distribución manejan su almacén con Excel, cuadernos o sistemas genéricos que no se adaptan a su negocio. Pierden tiempo buscando productos, cometen errores en despachos, y no tienen visibilidad de lo que realmente pasa en su bodega.
+
+Taurus WMS elimina ese caos.
+
+¿Qué hace Taurus WMS?
+
+Es un sistema completo que cubre todo el ciclo de operación de un almacén:
+
+- Materiales y stock — registro completo de productos con código de barras, presentaciones, pesos y proveedores habituales.
+- Ubicaciones inteligentes — organice su bodega por zonas, pasillos, rack y niveles. Encuentre cualquier producto en segundos.
+- Recepciones — controle la entrada de mercadería con estados, cantidades y documentación.
+- Despacho y pedidos — gestione pedidos completos desde la solicitud hasta la preparación y entrega, con seguimiento de estados.
+- Inventario — tome inventarios físicos con alertas de diferencias y estados de anulación.
+- OMC — controle operaciones de carga y descarga con contenedores, muelles y transporte.
+- Rutas y transportes — gestione sus rutas de distribución y flota.
+
+Todo accesible desde cualquier navegador, sin instalar nada.
+
+Lo que nos diferencia:
+
+Multi-tenancy real. Un solo sistema atiende múltiples clientes o sucursales. Cada uno ve solo sus datos. Ideal para empresas con varias bodegas o para operadores logísticos que manejan cuentas separadas.
+
+Administración centralizada. Un panel de administración separado le permite crear tenants, asignar usuarios, definir permisos por rol y configurar cada cuenta sin tocar el sistema operativo.
+
+Sin costos ocultos. No necesita licencias por usuario ni módulos adicionales. El sistema es suyo.
+
+Rápido de implementar. No necesitamos meses de configuración. Taurus WMS se adapta a su operación existente con migraciones de datos y configuración de zonas personalizadas.
+
+¿Para quién es?
+
+Para empresas de distribución, operadores logísticos, almacenes de alimentos, farmacéuticas, o cualquier negocio que maneje inventario físico y necesite control, trazabilidad y eficiencia.
+
+En resumen:
+
+Taurus WMS le da visibilidad total de su almacén, reduce errores, ahorra tiempo y le permite crecer sin crecer en personal administrativo.
+
+¿Tienen alguna pregunta?
+
+---
+Duración estimada: ~3 minutos a ritmo natural de habla.
+
+
+========================================================================
+MÓDULO DE DISPOSITIVOS MÓVILES — Extensión de la presentación
+========================================================================
+
+Y ahora, una novedad que cambia la forma de trabajar: el módulo de dispositivos móviles.
+
+Hasta ahora, la mayoría de los sistemas WMS obligan al operador a ir y venir entre la bodega y una computadora fija. Cada vez que se recibe, se despacha o se inventa, hay que anotar en papel y luego cargar manualmente en el sistema. Eso genera errores, demoras y pérdida de tiempo.
+
+Con nuestro módulo móvil, el operador lleva el sistema en la mano.
+
+¿Cómo funciona?
+
+Desde una tablet, un teléfono o un scanner portátil, el personal de almacén puede:
+
+- Recepción con escaneo — al llegar la mercadería, el operador escanea el código de barras del producto, confirma cantidades y el sistema registra la entrada en tiempo real. Sin papeles, sin carga manual.
+
+- Picking guiado — el sistema indica al operador exactamente a qué ubicación ir, en qué orden recorrer el almacén y cuánto tomar. Se reduce el tiempo de búsqueda y se minimizan los errores de picking.
+
+- Ubicación y reubicación — cuando un producto necesita moverse de una zona a otra, el operador escanea origen y destino. El sistema actualiza la ubicación al instante.
+
+- Inventario en el piso — en lugar de detener toda la operación para inventariar, el personal puede hacer conteos cíclicos recorriendo el almacén con el dispositivo. Los conteos parciales se suman al inventario general.
+
+- Despacho verificado — antes de entregar un pedido, el operador escanea cada producto y el sistema confirma que es correcto. Si falta algo o hay un error, lo detecta al instante.
+
+¿Por qué esto importa para su negocio?
+
+Primero, elimina errores humanos. El escaneo de código de barras no se equivoca. Cada operación se registra con exactitud.
+
+Segundo, acelera la productividad. Un operador con scanner recorre el almacén más rápido que uno con cuaderno y lápiz. Menos pasos innecesarios, más operaciones por hora.
+
+Tercero, visibilidad en tiempo real. La gerencia sabe exactamente qué está pasando en el piso en el momento que sucede. No al final del día, no después de cargar datos. Ahora.
+
+Cuarto, flexibilidad. Funciona en cualquier dispositivo con navegador — no necesita hardware especializado ni licencias costosas por terminal.
+
+La combinación de Taurus WMS más el módulo móvil le da un control total: desde la oficina gestiona, desde el piso opera. Los datos siempre están sincronizados.
+
+---
+Duración estimada sección móvil: ~2 minutos.
+Duración total con módulo móvil: ~5 minutos.

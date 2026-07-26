@@ -243,7 +243,7 @@ def tenants_guardar():
                 d.get('cuit'), d.get('direccion'), d.get('telefono'), d.get('email'),
                 1 if d.get('activo') else 0, tenant_id
             ))
-            msg = 'Empresa actualizada correctamente'
+            msg = 'Tenant actualizado correctamente'
             log_audit('UPDATE', 'tenants', {'id': tenant_id, 'nombre': nombre})
         else:
             cursor.execute("""
@@ -254,7 +254,7 @@ def tenants_guardar():
                 d.get('cuit'), d.get('direccion'), d.get('telefono'), d.get('email')
             ))
             tenant_id = cursor.lastrowid
-            msg = 'Empresa creada correctamente'
+            msg = 'Tenant creado correctamente'
             log_audit('CREATE', 'tenants', {'id': tenant_id, 'nombre': nombre})
         
         conn.commit()
@@ -283,7 +283,7 @@ def tenants_eliminar(encoded_id):
         cursor = conn.cursor(pymysql.cursors.DictCursor)
         cursor.execute("UPDATE tenants SET activo = FALSE WHERE id = %s", (tenant_id,))
         conn.commit()
-        flash('Empresa desactivada.', 'success')
+        flash('Tenant desactivado.', 'success')
         log_audit('DELETE', 'tenants', {'id': tenant_id})
         cursor.close()
     finally:
@@ -305,7 +305,7 @@ def tenants_activar(encoded_id):
         cursor = conn.cursor(pymysql.cursors.DictCursor)
         cursor.execute("UPDATE tenants SET activo = TRUE WHERE id = %s", (tenant_id,))
         conn.commit()
-        flash('Empresa activada.', 'success')
+        flash('Tenant activado.', 'success')
         log_audit('UPDATE', 'tenants', {'id': tenant_id, 'action': 'activar'})
         cursor.close()
     finally:
@@ -707,7 +707,8 @@ def parametros_editar(tenant_id):
         tenants_list = cursor_admin.fetchall()
         
         cursor_admin.execute("""
-            SELECT id, nombre, nombredelalmacen, metodosdepicking,
+            SELECT id, nombre, razon_social, cuit, direccion, telefono, email,
+                   nombredelalmacen, metodosdepicking,
                    bajostock, dias_filtro_fechas, proveedor_api_ia, api_key, modelo_api_ia,
                    contexto, prompt
             FROM tenants WHERE id = %s
@@ -721,6 +722,12 @@ def parametros_editar(tenant_id):
             
             cursor_admin.execute("""
                 UPDATE tenants SET
+                    nombre = %s,
+                    razon_social = %s,
+                    cuit = %s,
+                    direccion = %s,
+                    telefono = %s,
+                    email = %s,
                     nombredelalmacen = %s,
                     metodosdepicking = %s,
                     bajostock = %s,
@@ -732,6 +739,12 @@ def parametros_editar(tenant_id):
                     prompt = %s
                 WHERE id = %s
             """, (
+                d.get('nombre', ''),
+                d.get('razon_social', ''),
+                d.get('cuit', ''),
+                d.get('direccion', ''),
+                d.get('telefono', ''),
+                d.get('email', ''),
                 d.get('nombredelalmacen', ''),
                 picking_json,
                 float(d.get('bajostock') or 0),
@@ -754,8 +767,12 @@ def parametros_editar(tenant_id):
             param = {
                 'tenant_id': tenant_actual['id'],
                 'tenant_nombre': tenant_actual['nombre'],
+                'razon_social': tenant_actual.get('razon_social') or '',
+                'cuit': tenant_actual.get('cuit') or '',
+                'direccion': tenant_actual.get('direccion') or '',
+                'telefono': tenant_actual.get('telefono') or '',
+                'email': tenant_actual.get('email') or '',
                 'nombredelalmacen': tenant_actual.get('nombredelalmacen') or '',
-                'razonsocial': tenant_actual.get('razonsocial_almacen') or '',
                 'metodosdepicking': tenant_actual.get('metodosdepicking') or '"fifo"',
                 'bajostock': tenant_actual.get('bajostock') or 0,
                 'dias_filtro_fechas': tenant_actual.get('dias_filtro_fechas') or 30,
