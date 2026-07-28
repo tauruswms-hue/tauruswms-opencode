@@ -1,6 +1,5 @@
 from flask import Flask, render_template, session, redirect, url_for, request, flash, jsonify, abort
 from werkzeug.security import check_password_hash
-import pymysql
 import os
 import time
 import datetime
@@ -8,6 +7,14 @@ import json
 from dotenv import load_dotenv
 from pathlib import Path
 from functools import wraps
+import logging
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger(__name__)
 
 from modules.materiales import materiales_bp
 from modules.ubicaciones import ubicaciones_bp
@@ -27,7 +34,8 @@ from modules.zonas import zonas_bp
 from modules.omc import omc_bp
 from modules.inventario import inventario_bp
 from modules.despacho import despacho_bp
-from modules.db_config import get_db_config, clear_config_cache
+from modules.db_config import get_db_config, clear_config_cache, get_db_connection, _get_admin_connection, get_db_engine
+from modules.sql_dialect import quote as sql_quote, set_engine
 
 
 app = Flask(__name__)
@@ -50,45 +58,40 @@ app.register_blueprint(omc_bp)
 app.register_blueprint(inventario_bp)
 app.register_blueprint(despacho_bp)
 
-app.secret_key = 'clave-secreta-simple-taurus'
 env_path = Path('.') / '.env'
 load_dotenv(dotenv_path=env_path)
+
+app.secret_key = os.getenv('SECRET_KEY', 'dev-fallback')
 
 
 def get_db_config_from_table():
     config = get_db_config()
+    engine = config.get('DB_ENGINE', 'mysql')
     return {
         'host': config.get('DB_HOST', 'localhost'),
         'user': config.get('DB_USER', 'taurus'),
         'password': config.get('DB_PASSWORD', ''),
         'database': config.get('DB_NAME', 'taurus_wms'),
         'charset': config.get('DB_CHAR_SET', 'utf8mb4'),
-        'port': int(config.get('DB_PORT', 3306))
+        'port': int(config.get('DB_PORT', 3306)),
+        'engine': engine
     }
 
 
 try:
     DB_CONFIG = get_db_config_from_table()
 except Exception as e:
-    print(f"⚠️  No se pudo cargar config de BD desde tabla: {e}")
-    print("⚠️  Usando valores por defecto del entorno (.env)")
+    logger.warning("No se pudo cargar config de BD desde tabla: %s", e)
+    logger.warning("Usando valores por defecto del entorno (.env)")
     DB_CONFIG = {
         'host': os.getenv('DB_HOST', 'localhost'),
         'user': os.getenv('DB_USER', 'taurus'),
         'password': os.getenv('DB_PASSWORD', ''),
         'database': os.getenv('DB_NAME', 'taurus_wms'),
         'charset': os.getenv('DB_CHAR_SET', 'utf8mb4'),
-        'port': int(os.getenv('DB_PORT', 3306))
+        'port': int(os.getenv('DB_PORT', 3306)),
+        'engine': os.getenv('DB_ENGINE', 'mysql')
     }
-
-ADMIN_DB_CONFIG = {
-    'host': os.getenv('DB_ADMIN_HOST', 'localhost'),
-    'user': os.getenv('DB_ADMIN_USER', 'taurus_admin'),
-    'password': os.getenv('DB_ADMIN_PASSWORD', 'Taurus_2001'),
-    'database': os.getenv('DB_ADMIN_NAME', 'taurus_admin'),
-    'charset': os.getenv('DB_CHAR_SET', 'utf8mb4'),
-    'port': int(os.getenv('DB_ADMIN_PORT', 3306))
-}
 
 
 # ============================================================================
@@ -96,7 +99,7 @@ ADMIN_DB_CONFIG = {
 # ============================================================================
 def verificar_mysql():
     try:
-        conn = pymysql.connect(**DB_CONFIG)
+        conn = get_db_connection()
         conn.close()
         return True, "✅ Motor BD Conectado"
     except Exception as e:
@@ -109,8 +112,8 @@ def verificar_mysql():
 def obtener_rutas_por_rol(rol):
     """Obtiene las rutas habilitadas para un rol específico"""
     try:
-        conn = pymysql.connect(**DB_CONFIG)
-        cursor = conn.cursor(pymysql.cursors.DictCursor)
+        conn = get_db_connection()
+        cursor = conn.cursor()
 
         # Verificar si el rol tiene acceso a todas las rutas (*)
         sentencia = "SELECT ruta FROM roles_rutas WHERE rol = %s"
@@ -129,7 +132,7 @@ def obtener_rutas_por_rol(rol):
         return [ruta['ruta'] for ruta in rutas]
 
     except Exception as e:
-        print(f"Error al obtener rutas por rol: {str(e)}")
+        logger.error("Error al obtener rutas por rol: %s", e)
         return []
 
 
@@ -192,8 +195,8 @@ def index():
     pedidos_por_estado = {'Pendiente': 0, 'Preparado': 0, 'Despachado': 0}
     stock_por_tipo = {'Libre Venta': 0, 'Calidad': 0, 'Bloqueado': 0, 'Mal Estado': 0}
     try:
-        conn = pymysql.connect(**DB_CONFIG)
-        cursor = conn.cursor(pymysql.cursors.DictCursor)
+        conn = get_db_connection()
+        cursor = conn.cursor()
 
         cursor.execute("""
             SELECT estado, COUNT(*) as total 
@@ -215,13 +218,13 @@ def index():
             if row['TipoStock'] in stock_por_tipo:
                 stock_por_tipo[row['TipoStock']] = int(row['total'])
 
-        cursor.execute("""
-            SELECT t.`descipción` AS tipo_ubi, SUM(sc.StockTotal) AS total
+        cursor.execute(f"""
+            SELECT t.{sql_quote('descripcion')} AS tipo_ubi, SUM(sc.StockTotal) AS total
             FROM stockcontable sc
             JOIN ubicaciones u  ON sc.Ubicacion = u.id
             JOIN tipoubicacion t ON u.tipoubicacion = t.id
             WHERE (%s IS NULL OR sc.tenant_id = %s)
-            GROUP BY t.id, t.`descipción`
+            GROUP BY t.id, t.{sql_quote('descripcion')}
             ORDER BY total DESC
         """, (tenant_id, tenant_id))
         stock_por_tipo_ubi = [
@@ -283,8 +286,8 @@ def login():
             flash('Debe ingresar usuario y contraseña', 'error')
             return render_template('login.html')
         try:
-            conn = pymysql.connect(**ADMIN_DB_CONFIG)
-            cursor = conn.cursor(pymysql.cursors.DictCursor)
+            conn = _get_admin_connection()
+            cursor = conn.cursor()
             cursor.execute("""
                 SELECT u.id, u.username, u.password_hash, u.nombre, u.rol, u.tenant_id, u.activo as usuario_activo,
                        t.nombre as tenant_nombre, t.activo as tenant_activo,
@@ -331,7 +334,7 @@ def login():
             else:
                 flash('Usuario o contraseña incorrectos', 'error')
 
-        except pymysql.Error as e:
+        except Exception as e:
             flash(f'Error al conectar con la base de datos: {str(e)}', 'error')
         except Exception as e:
             flash(f'Error inesperado: {str(e)}', 'error')
@@ -355,7 +358,7 @@ def logout():
 def configuracion_db():
     db_config = get_db_config_from_env()
     db_config['LAST_MODIFIED'] = get_env_file_modification_time()
-    print(f"📋 Configuración DB cargada: {db_config['DB_HOST']}:{db_config['DB_PORT']}/{db_config['DB_NAME']}")
+    logger.info("Configuración DB cargada: %s:%s/%s", db_config['DB_HOST'], db_config['DB_PORT'], db_config['DB_NAME'])
     return render_template('configuracion_db.html', db_config=db_config)
 
 
@@ -398,21 +401,21 @@ def test_db_connection():
         load_dotenv(dotenv_path=env_path, override=True)
 
         # Para depuración (puedes borrar esto después)
-        print(f"🔐 Verificando conexión a BD...")
-        print(f"📋 Host: {data.get('host', os.getenv('DB_HOST'))}")
-        print(f"📋 Usuario: {data.get('username', os.getenv('DB_USER'))}")
-        print(f"📋 Base de datos: {data.get('database', os.getenv('DB_NAME'))}")
+        logger.info("Verificando conexión a BD...")
+        logger.debug("Host: %s", data.get('host', os.getenv('DB_HOST')))
+        logger.debug("Usuario: %s", data.get('username', os.getenv('DB_USER')))
+        logger.debug("Base de datos: %s", data.get('database', os.getenv('DB_NAME')))
 
         # Determinar qué contraseña usar
         password_input = data.get('password', '')
         if password_input and password_input != '********':
             # Usar la contraseña ingresada en el formulario (si no es el placeholder)
             password = password_input
-            print("🔑 Usando contraseña del formulario")
+            logger.debug("Usando contraseña del formulario")
         else:
             # Usar la contraseña del .env
             password = os.getenv('DB_PASSWORD', '')
-            print("🔑 Usando contraseña del archivo .env")
+            logger.debug("Usando contraseña del archivo .env")
 
         # Configuración de prueba
         test_config = {
@@ -426,7 +429,19 @@ def test_db_connection():
         }
 
         # Intentar conexión
-        connection = pymysql.connect(**test_config)
+        from modules.db_config import _get_driver_for_engine
+        engine = DB_CONFIG.get('engine', 'mysql')
+        driver = _get_driver_for_engine(engine)
+        if engine == 'sqlite':
+            connection = driver.connect(test_config['database'])
+        elif engine == 'postgresql':
+            connection = driver.connect(
+                host=test_config['host'], port=test_config['port'],
+                user=test_config['user'], password=test_config['password'],
+                database=test_config['database']
+            )
+        else:
+            connection = driver.connect(**test_config)
         connection.close()
 
         return jsonify({
@@ -434,9 +449,9 @@ def test_db_connection():
             'message': f'✅ Conexión exitosa a {test_config["database"]} en {test_config["host"]}:{test_config["port"]}'
         })
 
-    except pymysql.Error as e:
+    except Exception as e:
         error_msg = str(e)
-        print(f"❌ Error MySQL: {error_msg}")  # Para depuración
+        logger.error("Error de conexión a BD: %s", error_msg)
 
         if "Access denied" in error_msg:
             error_msg = "Acceso denegado: Usuario o contraseña incorrectos"
@@ -452,7 +467,7 @@ def test_db_connection():
             'message': f'❌ {error_msg}'
         })
     except Exception as e:
-        print(f"❌ Error inesperado: {str(e)}")  # Para depuración
+        logger.error("Error inesperado en test_db_connection: %s", e)
         return jsonify({
             'success': False,
             'message': f'❌ Error inesperado: {str(e)}'
@@ -536,7 +551,7 @@ def guardar_sidebar_preferences():
         if section is not None:
             collapsed[section] = value
         
-        conn = pymysql.connect(**ADMIN_DB_CONFIG)
+        conn = _get_admin_connection()
         try:
             with conn.cursor() as cursor:
                 cursor.execute(
@@ -628,9 +643,9 @@ def verificar_autenticacion_y_permisos():
 # ============================================================================
 if __name__ == '__main__':
     mysql_ok, mysql_msg = verificar_mysql()
-    print(f"\n📦 Estado MySQL: {mysql_msg}")
-    print("=" * 50)
-    print("🚀 TAURUS WMS")
-    print("=" * 50)
-    print("\n🌐 URL http://localhost:5000")
+    logger.info("Estado BD (%s): %s", DB_CONFIG.get('engine', 'mysql'), mysql_msg)
+    logger.info("=" * 50)
+    logger.info("TAURUS WMS")
+    logger.info("=" * 50)
+    logger.info("URL http://localhost:5000")
     app.run(debug=True, host='0.0.0.0', port=5000)

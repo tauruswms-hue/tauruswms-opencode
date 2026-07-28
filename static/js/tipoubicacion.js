@@ -19,8 +19,8 @@ function closeModal() {
 
 function editTipo(data) {
     openModal();
-    $('#modalTitle').text('Editar: ' + data.descipción);
+    $('#modalTitle').text('Editar: ' + data.descripcion);
     $('#form_id').val(data.id);
-    $('#form_descipcion').val(data.descipción);
+    $('#form_descipcion').val(data.descripcion);
     $('#form_soporte_picking').prop('checked', data.soporte_picking == 1);
 }

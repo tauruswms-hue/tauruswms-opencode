@@ -4,6 +4,7 @@ from modules.batch_utils import (parse_file, export_csv, export_json, export_xls
                                   plantilla_csv, plantilla_json, plantilla_xlsx,
                                   int_or_none, float_or_zero)
 from modules.db_config import get_db_connection
+from modules.sql_dialect import upsert_coalesce_sql
 
 stockcontable_bp = Blueprint('stockcontable', __name__)
 
@@ -76,27 +77,15 @@ def upsert_posicion(conn, ubicacion_id, material_id, contenedor,
     Clave única: (Ubicacion, Material, IDContenedor).
     Los deltas se suman al stock existente.
     """
+    cols = ['Ubicacion', 'Material', 'IDContenedor', 'Lote', 'TipoStock',
+            'StockTotal', 'StockDisponible', 'StockEntrando', 'StockSaliendo',
+            'UltimaEntrada', 'UltimaSalida', 'UltimoMovimiento', 'UsuarioUltimoMov',
+            'FechaVencimiento', 'tenant_id']
+    increment = ['StockTotal', 'StockDisponible', 'StockEntrando', 'StockSaliendo']
+    coalesce = ['UltimaEntrada', 'UltimaSalida', 'UltimoMovimiento', 'UsuarioUltimoMov', 'FechaVencimiento']
+    sql = upsert_coalesce_sql('stockcontable', cols, 'Ubicacion', increment, coalesce)
     with conn.cursor() as cursor:
-        cursor.execute("""
-            INSERT INTO stockcontable
-                (Ubicacion, Material, IDContenedor, Lote, TipoStock,
-                 StockTotal, StockDisponible, StockEntrando, StockSaliendo,
-                 UltimaEntrada, UltimaSalida, UltimoMovimiento, UsuarioUltimoMov,
-                 FechaVencimiento, tenant_id)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ON DUPLICATE KEY UPDATE
-                Lote               = VALUES(Lote),
-                TipoStock          = VALUES(TipoStock),
-                StockTotal         = StockTotal         + VALUES(StockTotal),
-                StockDisponible    = StockDisponible    + VALUES(StockDisponible),
-                StockEntrando      = StockEntrando      + VALUES(StockEntrando),
-                StockSaliendo      = StockSaliendo      + VALUES(StockSaliendo),
-                UltimaEntrada      = COALESCE(VALUES(UltimaEntrada),      UltimaEntrada),
-                UltimaSalida       = COALESCE(VALUES(UltimaSalida),       UltimaSalida),
-                UltimoMovimiento   = COALESCE(VALUES(UltimoMovimiento),   UltimoMovimiento),
-                UsuarioUltimoMov   = COALESCE(VALUES(UsuarioUltimoMov),   UsuarioUltimoMov),
-                FechaVencimiento   = COALESCE(VALUES(FechaVencimiento),   FechaVencimiento)
-        """, (
+        cursor.execute(sql, (
             ubicacion_id, material_id, contenedor,
             lote, tipo_stock,
             delta_total, delta_disponible, delta_entrando, delta_saliendo,

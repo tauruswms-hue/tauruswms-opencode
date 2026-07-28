@@ -3,6 +3,7 @@ from modules.batch_utils import (parse_file, export_csv, export_json, export_xls
                                   plantilla_csv, plantilla_json, plantilla_xlsx,
                                   int_or_none, bool_col)
 from modules.db_config import get_db_connection
+from modules.sql_dialect import quote
 
 ubicaciones_bp = Blueprint('ubicaciones', __name__)
 
@@ -17,8 +18,8 @@ def listar():
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            cursor.execute("""
-                SELECT u.*, t.`descipción` AS tipo_nombre,
+            cursor.execute(f"""
+                SELECT u.*, t.{quote('descripcion')} AS tipo_nombre,
                        z.codigo AS zona_codigo, z.nombre AS zona_nombre
                 FROM ubicaciones u
                 LEFT JOIN tipoubicacion t ON u.tipoubicacion = t.id
@@ -28,7 +29,7 @@ def listar():
             """, (tenant_id, tenant_id))
             ubicaciones = cursor.fetchall()
 
-            cursor.execute("SELECT * FROM tipoubicacion WHERE (%s IS NULL OR tenant_id = %s) ORDER BY `descipción`", (tenant_id, tenant_id))
+            cursor.execute(f"SELECT * FROM tipoubicacion WHERE (%s IS NULL OR tenant_id = %s) ORDER BY {quote('descripcion')}", (tenant_id, tenant_id))
             tipos = cursor.fetchall()
 
             cursor.execute("SELECT id, codigo, nombre FROM zonas WHERE activo = 1 AND (%s IS NULL OR tenant_id = %s) ORDER BY codigo", (tenant_id, tenant_id))
@@ -56,13 +57,13 @@ def guardar():
                          codigo=%s, descipcion=%s, tipoubicacion=%s, id_zona=%s, orden_picking=%s,
                          coordenadaA=%s, coordenadaB=%s, coordenadaC=%s, coordenadaD=%s,
                          capacidad_maxima=%s, disponible_entrada=%s, disponible_salida=%s
-                         WHERE id=%s"""
+                         WHERE id=%s AND (%s IS NULL OR tenant_id = %s)"""
                 cursor.execute(sql, (
                     d.get('codigo'), d.get('descipcion'), d.get('tipoubicacion') or None,
                     d.get('id_zona') or None, int(d.get('orden_picking') or 0),
                     d.get('coordenadaA'), d.get('coordenadaB'), d.get('coordenadaC'), d.get('coordenadaD'),
                     int(d.get('capacidad_maxima') or 0), 1 if d.get('disponible_entrada') else 0,
-                    1 if d.get('disponible_salida') else 0, u_id))
+                    1 if d.get('disponible_salida') else 0, u_id, tenant_id, tenant_id))
             else:
                 sql = """INSERT INTO ubicaciones
                          (codigo, descipcion, tipoubicacion, id_zona, orden_picking,
@@ -161,16 +162,17 @@ def exportar(formato):
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            cursor.execute("""
-                SELECT u.codigo, u.descipcion, t.`descipción` AS tipo_nombre, u.tipoubicacion,
+            cursor.execute(f"""
+                SELECT u.codigo, u.descipcion, t.{quote('descripcion')} AS tipo_nombre, u.tipoubicacion,
                        z.codigo AS zona_codigo, u.id_zona, u.orden_picking,
                        u.coordenadaA, u.coordenadaB, u.coordenadaC, u.coordenadaD,
                        u.capacidad_maxima, u.disponible_entrada, u.disponible_salida
                 FROM ubicaciones u
                 LEFT JOIN tipoubicacion t ON u.tipoubicacion = t.id
                 LEFT JOIN zonas z ON u.id_zona = z.id
+                WHERE (%s IS NULL OR u.tenant_id = %s)
                 ORDER BY z.codigo, u.orden_picking, u.codigo
-            """)
+            """, (tenant_id, tenant_id))
             rows = cursor.fetchall()
     finally:
         conn.close()

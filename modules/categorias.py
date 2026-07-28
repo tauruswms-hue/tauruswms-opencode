@@ -49,7 +49,7 @@ def guardar():
     return redirect(url_for('categorias.listar'))
 
 
-@categorias_bp.route('/categorias/eliminar/<int:id>')
+@categorias_bp.route('/categorias/eliminar/<int:id>', methods=['POST'])
 def eliminar(id):
     tenant_id = get_tenant_filter()
     conn = get_db_connection()

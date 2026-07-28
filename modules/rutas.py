@@ -52,13 +52,14 @@ def guardar():
     return redirect(url_for('rutas.listar'))
 
 
-@rutas_bp.route('/rutas/eliminar/<int:id>')
+@rutas_bp.route('/rutas/eliminar/<int:id>', methods=['POST'])
 def eliminar(id):
+    tenant_id = get_tenant_filter()
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
             # Nota: Si la ruta está asignada a un transporte, fallará por FK (lo cual es correcto)
-            cursor.execute("DELETE FROM rutas WHERE id_ruta = %s", (id,))
+            cursor.execute("DELETE FROM rutas WHERE id_ruta = %s AND (%s IS NULL OR tenant_id = %s)", (id, tenant_id, tenant_id))
             conn.commit()
             flash("Ruta eliminada", "success")
     except Exception:

@@ -65,11 +65,9 @@
                             <i class="fas fa-edit"></i>
                         </button>
                         {% if z.total_ubicaciones == 0 %}
-                        <a href="{{ url_for('zonas.eliminar', id=z.id) }}"
-                           onclick="return confirm('¿Eliminar zona {{ z.codigo }}?')"
-                           style="color:#e74c3c; text-decoration:none;" title="Eliminar">
-                            <i class="fas fa-trash"></i>
-                        </a>
+                        <form method="POST" action="{{ url_for('zonas.eliminar', id=z.id) }}" style="display:inline;" onsubmit="return confirm('¿Eliminar zona {{ z.codigo }}?')">
+                            <button type="submit" style="color:#e74c3c; text-decoration:none; border:none; background:none; cursor:pointer;" title="Eliminar"><i class="fas fa-trash"></i></button>
+                        </form>
                         {% endif %}
                     </td>
                 </tr>

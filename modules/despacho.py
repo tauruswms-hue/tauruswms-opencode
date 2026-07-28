@@ -46,8 +46,8 @@ def despachar(id_pedido):
                 return redirect(url_for('despacho.listar'))
 
             cursor.execute(
-                "UPDATE pedidos_cabecera SET estado = 'Despachado', fecha_despacho = %s WHERE id_pedido = %s",
-                (datetime.now(), id_pedido)
+                "UPDATE pedidos_cabecera SET estado = 'Despachado', fecha_despacho = %s WHERE id_pedido = %s AND (%s IS NULL OR tenant_id = %s)",
+                (datetime.now(), id_pedido, tenant_id, tenant_id)
             )
             conn.commit()
             flash(f"Pedido {p['nro_pedido']} despachado.", "success")

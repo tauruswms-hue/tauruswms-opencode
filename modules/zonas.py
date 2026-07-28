@@ -62,7 +62,7 @@ def guardar():
     return redirect(url_for('zonas.listar'))
 
 
-@zonas_bp.route('/zonas/eliminar/<int:id>')
+@zonas_bp.route('/zonas/eliminar/<int:id>', methods=['POST'])
 def eliminar(id):
     tenant_id = get_tenant_filter()
     conn = get_db_connection()

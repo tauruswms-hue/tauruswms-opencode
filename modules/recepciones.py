@@ -3,6 +3,7 @@ from datetime import datetime
 from collections import OrderedDict
 from modules.batch_utils import parse_file, float_or_zero, plantilla_csv, plantilla_json, plantilla_xlsx
 from modules.db_config import get_db_connection, _get_admin_connection
+from modules.sql_dialect import upsert_incremental_sql, cast_as_int, substring_index, year as year_func, quote, execute_insert, limit_sql
 
 recepciones_bp = Blueprint('recepciones', __name__)
 
@@ -66,11 +67,11 @@ def nueva():
             )
             proveedores = cursor.fetchall()
 
-            cursor.execute("""
-                SELECT u.id, u.codigo, u.descipcion AS nombre, t.`descipción` AS tipo
+            cursor.execute(f"""
+                SELECT u.id, u.codigo, u.descipcion AS nombre, t.{quote('descripcion')} AS tipo
                 FROM ubicaciones u
                 JOIN tipoubicacion t ON u.tipoubicacion = t.id
-                WHERE t.`descipción` LIKE '%Recepci%' AND (%s IS NULL OR u.tenant_id = %s)
+                WHERE t.{quote('descripcion')} LIKE '%Recepci%' AND (%s IS NULL OR u.tenant_id = %s)
                 ORDER BY u.codigo
             """, (tenant_id, tenant_id))
             ubicaciones_recep = cursor.fetchall()
@@ -102,16 +103,17 @@ def guardar():
     try:
         with conn.cursor() as cursor:
             anio = datetime.now().year
+            expr = cast_as_int(substring_index("numero", "-", -1))
             cursor.execute(
-                "SELECT MAX(CAST(SUBSTRING_INDEX(numero, '-', -1) AS UNSIGNED)) AS max_seq "
-                "FROM recepciones_cabecera WHERE YEAR(fecha_recepcion) = %s AND (%s IS NULL OR tenant_id = %s)",
+                f"SELECT MAX({expr}) AS max_seq "
+                f"FROM recepciones_cabecera WHERE {year_func('fecha_recepcion')} = %s AND (%s IS NULL OR tenant_id = %s)",
                 (anio, tenant_id, tenant_id)
             )
             seq = (cursor.fetchone()['max_seq'] or 0) + 1
             numero = f"REC-{anio}-{seq:05d}"
             usuario = session.get('nombre', 'sistema')
 
-            cursor.execute("""
+            id_recepcion = execute_insert(cursor, """
                 INSERT INTO recepciones_cabecera
                     (numero, id_proveedor, id_ubicacion_recep, id_ubicacion_destino,
                      observaciones, usuario_creacion, tenant_id)
@@ -125,13 +127,12 @@ def guardar():
                 usuario,
                 tenant_id
             ))
-            id_recepcion = cursor.lastrowid
 
             # El contenedor se genera con el ID definitivo
             contenedor = f"RC{id_recepcion:05d}"
             cursor.execute(
-                "UPDATE recepciones_cabecera SET id_contenedor = %s WHERE id_recepcion = %s",
-                (contenedor, id_recepcion)
+                "UPDATE recepciones_cabecera SET id_contenedor = %s WHERE id_recepcion = %s AND (%s IS NULL OR tenant_id = %s)",
+                (contenedor, id_recepcion, tenant_id, tenant_id)
             )
             conn.commit()
             session['ultima_ubicacion_recepcion'] = d.get('id_ubicacion_recep')
@@ -185,8 +186,9 @@ def ver(id_recepcion):
                        ON mp.id_material = m.id AND mp.id_proveedor = %s
                 LEFT JOIN unidades_medida un ON m.unidad_medida_id = un.id_unidad
                 WHERE d.id_recepcion = %s
+                  AND (%s IS NULL OR d.tenant_id = %s)
                 ORDER BY d.id_detalle
-            """, (recepcion['id_proveedor'], id_recepcion))
+            """, (recepcion['id_proveedor'], id_recepcion, tenant_id, tenant_id))
             detalle = cursor.fetchall()
 
             # Materiales disponibles del proveedor para el selector
@@ -204,8 +206,8 @@ def ver(id_recepcion):
             materiales = cursor.fetchall()
 
             # Ubicaciones para el modal de cierre
-            cursor.execute("""
-                SELECT u.id, u.codigo, u.descipcion AS nombre, t.`descipción` AS tipo
+            cursor.execute(f"""
+                SELECT u.id, u.codigo, u.descipcion AS nombre, t.{quote('descripcion')} AS tipo
                 FROM ubicaciones u
                 JOIN tipoubicacion t ON u.tipoubicacion = t.id
                 WHERE (%s IS NULL OR u.tenant_id = %s)
@@ -214,12 +216,12 @@ def ver(id_recepcion):
             ubicaciones_destino = cursor.fetchall()
 
             # OMC relacionada (si existe)
-            cursor.execute("""
+            cursor.execute(f"""
                 SELECT id_omc, numero, estado
                 FROM omc
-                WHERE id_recepcion = %s
-                ORDER BY id_omc DESC LIMIT 1
-            """, (id_recepcion,))
+                WHERE id_recepcion = %s AND (%s IS NULL OR tenant_id = %s)
+                ORDER BY id_omc DESC {limit_sql(1)}
+            """, (id_recepcion, tenant_id, tenant_id))
             omc_relacionada = cursor.fetchone()
 
         return render_template('recepciones_ver.html',
@@ -243,7 +245,7 @@ def buscar_materiales(id_proveedor):
     try:
         with conn.cursor() as cursor:
             like = f'%{q}%'
-            cursor.execute("""
+            cursor.execute(f"""
                 SELECT m.id, m.codigo, m.nombre,
                        COALESCE(m.codigo_barras, '') AS codigo_barras,
                        mp.codigo_referencia_prov,
@@ -255,7 +257,7 @@ def buscar_materiales(id_proveedor):
                   AND (m.nombre LIKE %s OR m.codigo LIKE %s
                        OR m.codigo_barras LIKE %s OR mp.codigo_referencia_prov LIKE %s)
                 ORDER BY m.nombre
-                LIMIT 20
+                {limit_sql(20)}
             """, (id_proveedor, tenant_id, tenant_id, like, like, like, like))
             return jsonify(cursor.fetchall())
     finally:
@@ -272,7 +274,7 @@ def buscar_barcode(id_proveedor):
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            cursor.execute("""
+            cursor.execute(f"""
                 SELECT m.id, m.codigo, m.nombre,
                        COALESCE(m.codigo_barras, '') AS codigo_barras,
                        mp.codigo_referencia_prov,
@@ -283,7 +285,7 @@ def buscar_barcode(id_proveedor):
                 WHERE mp.id_proveedor = %s AND m.activo = 1 AND (%s IS NULL OR m.tenant_id = %s)
                   AND (m.codigo_barras = %s OR m.codigo = %s
                        OR mp.codigo_referencia_prov = %s)
-                LIMIT 1
+                {limit_sql(1)}
             """, (id_proveedor, tenant_id, tenant_id, barcode, barcode, barcode))
             mat = cursor.fetchone()
             return jsonify(mat or {})
@@ -304,25 +306,25 @@ def buscar_ubicaciones():
         with conn.cursor() as cursor:
             like = f'%{q}%'
             if tipo == 'recep':
-                cursor.execute("""
-                    SELECT u.id, u.codigo, u.descipcion AS nombre, t.`descipción` AS tipo
+                cursor.execute(f"""
+                    SELECT u.id, u.codigo, u.descipcion AS nombre, t.{quote('descripcion')} AS tipo
                     FROM ubicaciones u
                     JOIN tipoubicacion t ON u.tipoubicacion = t.id
-                    WHERE t.`descipción` LIKE '%Recepci%'
+                    WHERE t.{quote('descripcion')} LIKE '%Recepci%'
                       AND (u.codigo LIKE %s OR u.descipcion LIKE %s)
                       AND (%s IS NULL OR u.tenant_id = %s)
                     ORDER BY u.codigo
-                    LIMIT 20
+                    {limit_sql(20)}
                 """, (like, like, tenant_id, tenant_id))
             else:
-                cursor.execute("""
-                    SELECT u.id, u.codigo, u.descipcion AS nombre, t.`descipción` AS tipo
+                cursor.execute(f"""
+                    SELECT u.id, u.codigo, u.descipcion AS nombre, t.{quote('descripcion')} AS tipo
                     FROM ubicaciones u
                     JOIN tipoubicacion t ON u.tipoubicacion = t.id
                     WHERE (u.codigo LIKE %s OR u.descipcion LIKE %s)
                       AND (%s IS NULL OR u.tenant_id = %s)
                     ORDER BY u.codigo
-                    LIMIT 20
+                    {limit_sql(20)}
                 """, (like, like, tenant_id, tenant_id))
             return jsonify(cursor.fetchall())
     finally:
@@ -363,19 +365,19 @@ def guardar_item():
                     SET cantidad_esperada=%s, cantidad_recibida=%s, lote=%s,
                         fecha_vencimiento=%s, tipo_stock=%s, observaciones=%s
                     WHERE id_detalle=%s AND id_recepcion=%s
+                      AND (%s IS NULL OR tenant_id = %s)
                 """, (cant_esp, cant_rec, lote, fecha_venc, tipo_stock,
-                      observaciones, id_detalle, id_recepcion))
+                      observaciones, id_detalle, id_recepcion, tenant_id, tenant_id))
             else:
                 if not id_material:
                     return jsonify({"ok": False, "msg": "Debe seleccionar un material."})
-                cursor.execute("""
+                id_detalle = execute_insert(cursor, """
                     INSERT INTO recepciones_detalle
                         (id_recepcion, id_material, lote, fecha_vencimiento,
                          cantidad_esperada, cantidad_recibida, tipo_stock, observaciones, tenant_id)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """, (id_recepcion, id_material, lote, fecha_venc,
                       cant_esp, cant_rec, tipo_stock, observaciones, tenant_id))
-                id_detalle = cursor.lastrowid
 
             conn.commit()
             return jsonify({"ok": True, "id_detalle": id_detalle})
@@ -404,7 +406,7 @@ def eliminar_item(id_detalle):
             if not row or row['estado'] != 'Abierta':
                 return jsonify({"ok": False, "msg": "No se puede eliminar."})
 
-            cursor.execute("DELETE FROM recepciones_detalle WHERE id_detalle = %s", (id_detalle,))
+            cursor.execute("DELETE FROM recepciones_detalle WHERE id_detalle = %s AND (%s IS NULL OR tenant_id = %s)", (id_detalle, tenant_id, tenant_id))
             conn.commit()
             return jsonify({"ok": True})
     except Exception as e:
@@ -440,7 +442,8 @@ def cerrar(id_recepcion):
             cursor.execute("""
                 SELECT * FROM recepciones_detalle
                 WHERE id_recepcion = %s AND cantidad_recibida > 0
-            """, (id_recepcion,))
+                  AND (%s IS NULL OR tenant_id = %s)
+            """, (id_recepcion, tenant_id, tenant_id))
             items = cursor.fetchall()
 
             if not items:
@@ -453,52 +456,40 @@ def cerrar(id_recepcion):
 
             for item in items:
                 # El stock queda en la ubicación de recepción como StockSaliendo
-                cursor.execute("""
-                    INSERT INTO stockcontable
-                        (Ubicacion, Material, Lote, TipoStock, IDContenedor,
-                         StockTotal, StockDisponible, StockEntrando, StockSaliendo,
-                         UltimaEntrada, UltimoMovimiento, FechaVencimiento, UsuarioUltimoMov)
-                    VALUES (%s, %s, %s, %s, %s, 0, 0, 0, %s, NULL, %s, %s, %s)
-                    ON DUPLICATE KEY UPDATE
-                        StockSaliendo    = StockSaliendo + VALUES(StockSaliendo),
-                        UltimoMovimiento = VALUES(UltimoMovimiento),
-                        UsuarioUltimoMov = VALUES(UsuarioUltimoMov)
-                """, (
+                cols_stock = ['Ubicacion', 'Material', 'Lote', 'TipoStock', 'IDContenedor',
+                              'StockTotal', 'StockDisponible', 'StockEntrando', 'StockSaliendo',
+                              'UltimaEntrada', 'UltimoMovimiento', 'FechaVencimiento', 'UsuarioUltimoMov']
+                sql_saliendo = upsert_incremental_sql('stockcontable', cols_stock, 'Ubicacion',
+                                                      ['StockSaliendo'], ['UltimoMovimiento', 'UsuarioUltimoMov'])
+                cursor.execute(sql_saliendo, (
                     recepcion['id_ubicacion_recep'], item['id_material'], item['lote'],
                     item['tipo_stock'], contenedor,
-                    item['cantidad_recibida'],
-                    ahora, item['fecha_vencimiento'], usuario
+                    0, 0, 0, item['cantidad_recibida'],
+                    None, ahora, item['fecha_vencimiento'], usuario
                 ))
 
                 # Crear StockEntrando en la ubicación destino
-                cursor.execute("""
-                    INSERT INTO stockcontable
-                        (Ubicacion, Material, Lote, TipoStock, IDContenedor,
-                         StockTotal, StockDisponible, StockEntrando, StockSaliendo,
-                         UltimaEntrada, UltimoMovimiento, FechaVencimiento, UsuarioUltimoMov)
-                    VALUES (%s, %s, %s, %s, %s, 0, 0, %s, 0, NULL, %s, %s, %s)
-                    ON DUPLICATE KEY UPDATE
-                        StockEntrando    = StockEntrando + VALUES(StockEntrando),
-                        UltimoMovimiento = VALUES(UltimoMovimiento),
-                        UsuarioUltimoMov = VALUES(UsuarioUltimoMov)
-                """, (
+                sql_entrando = upsert_incremental_sql('stockcontable', cols_stock, 'Ubicacion',
+                                                      ['StockEntrando'], ['UltimoMovimiento', 'UsuarioUltimoMov'])
+                cursor.execute(sql_entrando, (
                     id_ubicacion_destino, item['id_material'], item['lote'],
                     item['tipo_stock'], contenedor,
-                    item['cantidad_recibida'],
-                    ahora, item['fecha_vencimiento'], usuario
+                    0, 0, item['cantidad_recibida'], 0,
+                    None, ahora, item['fecha_vencimiento'], usuario
                 ))
 
             # Generar número de OMC
             anio_omc = ahora.year
+            expr_omc = cast_as_int(substring_index("numero", "-", -1))
             cursor.execute(
-                "SELECT MAX(CAST(SUBSTRING_INDEX(numero, '-', -1) AS UNSIGNED)) AS max_seq "
-                "FROM omc WHERE YEAR(fecha_creacion) = %s AND (%s IS NULL OR tenant_id = %s)",
+                f"SELECT MAX({expr_omc}) AS max_seq "
+                f"FROM omc WHERE {year_func('fecha_creacion')} = %s AND (%s IS NULL OR tenant_id = %s)",
                 (anio_omc, tenant_id, tenant_id)
             )
             seq_omc = (cursor.fetchone()['max_seq'] or 0) + 1
             numero_omc = f"OMC-{anio_omc}-{seq_omc:05d}"
 
-            cursor.execute("""
+            id_omc_rec = execute_insert(cursor, """
                 INSERT INTO omc
                     (numero, id_contenedor, id_ubicacion_origen, id_ubicacion_destino,
                      id_recepcion, estado, observaciones, usuario_creacion, fecha_creacion, tenant_id)
@@ -510,7 +501,6 @@ def cerrar(id_recepcion):
                 f"Generada al cerrar recepción {recepcion['numero']}",
                 usuario, ahora, tenant_id
             ))
-            id_omc_rec = cursor.lastrowid
             cursor.execute("""
                 INSERT INTO omc_contenedores
                     (id_omc, id_contenedor, id_contenedor_destino, id_ubicacion_origen)
@@ -522,8 +512,8 @@ def cerrar(id_recepcion):
                 UPDATE recepciones_cabecera
                 SET estado = 'Cerrada', fecha_cierre = %s,
                     usuario_cierre = %s, id_ubicacion_destino = %s
-                WHERE id_recepcion = %s
-            """, (ahora, usuario, id_ubicacion_destino, id_recepcion))
+                WHERE id_recepcion = %s AND (%s IS NULL OR tenant_id = %s)
+            """, (ahora, usuario, id_ubicacion_destino, id_recepcion, tenant_id, tenant_id))
 
             conn.commit()
             flash(
@@ -561,8 +551,8 @@ def eliminar(id_recepcion):
                 return redirect(url_for('recepciones.listar'))
 
             cursor.execute(
-                "SELECT COUNT(*) AS total FROM recepciones_detalle WHERE id_recepcion = %s",
-                (id_recepcion,)
+                "SELECT COUNT(*) AS total FROM recepciones_detalle WHERE id_recepcion = %s AND (%s IS NULL OR tenant_id = %s)",
+                (id_recepcion, tenant_id, tenant_id)
             )
             if cursor.fetchone()['total'] > 0:
                 flash("No se puede eliminar: la recepción tiene materiales asignados.", "danger")
@@ -635,12 +625,13 @@ def confirmar_stock(id_recepcion):
 # ============================================================================
 @recepciones_bp.route('/recepciones/anular/<int:id_recepcion>', methods=['POST'])
 def anular(id_recepcion):
+    tenant_id = get_tenant_filter()
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
             cursor.execute(
-                "SELECT numero, estado FROM recepciones_cabecera WHERE id_recepcion = %s",
-                (id_recepcion,)
+                "SELECT numero, estado FROM recepciones_cabecera WHERE id_recepcion = %s AND (%s IS NULL OR tenant_id = %s)",
+                (id_recepcion, tenant_id, tenant_id)
             )
             rec = cursor.fetchone()
             if not rec or rec['estado'] != 'Abierta':
@@ -651,8 +642,8 @@ def anular(id_recepcion):
             cursor.execute("""
                 UPDATE recepciones_cabecera
                 SET estado = 'Anulada', fecha_cierre = %s, usuario_cierre = %s
-                WHERE id_recepcion = %s
-            """, (datetime.now(), usuario, id_recepcion))
+                WHERE id_recepcion = %s AND (%s IS NULL OR tenant_id = %s)
+            """, (datetime.now(), usuario, id_recepcion, tenant_id, tenant_id))
             conn.commit()
             flash(f"Recepción {rec['numero']} anulada.", "success")
     except Exception as e:
@@ -733,24 +724,24 @@ def importar():
                         if ubic_dest:
                             id_dest = ubic_dest['id']
 
+                    expr_imp = cast_as_int(substring_index("numero", "-", -1))
                     cursor.execute(
-                        "SELECT MAX(CAST(SUBSTRING_INDEX(numero, '-', -1) AS UNSIGNED)) AS max_seq "
-                        "FROM recepciones_cabecera WHERE YEAR(fecha_recepcion) = %s AND (%s IS NULL OR tenant_id = %s)", (anio, tenant_id, tenant_id)
+                        f"SELECT MAX({expr_imp}) AS max_seq "
+                        f"FROM recepciones_cabecera WHERE {year_func('fecha_recepcion')} = %s AND (%s IS NULL OR tenant_id = %s)", (anio, tenant_id, tenant_id)
                     )
                     seq = (cursor.fetchone()['max_seq'] or 0) + 1
                     numero = f"REC-{anio}-{seq:05d}"
 
-                    cursor.execute("""
+                    id_recepcion = execute_insert(cursor, """
                         INSERT INTO recepciones_cabecera
                             (numero, id_proveedor, id_ubicacion_recep, id_ubicacion_destino,
                              observaciones, usuario_creacion, tenant_id)
                         VALUES (%s, %s, %s, %s, %s, %s, %s)
                     """, (numero, prov['id'], ubic_recep['id'], id_dest, observaciones, usuario, tenant_id))
-                    id_recepcion = cursor.lastrowid
 
                     cursor.execute(
-                        "UPDATE recepciones_cabecera SET id_contenedor = %s WHERE id_recepcion = %s",
-                        (f"RC{id_recepcion:05d}", id_recepcion)
+                        "UPDATE recepciones_cabecera SET id_contenedor = %s WHERE id_recepcion = %s AND (%s IS NULL OR tenant_id = %s)",
+                        (f"RC{id_recepcion:05d}", id_recepcion, tenant_id, tenant_id)
                     )
 
                     lineas_ok = 0
@@ -773,7 +764,8 @@ def importar():
                             str(row.get('lote', '') or '').strip() or 'UNICO',
                             str(row.get('fecha_vencimiento', '') or '').strip() or None,
                             float_or_zero(row.get('cantidad')),
-                            str(row.get('tipo_stock', '') or '').strip() or 'Libre Venta'
+                            str(row.get('tipo_stock', '') or '').strip() or 'Libre Venta',
+                            tenant_id
                         ))
                         lineas_ok += 1
 

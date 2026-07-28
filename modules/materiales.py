@@ -1,5 +1,4 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, send_file, session
-import pymysql
 import os
 import csv
 import json
@@ -7,6 +6,7 @@ import io
 from dotenv import load_dotenv
 import openpyxl
 from modules.db_config import get_db_connection
+from modules.sql_dialect import cast_as_char, execute_insert
 
 load_dotenv()
 materiales_bp = Blueprint('materiales', __name__)
@@ -84,9 +84,9 @@ def listar():
             cursor.execute("SELECT mp.* FROM material_proveedor mp WHERE %s IS NULL OR mp.tenant_id = %s", (tenant_id, tenant_id))
             relaciones = cursor.fetchall()
 
-            cursor.execute("""
+            cursor.execute(f"""
                 SELECT id, id_material, nombre, codigo_barras,
-                       CAST(cantidad_unidades AS CHAR) AS cantidad_unidades,
+                       {cast_as_char('cantidad_unidades')} AS cantidad_unidades,
                        peso_bruto, peso_neto
                 FROM material_presentaciones
                 WHERE activo = 1 AND (%s IS NULL OR tenant_id = %s)
@@ -160,14 +160,13 @@ def guardar():
                       unidad_id, trazabilidad, peso_bruto, peso_neto, m_id, tenant_id, tenant_id))
                 current_id = int(m_id)
             else:
-                cursor.execute("""
+                current_id = execute_insert(cursor, """
                     INSERT INTO materiales (codigo, nombre, descripcion, codigo_barras, categoria_id,
                         stock_minimo, stock_maximo, unidad_medida_id, trazabilidad, peso_bruto, peso_neto, tenant_id)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """, (d.get('codigo'), d.get('nombre'), d.get('descripcion') or '', 
                       barcode or None, categoria_id, stock_min, stock_max,
                       unidad_id, trazabilidad, peso_bruto, peso_neto, tenant_id))
-                current_id = cursor.lastrowid
 
             cursor.execute("DELETE FROM material_proveedor WHERE id_material = %s AND (%s IS NULL OR tenant_id = %s)", (current_id, tenant_id, tenant_id))
             for i, prov_id in enumerate(prov_ids):
@@ -295,7 +294,7 @@ def importar():
                             errores.append({'fila': i, 'codigo': codigo, 'razon': f'El código de barras {barcode_import} ya está asignado a otro material.'})
                             continue
 
-                    cursor.execute("""
+                    material_id = execute_insert(cursor, """
                         INSERT INTO materiales
                             (codigo, nombre, descripcion, codigo_barras,
                              categoria_id, stock_minimo, stock_maximo,
@@ -316,7 +315,6 @@ def importar():
                         _float_or_zero(row.get('peso_neto')) or None,
                         tenant_id,
                     ))
-                    material_id = cursor.lastrowid
 
                     id_prov_hab = _int_or_none(row.get('id_proveedor_habitual'))
                     if id_prov_hab:
@@ -343,6 +341,7 @@ def importar():
 
 @materiales_bp.route('/materiales/exportar/<formato>')
 def exportar(formato):
+    tenant_id = get_tenant_filter()
     CAMPOS = ['codigo', 'nombre', 'descripcion', 'codigo_barras',
               'categoria_id', 'categoria_nombre', 'stock_minimo', 'stock_maximo',
               'unidad_medida_id', 'unidad_medida_nombre', 'trazabilidad',
@@ -366,8 +365,9 @@ def exportar(formato):
                 LEFT JOIN unidades_medida u ON m.unidad_medida_id = u.id_unidad
                 LEFT JOIN material_proveedor mp ON mp.id_material = m.id AND mp.es_habitual = 1
                 LEFT JOIN proveedores p ON p.id = mp.id_proveedor
+                WHERE (%s IS NULL OR m.tenant_id = %s)
                 ORDER BY m.codigo
-            """)
+            """, (tenant_id, tenant_id))
             rows = cursor.fetchall()
     finally:
         conn.close()
@@ -551,7 +551,7 @@ def plantilla(formato):
     return 'Formato no válido', 400
 
 
-@materiales_bp.route('/materiales/eliminar/<int:id>')
+@materiales_bp.route('/materiales/eliminar/<int:id>', methods=['POST'])
 def eliminar(id):
     tenant_id = get_tenant_filter()
     conn = get_db_connection()

@@ -1,12 +1,14 @@
 from flask import Blueprint, render_template, session, redirect, url_for, request, flash
 from werkzeug.security import check_password_hash, generate_password_hash
-import pymysql
 import os
 import datetime
 import json
 import base64
 import hashlib
+import logging
 from dotenv import load_dotenv
+from modules.db_config import _get_admin_connection
+from modules.sql_dialect import date as date_func, is_duplicate_key_error, execute_insert, limit_sql
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -51,20 +53,13 @@ def decode_codigo(encoded_codigo):
     return encoded_codigo
 
 
-ADMIN_DB_CONFIG = {
-    'host': os.getenv('DB_ADMIN_HOST', os.getenv('DB_HOST')),
-    'user': os.getenv('DB_ADMIN_USER', os.getenv('DB_USER')),
-    'password': os.getenv('DB_ADMIN_PASSWORD', os.getenv('DB_PASSWORD')),
-    'database': os.getenv('DB_ADMIN_NAME', 'taurus_admin'),
-    'charset': os.getenv('DB_CHARSET', 'utf8mb4'),
-    'port': int(os.getenv('DB_ADMIN_PORT', os.getenv('DB_PORT', 3306)))
-}
+
 
 
 def log_audit(accion, modulo, detalle=None):
     """Registra acciones en el log de auditoría"""
     try:
-        conn = pymysql.connect(**ADMIN_DB_CONFIG)
+        conn = _get_admin_connection()
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO audit_logs 
@@ -83,7 +78,7 @@ def log_audit(accion, modulo, detalle=None):
         cursor.close()
         conn.close()
     except Exception as e:
-        print(f"Error al registrar auditoría: {e}")
+        logging.error("Error al registrar auditoría: %s", e)
 
 
 def admin_required(f):
@@ -110,8 +105,8 @@ def login():
             return render_template('admin_login.html')
         
         try:
-            conn = pymysql.connect(**ADMIN_DB_CONFIG)
-            cursor = conn.cursor(pymysql.cursors.DictCursor)
+            conn = _get_admin_connection()
+            cursor = conn.cursor()
             cursor.execute("""
                 SELECT id, username, password_hash, nombre, rol
                 FROM admin_usuarios 
@@ -141,10 +136,8 @@ def login():
                 flash('Credenciales inválidas', 'error')
                 log_audit('LOGIN_FAILED', 'auth', {'username': username})
                 
-        except pymysql.Error as e:
-            flash(f'Error de conexión: {str(e)}', 'error')
         except Exception as e:
-            flash(f'Error: {str(e)}', 'error')
+            flash(f'Error de conexión: {str(e)}', 'error')
     
     return render_template('admin_login.html')
 
@@ -172,9 +165,9 @@ def index():
 @admin_bp.route('/tenants')
 @admin_required
 def tenants():
-    conn = pymysql.connect(**ADMIN_DB_CONFIG)
+    conn = _get_admin_connection()
     try:
-        cursor = conn.cursor(pymysql.cursors.DictCursor)
+        cursor = conn.cursor()
         cursor.execute("""
             SELECT t.*, 
                    (SELECT COUNT(*) FROM usuarios u WHERE u.tenant_id = t.id) as total_usuarios
@@ -193,16 +186,14 @@ def tenants():
 @admin_bp.route('/tenants/ver/<encoded_id>')
 @admin_required
 def tenants_ver(encoded_id):
-    print(f"DEBUG: encoded_id recibido = {encoded_id}")
     tenant_id = decode_id(encoded_id)
-    print(f"DEBUG: tenant_id decodificado = {tenant_id}")
-    if not tenant_id:
+    if tenant_id is None:
         flash('ID inválido', 'danger')
         return redirect(url_for('admin.tenants'))
     
-    conn = pymysql.connect(**ADMIN_DB_CONFIG)
+    conn = _get_admin_connection()
     try:
-        cursor = conn.cursor(pymysql.cursors.DictCursor)
+        cursor = conn.cursor()
         cursor.execute("SELECT * FROM tenants WHERE id = %s", (tenant_id,))
         tenant = cursor.fetchone()
         
@@ -229,9 +220,9 @@ def tenants_guardar():
     tenant_id = d.get('id')
     nombre = d.get('nombre')
     
-    conn = pymysql.connect(**ADMIN_DB_CONFIG)
+    conn = _get_admin_connection()
     try:
-        cursor = conn.cursor(pymysql.cursors.DictCursor)
+        cursor = conn.cursor()
         if tenant_id:
             cursor.execute("""
                 UPDATE tenants SET 
@@ -246,14 +237,13 @@ def tenants_guardar():
             msg = 'Tenant actualizado correctamente'
             log_audit('UPDATE', 'tenants', {'id': tenant_id, 'nombre': nombre})
         else:
-            cursor.execute("""
+            tenant_id = execute_insert(cursor, """
                 INSERT INTO tenants (nombre, razon_social, cuit, direccion, telefono, email)
                 VALUES (%s, %s, %s, %s, %s, %s)
             """, (
                 nombre, d.get('razon_social'),
                 d.get('cuit'), d.get('direccion'), d.get('telefono'), d.get('email')
             ))
-            tenant_id = cursor.lastrowid
             msg = 'Tenant creado correctamente'
             log_audit('CREATE', 'tenants', {'id': tenant_id, 'nombre': nombre})
         
@@ -274,13 +264,13 @@ def tenants_guardar():
 @admin_required
 def tenants_eliminar(encoded_id):
     tenant_id = decode_id(encoded_id)
-    if not tenant_id:
+    if tenant_id is None:
         flash('ID inválido', 'danger')
         return redirect(url_for('admin.tenants'))
     
-    conn = pymysql.connect(**ADMIN_DB_CONFIG)
+    conn = _get_admin_connection()
     try:
-        cursor = conn.cursor(pymysql.cursors.DictCursor)
+        cursor = conn.cursor()
         cursor.execute("UPDATE tenants SET activo = FALSE WHERE id = %s", (tenant_id,))
         conn.commit()
         flash('Tenant desactivado.', 'success')
@@ -296,13 +286,13 @@ def tenants_eliminar(encoded_id):
 @admin_required
 def tenants_activar(encoded_id):
     tenant_id = decode_id(encoded_id)
-    if not tenant_id:
+    if tenant_id is None:
         flash('ID inválido', 'danger')
         return redirect(url_for('admin.tenants'))
     
-    conn = pymysql.connect(**ADMIN_DB_CONFIG)
+    conn = _get_admin_connection()
     try:
-        cursor = conn.cursor(pymysql.cursors.DictCursor)
+        cursor = conn.cursor()
         cursor.execute("UPDATE tenants SET activo = TRUE WHERE id = %s", (tenant_id,))
         conn.commit()
         flash('Tenant activado.', 'success')
@@ -321,9 +311,9 @@ def usuarios_guardar():
     usuario_id = d.get('id')
     tenant_id = d.get('tenant_id')
     
-    conn = pymysql.connect(**ADMIN_DB_CONFIG)
+    conn = _get_admin_connection()
     try:
-        cursor = conn.cursor(pymysql.cursors.DictCursor)
+        cursor = conn.cursor()
         if usuario_id:
             if d.get('password'):
                 cursor.execute("""
@@ -370,16 +360,12 @@ def usuarios_guardar():
         conn.commit()
         flash(msg, 'success')
         cursor.close()
-    except pymysql.err.IntegrityError as e:
+    except Exception as e:
         conn.rollback()
-        if e.args[0] == 1062:
+        if is_duplicate_key_error(e):
             flash('El nombre de usuario ya existe. Elija otro.', 'danger')
         else:
             flash(f'Error: {str(e)}', 'danger')
-        log_audit('ERROR', 'usuarios', {'error': str(e)})
-    except Exception as e:
-        conn.rollback()
-        flash(f'Error: {str(e)}', 'danger')
         log_audit('ERROR', 'usuarios', {'error': str(e)})
     finally:
         conn.close()
@@ -391,13 +377,13 @@ def usuarios_guardar():
 @admin_required
 def usuarios_eliminar(usuario_id, encoded_tenant_id):
     tenant_id = decode_id(encoded_tenant_id)
-    if not tenant_id:
+    if tenant_id is None:
         flash('ID inválido', 'danger')
         return redirect(url_for('admin.tenants'))
     
-    conn = pymysql.connect(**ADMIN_DB_CONFIG)
+    conn = _get_admin_connection()
     try:
-        cursor = conn.cursor(pymysql.cursors.DictCursor)
+        cursor = conn.cursor()
         cursor.execute("UPDATE usuarios SET activo = FALSE WHERE id = %s", (usuario_id,))
         conn.commit()
         filas_afectadas = cursor.rowcount
@@ -422,13 +408,13 @@ def usuarios_eliminar(usuario_id, encoded_tenant_id):
 @admin_required
 def usuarios_activar(usuario_id, encoded_tenant_id):
     tenant_id = decode_id(encoded_tenant_id)
-    if not tenant_id:
+    if tenant_id is None:
         flash('ID inválido', 'danger')
         return redirect(url_for('admin.tenants'))
     
-    conn = pymysql.connect(**ADMIN_DB_CONFIG)
+    conn = _get_admin_connection()
     try:
-        cursor = conn.cursor(pymysql.cursors.DictCursor)
+        cursor = conn.cursor()
         cursor.execute("UPDATE usuarios SET activo = TRUE WHERE id = %s", (usuario_id,))
         conn.commit()
         filas_afectadas = cursor.rowcount
@@ -458,9 +444,9 @@ def usuarios():
     
     tenant_id = request.args.get('tenant_id', type=int)
     
-    conn = pymysql.connect(**ADMIN_DB_CONFIG)
+    conn = _get_admin_connection()
     try:
-        cursor = conn.cursor(pymysql.cursors.DictCursor)
+        cursor = conn.cursor()
         
         if tenant_id:
             cursor.execute("""
@@ -541,9 +527,9 @@ def audit():
         filtro_desde = desde.strftime('%Y-%m-%d')
         filtro_hasta = hasta.strftime('%Y-%m-%d')
     
-    conn = pymysql.connect(**ADMIN_DB_CONFIG)
+    conn = _get_admin_connection()
     try:
-        cursor = conn.cursor(pymysql.cursors.DictCursor)
+        cursor = conn.cursor()
         
         where = "1=1"
         params = []
@@ -554,10 +540,10 @@ def audit():
             where += " AND modulo = %s"
             params.append(filtro_modulo)
         if desde:
-            where += " AND DATE(created_at) >= %s"
+            where += f" AND {date_func('created_at')} >= %s"
             params.append(filtro_desde)
         if hasta:
-            where += " AND DATE(created_at) <= %s"
+            where += f" AND {date_func('created_at')} <= %s"
             params.append(filtro_hasta)
         
         cursor.execute(f"SELECT COUNT(*) as total FROM audit_logs WHERE {where}", params)
@@ -567,8 +553,8 @@ def audit():
             SELECT * FROM audit_logs 
             WHERE {where}
             ORDER BY created_at DESC
-            LIMIT %s OFFSET %s
-        """, params + [por_pagina, offset])
+            {limit_sql(por_pagina, offset)}
+        """, params)
         logs = cursor.fetchall()
         
         cursor.close()
@@ -595,9 +581,9 @@ def configuracion():
         flash('Solo SUPERADMIN puede gestionar la configuración', 'danger')
         return redirect(url_for('admin.tenants'))
     
-    conn = pymysql.connect(**ADMIN_DB_CONFIG)
+    conn = _get_admin_connection()
     try:
-        cursor = conn.cursor(pymysql.cursors.DictCursor)
+        cursor = conn.cursor()
         cursor.execute("SELECT * FROM configuracion ORDER BY clave")
         configs = cursor.fetchall()
         cursor.close()
@@ -625,9 +611,9 @@ def configuracion_guardar():
         flash('La clave es obligatoria', 'danger')
         return redirect(url_for('admin.configuracion'))
     
-    conn = pymysql.connect(**ADMIN_DB_CONFIG)
+    conn = _get_admin_connection()
     try:
-        cursor = conn.cursor(pymysql.cursors.DictCursor)
+        cursor = conn.cursor()
         
         if config_id:
             cursor.execute("""
@@ -648,14 +634,14 @@ def configuracion_guardar():
         conn.commit()
         flash(msg, 'success')
         cursor.close()
-    except pymysql.err.IntegrityError:
-        conn.rollback()
-        flash('La clave ya existe. Elija otra.', 'danger')
-        log_audit('ERROR', 'configuracion', {'error': 'clave duplicada'})
     except Exception as e:
         conn.rollback()
-        flash(f'Error: {str(e)}', 'danger')
-        log_audit('ERROR', 'configuracion', {'error': str(e)})
+        if is_duplicate_key_error(e):
+            flash('La clave ya existe. Elija otra.', 'danger')
+            log_audit('ERROR', 'configuracion', {'error': 'clave duplicada'})
+        else:
+            flash(f'Error: {str(e)}', 'danger')
+            log_audit('ERROR', 'configuracion', {'error': str(e)})
     finally:
         conn.close()
     
@@ -669,9 +655,9 @@ def configuracion_eliminar(config_id):
         flash('Solo SUPERADMIN puede gestionar la configuración', 'danger')
         return redirect(url_for('admin.tenants'))
     
-    conn = pymysql.connect(**ADMIN_DB_CONFIG)
+    conn = _get_admin_connection()
     try:
-        cursor = conn.cursor(pymysql.cursors.DictCursor)
+        cursor = conn.cursor()
         cursor.execute("DELETE FROM configuracion WHERE id = %s", (config_id,))
         conn.commit()
         filas = cursor.rowcount
@@ -699,10 +685,10 @@ def parametros_editar(tenant_id):
         flash('Solo SUPERADMIN puede gestionar parámetros', 'danger')
         return redirect(url_for('admin.tenants'))
     
-    conn_admin = pymysql.connect(**ADMIN_DB_CONFIG)
+    conn_admin = _get_admin_connection()
     
     try:
-        cursor_admin = conn_admin.cursor(pymysql.cursors.DictCursor)
+        cursor_admin = conn_admin.cursor()
         cursor_admin.execute("SELECT id, nombre FROM tenants WHERE activo = 1 ORDER BY nombre")
         tenants_list = cursor_admin.fetchall()
         

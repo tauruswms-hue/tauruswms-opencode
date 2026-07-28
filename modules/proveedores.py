@@ -54,7 +54,7 @@ def guardar():
     return redirect(url_for('proveedores.listar'))
 
 
-@proveedores_bp.route('/proveedores/eliminar/<int:id>')
+@proveedores_bp.route('/proveedores/eliminar/<int:id>', methods=['POST'])
 def eliminar(id):
     tenant_id = get_tenant_filter()
     conn = get_db_connection()

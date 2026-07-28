@@ -1,10 +1,12 @@
-import pymysql
 import os
 from dotenv import load_dotenv
+
+from modules.sql_dialect import set_engine
 
 load_dotenv()
 
 _cached_config = None
+_db_engine = None
 
 
 def _get_env(key, default=''):
@@ -12,38 +14,111 @@ def _get_env(key, default=''):
 
 
 def _get_admin_connection():
-    return pymysql.connect(
+    engine = _get_env('DB_ADMIN_ENGINE', 'mysql').strip().lower()
+    driver = _get_driver_for_engine(engine)
+
+    connect_kwargs = dict(
         host=_get_env('DB_ADMIN_HOST', 'localhost'),
         user=_get_env('DB_ADMIN_USER', 'taurus_admin'),
         password=_get_env('DB_ADMIN_PASSWORD', 'Taurus_2001'),
         database=_get_env('DB_ADMIN_NAME', 'taurus_admin'),
-        charset=_get_env('DB_CHAR_SET', 'utf8mb4'),
-        port=int(_get_env('DB_ADMIN_PORT', '3306')),
-        cursorclass=pymysql.cursors.DictCursor
     )
+
+    if engine == 'sqlite':
+        return driver.connect(connect_kwargs['database'])
+
+    port = int(_get_env('DB_ADMIN_PORT', '3306'))
+
+    if engine == 'mysql':
+        connect_kwargs['charset'] = _get_env('DB_CHAR_SET', 'utf8mb4')
+        connect_kwargs['port'] = port
+        connect_kwargs['cursorclass'] = driver.cursors.DictCursor
+    elif engine == 'postgresql':
+        connect_kwargs['port'] = port
+        connect_kwargs['options'] = f"-c client_encoding={_get_env('DB_CHAR_SET', 'UTF8')}"
+        from psycopg2.extras import RealDictCursor
+        connect_kwargs['cursor_factory'] = RealDictCursor
+    elif engine == 'sqlserver':
+        connect_kwargs = dict(
+            server=_get_env('DB_ADMIN_HOST', 'localhost'),
+            user=_get_env('DB_ADMIN_USER', 'taurus_admin'),
+            password=_get_env('DB_ADMIN_PASSWORD', 'Taurus_2001'),
+            database=_get_env('DB_ADMIN_NAME', 'taurus_admin'),
+            port=port,
+        )
+
+    return driver.connect(**connect_kwargs)
+
+
+def get_db_engine():
+    global _db_engine
+    if _db_engine is not None:
+        return _db_engine
+    env_engine = _get_env('DB_ENGINE', '').strip().lower()
+    if env_engine in ('mysql', 'postgresql', 'sqlite', 'sqlserver'):
+        _db_engine = env_engine
+        set_engine(env_engine)
+        return _db_engine
+    try:
+        config = get_db_config()
+        engine_val = config.get('DB_ENGINE', 'mysql').strip().lower()
+        if engine_val not in ('mysql', 'postgresql', 'sqlite', 'sqlserver'):
+            engine_val = 'mysql'
+        _db_engine = engine_val
+        set_engine(engine_val)
+        return _db_engine
+    except Exception:
+        _db_engine = 'mysql'
+        set_engine('mysql')
+        return _db_engine
+
+
+def _get_driver_for_engine(engine):
+    if engine == 'postgresql':
+        try:
+            import psycopg2
+            return psycopg2
+        except ImportError:
+            raise ImportError("psycopg2 no está instalado. Ejecute: pip install psycopg2-binary")
+    if engine == 'sqlite':
+        import sqlite3
+        return sqlite3
+    if engine == 'sqlserver':
+        try:
+            import pymssql
+            return pymssql
+        except ImportError:
+            raise ImportError("pymssql no está instalado. Ejecute: pip install pymssql")
+    import pymysql
+    return pymysql
 
 
 def get_db_config():
     global _cached_config
     if _cached_config is not None:
         return _cached_config.copy()
-    
+
     conn = _get_admin_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT clave, valor FROM configuracion WHERE clave IN ('DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASSWORD', 'DB_CHAR_SET')")
+        cursor.execute("SELECT clave, valor FROM configuracion WHERE clave IN ('DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASSWORD', 'DB_CHAR_SET', 'DB_ENGINE')")
         rows = cursor.fetchall()
         cursor.close()
-        
+
         config = {}
         for row in rows:
             clave = row['clave']
             valor = row['valor'] if row['valor'] is not None else ''
             config[clave] = str(valor)
-        
-        if len(config) < 6:
-            raise Exception(f"Configuración incompleta en BD. Se encontraron {len(config)} de 6 parámetros requeridos.")
-        
+
+        required = ['DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASSWORD']
+        missing = [k for k in required if k not in config]
+        if missing:
+            raise Exception(f"Configuración incompleta en BD. Faltan: {', '.join(missing)}")
+
+        if 'DB_ENGINE' not in config:
+            config['DB_ENGINE'] = 'mysql'
+
         _cached_config = config
         return config.copy()
     finally:
@@ -51,18 +126,45 @@ def get_db_config():
 
 
 def clear_config_cache():
-    global _cached_config
+    global _cached_config, _db_engine
     _cached_config = None
+    _db_engine = None
+    set_engine('mysql')
 
 
 def get_db_connection():
+    engine = get_db_engine()
+    driver = _get_driver_for_engine(engine)
     config = get_db_config()
-    return pymysql.connect(
+
+    if engine == 'sqlite':
+        conn = driver.connect(config['DB_NAME'])
+        conn.row_factory = driver.Row
+        return conn
+
+    connect_kwargs = dict(
         host=config['DB_HOST'],
         user=config['DB_USER'],
         password=config['DB_PASSWORD'],
         database=config['DB_NAME'],
-        charset=config['DB_CHAR_SET'],
         port=int(config['DB_PORT']),
-        cursorclass=pymysql.cursors.DictCursor
     )
+    if engine == 'mysql':
+        connect_kwargs['charset'] = config.get('DB_CHAR_SET', 'utf8mb4')
+        connect_kwargs['cursorclass'] = driver.cursors.DictCursor
+    elif engine == 'postgresql':
+        connect_kwargs['options'] = f"-c client_encoding={config.get('DB_CHAR_SET', 'UTF8')}"
+        from psycopg2.extras import RealDictCursor
+        connect_kwargs['cursor_factory'] = RealDictCursor
+    elif engine == 'sqlserver':
+        connect_kwargs = dict(
+            server=config['DB_HOST'],
+            user=config['DB_USER'],
+            password=config['DB_PASSWORD'],
+            database=config['DB_NAME'],
+        )
+        port = config.get('DB_PORT', '1433')
+        if port:
+            connect_kwargs['port'] = int(port)
+
+    return driver.connect(**connect_kwargs)

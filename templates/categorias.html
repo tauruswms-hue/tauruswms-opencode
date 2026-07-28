@@ -60,9 +60,9 @@
                         <button class="btn-icon edit" onclick='editCategoria({{ c | tojson }})'>
                             <i class="fas fa-edit"></i>
                         </button>
-                        <a href="{{ url_for('categorias.eliminar', id=c.id_categoria) }}" class="btn-icon delete" onclick="return confirm('¿Inactivar categoría?')">
-                            <i class="fas fa-trash"></i>
-                        </a>
+                        <form method="POST" action="{{ url_for('categorias.eliminar', id=c.id_categoria) }}" style="display:inline;" onsubmit="return confirm('¿Inactivar categoría?')">
+                            <button type="submit" class="btn-icon delete"><i class="fas fa-trash"></i></button>
+                        </form>
                     </td>
                 </tr>
                 {% endfor %}

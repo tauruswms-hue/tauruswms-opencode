@@ -64,9 +64,9 @@
                         <button class="btn-icon edit" onclick='editUnidad({{ u | tojson }})'>
                             <i class="fas fa-edit"></i>
                         </button>
-                        <a href="{{ url_for('unidades.eliminar', id=u.id_unidad) }}" class="btn-icon delete" onclick="return confirm('¿Inactivar esta unidad?')">
-                            <i class="fas fa-trash"></i>
-                        </a>
+                        <form method="POST" action="{{ url_for('unidades.eliminar', id=u.id_unidad) }}" style="display:inline;" onsubmit="return confirm('¿Inactivar esta unidad?')">
+                            <button type="submit" class="btn-icon delete"><i class="fas fa-trash"></i></button>
+                        </form>
                     </td>
                 </tr>
                 {% endfor %}

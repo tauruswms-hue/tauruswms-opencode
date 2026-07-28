@@ -49,7 +49,7 @@ When `tenant_id` is NULL (superadmin), all rows are returned. This pattern appea
 ## Key conventions
 
 - UI language is **Spanish** (variable names, route names, flash messages, DB column names)
-- Column `descipción` in `tipoubicacion` table has an accent — match it exactly in SQL
+- Column `descripcion` in `tipoubicacion` table — no accent, match it exactly in SQL
 - ID columns are inconsistent: some tables use `id`, others `id_pedido`, `id_cliente`, `id_transporte`, etc. Check the actual table before writing queries.
 - Tenant IDs in admin URLs are base64-encoded (`encode_id`/`decode_id` in `modules/admin.py`) — do not pass raw integers in admin routes
 - `openpyxl` is used for XLSX export; `werkzeug.security` for password hashing (`scrypt`)

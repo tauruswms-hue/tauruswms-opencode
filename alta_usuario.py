@@ -1,4 +1,4 @@
-import pymysql
+from modules.db_config import get_db_connection
 import os
 import tkinter as tk
 from tkinter import ttk, messagebox, StringVar
@@ -52,15 +52,6 @@ class CrearUsuarioApp:
         """Cargar configuración de base de datos"""
         env_path = Path('.') / '.env'
         load_dotenv(dotenv_path=env_path)
-
-        self.db_config = {
-            'host': os.getenv('DB_HOST'),
-            'user': os.getenv('DB_USER'),
-            'password': os.getenv('DB_PASSWORD'),
-            'database': os.getenv('DB_NAME'),
-            'charset': os.getenv('DB_CHARSET'),
-            'port': int(os.getenv('DB_PORT'))
-        }
 
     def crear_interfaz(self):
         """Crear todos los elementos de la interfaz"""
@@ -213,16 +204,15 @@ class CrearUsuarioApp:
     def crear_usuario_bd(self, usuario, clave, mail, nombre, rol):
         """Crear usuario en la base de datos"""
         try:
-            conn = pymysql.connect(**self.db_config)
+            from modules.sql_dialect import insert_ignore_sql, is_duplicate_key_error
+            conn = get_db_connection()
             cursor = conn.cursor()
 
             password_hash = generate_password_hash(clave)
 
-            cursor.execute("""
-                INSERT IGNORE INTO usuarios 
-                (username, email, password_hash, nombre, rol) 
-                VALUES (%s, %s, %s, %s, %s)
-            """, (usuario, mail, password_hash, nombre, rol))
+            cols = ['username', 'email', 'password_hash', 'nombre', 'rol']
+            sql = insert_ignore_sql('usuarios', cols)
+            cursor.execute(sql, (usuario, mail, password_hash, nombre, rol))
 
             conn.commit()
             cursor.close()
@@ -230,14 +220,9 @@ class CrearUsuarioApp:
 
             return True, "Usuario creado exitosamente"
 
-        except pymysql.IntegrityError as e:
-            if "Duplicate entry" in str(e):
-                if "username" in str(e):
-                    return False, f"El nombre de usuario '{usuario}' ya existe"
-                elif "email" in str(e):
-                    return False, f"El email '{mail}' ya está registrado"
-            return False, f"Error de integridad: {str(e)}"
         except Exception as e:
+            if is_duplicate_key_error(e):
+                return False, f"El nombre de usuario '{usuario}' o email '{mail}' ya existe"
             return False, f"Error al crear usuario: {str(e)}"
 
     def crear_usuario(self):

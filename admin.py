@@ -1,29 +1,22 @@
 from flask import Flask, session
 from werkzeug.security import check_password_hash, generate_password_hash
-import pymysql
 import os
 import datetime
 import base64
 from dotenv import load_dotenv
 from pathlib import Path
+from modules.db_config import _get_admin_connection
+from modules.sql_dialect import insert_ignore_sql
 
 app = Flask(__name__)
-app.secret_key = 'admin-secret-key-taurus-2024'
-app.register_blueprint(__import__('modules.admin', fromlist=['admin_bp']).admin_bp)
 
 env_path = Path('.') / '.env'
 load_dotenv(dotenv_path=env_path)
 
-SECRET_SALT = os.getenv('SECRET_SALT', 'taurus-wms-salt-2024')
+app.secret_key = os.getenv('ADMIN_SECRET_KEY', 'dev-fallback')
+app.register_blueprint(__import__('modules.admin', fromlist=['admin_bp']).admin_bp)
 
-ADMIN_DB_CONFIG = {
-    'host': os.getenv('DB_ADMIN_HOST', os.getenv('DB_HOST')),
-    'user': os.getenv('DB_ADMIN_USER', os.getenv('DB_USER')),
-    'password': os.getenv('DB_ADMIN_PASSWORD', os.getenv('DB_PASSWORD')),
-    'database': os.getenv('DB_ADMIN_NAME', 'taurus_admin'),
-    'charset': os.getenv('DB_CHARSET', 'utf8mb4'),
-    'port': int(os.getenv('DB_ADMIN_PORT', os.getenv('DB_PORT', 3306)))
-}
+SECRET_SALT = os.getenv('SECRET_SALT', 'taurus-wms-salt-2024')
 
 
 def encode_id(tenant_id):
@@ -53,13 +46,15 @@ def encode_id_filter(tenant_id):
 def init_admin_db():
     """Inicializa la BD admin con el usuario inicial si no existe"""
     try:
-        conn = pymysql.connect(**ADMIN_DB_CONFIG)
+        conn = _get_admin_connection()
         cursor = conn.cursor()
         
-        cursor.execute("""
-            INSERT IGNORE INTO admin_usuarios (username, password_hash, nombre, email, rol)
-            VALUES ('admin', %s, 'Administrador', 'admin@taurus.local', 'SUPERADMIN')
-        """, (generate_password_hash('Admin@2024!'),))
+        cols = ['username', 'password_hash', 'nombre', 'email', 'rol']
+        sql = insert_ignore_sql('admin_usuarios', cols)
+        cursor.execute(sql, (
+            'admin', generate_password_hash('Admin@2024!'),
+            'Administrador', 'admin@taurus.local', 'SUPERADMIN'
+        ))
         
         conn.commit()
         cursor.close()

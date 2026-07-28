@@ -1,526 +1,512 @@
 ========================================================================
 HOJA DE RUTA — Taurus WMS
-Plan de reactivacion para venta comercial
+MVP para presentacion a accionistas
 ========================================================================
 Fecha: julio 2026
-Objetivo: Llevar el WMS a estado comercial viable en ~6-8 semanas
-Metodo: Fases semanales con entregables claros
+Objetivo: Demo funcional estable que muestre el ciclo completo del WMS
+Enfoque: Estabilidad > Features > Multi-engine > Seguridad basica
+Metodo: Fases con entregables verificables, priorizado por impacto en demo
 ========================================================================
 
 
-FASE 0 — PREPARACION (Semana 0, 1-2 dias)
+ESTADO ACTUAL DEL PROYECTO
 ========================================================================
-Objetivo: Tener el entorno de desarrollo limpio y funcional.
 
-Tareas:
-  [X] Instalar dependencias faltantes:
-      pip install pymysql openpyxl werkzeug python-dotenv
-      (werkzeug viene con Flask pero se importa directo en el codigo)
-  [X] Actualizar requirements.txt con las 6 dependencias reales:
-      Flask, pymysql, openpyxl, werkzeug, python-dotenv, Flask-WTF
-  [X] Crear .gitignore en raiz con:
-      .env, __pycache__/, *.pyc, .venv/, .idea/, picking_docs/,
-      *.db, .DS_Store
-  [X] Ejecutar migracion pendiente: add_api_key_tenant.sql
-  [X] Ejecutar migracion pendiente: fix_admin_password.sql
-  [ ] Verificar que app.py y admin.py arrancan sin errores
-  [ ] Hacer commit de todo lo anterior como baseline
+  Modulos implementados (18 blueprints):
+    Materiales, Ubicaciones, TipoUbicacion, Categorias, Proveedores,
+    Clientes, Transportes, Rutas, ClasesPedido, Zonas, Unidades,
+    Pedidos, Recepciones, OMC, Inventario, StockContable, Despacho,
+    Admin panel ( tenants + usuarios + parametros + audit )
 
-Entregable: Repo limpio, dependencias completas, ambos apps arrancando.
+  Infraestructura:
+    - Multi-tenant con filtro por session
+    - Admin panel separado (port 5001)
+    - Import/Export batch (CSV/JSON/XLSX) en todos los modulos core
+    - sql_dialect.py: abstraccion de MySQL/PostgreSQL/SQLite/SQLServer
+    - db_config.py: config por .env (admin) + tabla configuracion (WMS)
+    - 66 templates, 12 archivos JS, CSS custom
+
+  Deuda tecnica conocida:
+    - 12+ rutas sin filtro tenant_id (fuga de datos entre tenants)
+    - Secretos hardcodeados (secret_key en app.py y admin.py)
+    - Sin CSRF, sin rate limiting, sin tests
+    - Codigo duplicado en materiales.py (parseo propio vs batch_utils)
+    - Prints de debug en modules/admin.py y app.py
+    - Eliminar via GET (deberia ser POST)
+    - migrations/ son 100% MySQL-specific
+    - 1 ruta con LIMIT raw sin pasar por limit_sql() (admin.py:557)
+    - Columna tipoubicacion renombrada a 'descripcion' (corregido en codigo)
 
 
-FASE 1 — SEGURIDAD CRITICA (Semana 1)
 ========================================================================
-Objetivo: Eliminar riesgos de fuga de datos y vulnerabilidades basicas.
-
-1.1 Filtros de tenant ausentes (12+ rutas)
--------------------------------------------
-Archivo: modules/ubicaciones.py
-  - exportar(): agregar WHERE (%s IS NULL OR tenant_id = %s)
-
-Archivo: modules/materiales.py
-  - exportar(): agregar WHERE (%s IS NULL OR tenant_id = %s)
-
-Archivo: modules/rutas.py
-  - eliminar(): agregar filtro tenant_id al DELETE
-
-Archivo: modules/recepciones.py
-  - anular(): agregar filtro tenant_id al SELECT y UPDATE
-
-Archivo: modules/pedidos.py (7+ rutas):
-  - eliminar(): agregar filtro tenant_id
-  - preparar_masivo(): agregar filtro tenant_id
-  - resumen_preparar(): agregar filtro tenant_id
-  - cambiar_ruta_transporte(): agregar filtro tenant_id
-  - buscar_contenedores(): agregar filtro tenant_id
-  - filtros_contenedores(): agregar filtro tenant_id
-  - contenedor_stock(): agregar filtro tenant_id
-  - filtros_tipos(): agregar filtro tenant_id (si aplica)
-  - filtros_ubicaciones(): agregar filtro tenant_id (si aplica)
-
-Archivo: modules/omc.py
-  - buscar_contenedores_destino(): agregar filtro tenant_id
-
-Metodo: En cada ruta, usar session['tenant_id'] como se hace en el
-resto del codigo. El patron es:
-  cursor.execute("SELECT ... WHERE ... AND (%s IS NULL OR tenant_id = %s)",
-                 (session.get('tenant_id'), session.get('tenant_id')))
-
-Verificacion: Revisar TODAS las rutas de TODOS los modulos buscando
-queries sin el patron de tenant. Usar grep:
-  grep -rn "WHERE.*id_pedido\|WHERE.*id_recepcion\|DELETE FROM" modules/
-
-1.2 Secretos en variables de entorno
---------------------------------------
-Archivo: app.py linea 53
-  Cambiar: app.secret_key = 'clave-secreta-simple-taurus'
-  Por:      app.secret_key = os.getenv('SECRET_KEY', 'fallback-dev-key')
-
-Archivo: admin.py linea 11
-  Cambiar: app.secret_key = 'admin-secret-key-taurus-2024'
-  Por:      app.secret_key = os.getenv('ADMIN_SECRET_KEY', 'fallback-dev-key')
-
-Archivo: admin.py linea 17
-  Cambiar: SECRET_SALT = os.getenv('SECRET_SALT', 'taurus-wms-salt-2024')
-  (ya lo hace, pero agregar ADMIN_SECRET_KEY a .env)
-
-Archivo: .env
-  Agregar:
-    SECRET_KEY=tu-clave-secreta-aqui-cambiar-en-produccion
-    ADMIN_SECRET_KEY=tu-admin-clave-aqui-cambiar-en-produccion
-
-1.3 Eliminar codigo debug
----------------------------
-Archivo: modules/admin.py
-  - Eliminar lineas 196-198: print("DEBUG: ...")
-  - Buscar mas prints de debug: grep -n "print.*DEBUG" modules/admin.py
-
-Archivo: app.py
-  - Lineas 400-404: eliminar prints de test_db_connection
-  - Lineas 439, 455: eliminar o convertir a logging
-  - Buscar mas: grep -n "print(" app.py
-
-1.4 Acciones destructivas via GET -> POST
-------------------------------------------
-Archivos afectados: todos los modulos con ruta eliminar/anular
-
-Cambiar metodos de GET a POST en:
-  - modules/rutas.py: eliminar()
-  - modules/tipoubicacion.py: eliminar()
-  - modules/materiales.py: eliminar()
-  - modules/categorias.py: eliminar()
-  - modules/clases_pedido.py: eliminar()
-  - modules/proveedores.py: eliminar()
-  - modules/zonas.py: eliminar()
-  - modules/unidades.py: eliminar()
-  - modules/recepciones.py: anular()
-  - modules/pedidos.py: eliminar()
-  - modules/omc.py: anular()
-  - modules/inventario.py: anular()
-
-En los templates, cambiar los botones/link de eliminar de <a href="...">
-a <form method="POST"><button>...</button></form>
-
-Entregable: Zero rutas sin filtro tenant, secretos en .env, debug limpio.
-
-
-FASE 2 — PROTECCIONES BASICAS (Semana 2)
+FASE 0 — CORRECCIONES CRITICAS PRE-DEMO (2-3 dias)
 ========================================================================
-Objetivo: Protecciones de seguridad estandar para app web.
+Objetivo: Eliminar bugs que rompen funcionalidad basica.
 
-2.1 CSRF Protection
---------------------
-Instalar: pip install Flask-WTF
+  [X] Corregir nombre de columna 'descipción' -> 'descripcion' en
+      tipoubicacion. Actualizado en 9 archivos Python, 3 templates, 1 JS.
+      La columna en la BD ya se llama 'descripcion'.
 
-Archivo: app.py
-  from flask_wtf.csrf import CSRFProtect
-  csrf = CSRFProtect(app)
+  [X] schema_completo.sql eliminado — reemplazado por modules/schema_generator.py
+      que genera DDL multi-engine (MySQL, PostgreSQL, SQLite)
 
-  En cada <form> HTML agregar:
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  [X] Ejecutar migracion pendiente: add_db_engine_config.sql
+      (agrega registro DB_ENGINE a tabla configuracion)
 
-  En cada AJAX POST agregar header:
-    'X-CSRFToken': document.querySelector('meta[name=csrf-token]').content
+  [X] Corregir admin.py:557 — reemplazar LIMIT raw por limit_sql()
 
-  En base.html agregar:
-    <meta name="csrf-token" content="{{ csrf_token() }}">
+  [X] Verificar que AMBAS apps (app.py + admin.py) arrancan sin errores
+      con el cambio de columna
 
-  Excepcion: rutas AJAX que devuelven JSON (batch imports) necesitan
-  el token en header, no en body.
-
-2.2 Rate Limiting en Login
----------------------------
-Instalar: pip install Flask-Limiter
-
-Archivo: app.py
-  from flask_limiter import Limiter
-  from flask_limiter.util import get_remote_address
-
-  limiter = Limiter(get_remote_address, app=app)
-
-  @app.route('/login', methods=['GET', 'POST'])
-  @limiter.limit("5/minute")
-  def login():
-      ...
-
-2.3 Completar rutas de DELETE/DEACTIVATE faltantes
-----------------------------------------------------
-Modulos sin eliminar: clientes, ubicaciones, transportes
-
-  modules/clientes.py — agregar:
-    @clientes_bp.route('/clientes/eliminar/<int:id>', methods=['POST'])
-    def eliminar():
-        # Verificar dependencias antes de borrar
-        # Borrado logico (activo=0) o fisico segun convenga
-
-  modules/ubicaciones.py — agregar ruta eliminar
-  modules/transportes.py — agregar ruta eliminar
-
-  En cada caso, agregar verificacion de dependencias antes de borrar.
-
-Entregable: App con CSRF, rate limiting, todas las entidades editables.
+Entregable: App funcional sin errores de columna, DB config lista.
 
 
-FASE 3 — BASE DE DATOS Y MIGRACIONES (Semana 3)
 ========================================================================
-Objetivo: Schema de BD documentado y consistente.
-
-3.1 Documentar tablas sin CREATE TABLE
-----------------------------------------
-[X] Crear archivo: schema_completo.sql (en raiz del proyecto)
-    - Script completo que recrea ambas bases de datos desde cero
-    - Incluye 23+ tablas, procedimiento sp_guardar_material, datos semilla
-    - Cubre: taurus_admin (6 tablas) + taurus_wms (17 tablas + SP)
-    - Solucionado problema de encoding para MariaDB en Windows:
-      * Archivo 100% ASCII-safe (sin caracteres acentuados)
-      * Columna descipción se renombra via prepared statement + UNHEX()
-    - Para ejecutar: mysql -u root -p < schema_completo.sql
-  [X] Tablas documentadas (23+):
-      admin_usuarios, tenants, usuarios, configuracion, audit_logs,
-      roles_rutas, zonas, tipoubicacion, categorias, proveedores, rutas,
-      unidades_medida, ubicaciones, transportes, transporte_rutas,
-      clientes, materiales, material_proveedor, material_presentaciones,
-      stockcontable, clases_pedido, recepciones_cabecera,
-      recepciones_detalle, pedidos_cabecera, pedidos_detalle, omc,
-      omc_contenedores, inventarios_cabecera, inventarios_detalle
-
-3.2 Limpiar migraciones rotas
--------------------------------
-Archivos a revisar:
-  - 008_inventarios_anulado.sql → completar o eliminar
-  - add_sidebar_preferences.sql → completar con ALTER TABLE real
-  - add_dias_filtro_fechas.sql → completar con ALTER TABLE real
-  - seed_pedidos_prueba.sql → completar o eliminar
-  - add_estado_trabajo_omc_pedidos.sql → completar o eliminar
-
-Decision: Si la migracion ya fue ejecutada manualmente en produccion,
-moverla a procesados/ y documentar que fue aplicada manualmente.
-Si falta, completar el SQL.
-
-3.3 Corregir migracion con USE incorrecto
-------------------------------------------
-Archivo: migrations/procesados/add_tenant_operational_tables.sql
-  - Verificar si se ejecuto contra taurus_admin o taurus_wms
-  - Si se ejecuto bien, solo documentar
-  - Si se ejecuto mal, crear migracion correctiva
-
-3.4 Limpiar crear_tablas.py
------------------------------
-[X] Opcion B implementada: crear schema_completo.sql como source of truth
-    - crear_tablas.py puede mantenerse como referencia historica
-    - El nuevo schema cubre todas las tablas incluyendo las que faltaban
-    - Incluye relaciones FK, indices, y datos semilla iniciales
-
-Entregable: Documento SQL con todo el schema, migraciones limpias.
-
-
-FASE 4 — LIMPIEZA DE CODIGO (Semana 3-4)
+FASE 1 — SEGURIDAD MINIMA PARA DEMO (3-4 dias)
 ========================================================================
-Objetivo: Codigo mas mantenible y consistente.
+Objetivo: No mostrar vulnerabilidades obvias a los accionistas.
 
-4.1 Eliminar rutas duplicadas
--------------------------------
-Archivo: app.py
-  - Eliminar /rentradas (alias de /entradas)
-  - Eliminar /rsalidas (alias de /salidas)
-  - Eliminar /dashboard (redirect muerto a /index)
-  - Verificar que no hayan templates referenciando estas rutas
+  1.1 Filtros tenant_id ausentes (PRIORIDAD MAXIMA)
+  ---------------------------------------------------
+  Estas rutas permiten acceder a datos de OTROS tenants.
+  En una demo con datos de prueba, esto se vera como un bug grave.
 
-4.2 Unificar import/export de materiales
-------------------------------------------
-Archivo: modules/materiales.py
-  - Reemplazar funciones _parse_csv, _parse_json, _parse_xlsx
-    por llamadas a batch_utils.parse_file()
-  - Reemplazar logica de export por batch_utils.export_*()
-  - Mantener la logica de plantilla multi-hoja (especifica de materiales)
+  modules/ubicaciones.py
+    - exportar(): SIN filtro tenant_id en el SELECT
 
-4.3 Eliminar funciones duplicadas
------------------------------------
-Archivo: app.py
-  - get_db_config_from_table() y get_db_config_from_env() son casi
-    identicas. Unificar en una sola.
+  modules/materiales.py
+    - exportar(): SIN filtro tenant_id en el SELECT
 
-4.4 Limpiar prints de error
------------------------------
-Archivo: app.py
-  - Reemplazar print() por logging.warn() o logging.error()
-  - Configurar logging basico: import logging; logging.basicConfig()
+  modules/pedidos.py
+    - eliminar(): SIN filtro tenant_id
+    - buscar_contenedores(): SIN filtro tenant_id
+    - filtros_contenedores(): SIN filtro tenant_id
+    - contenedor_stock(): SIN filtro tenant_id
 
-4.5 Completar flash messages faltantes
-----------------------------------------
-Archivo: modules/unidades.py
-  - eliminar(): agregar flash() despues de borrar
+  modules/omc.py
+    - buscar_contenedores_destino(): SIN filtro tenant_id
 
-Entregable: Codigo sin duplicaciones, sin prints, con logging real.
+  Metodo: Agregar WHERE (%s IS NULL OR tenant_id = %s) en cada ruta.
+  Verificar con grep que TODAS las queries SELECT/UPDATE/DELETE
+  tienen el patron de tenant.
+
+  1.2 Secretos en variables de entorno [X]
+  --------------------------------------
+  app.py linea 53:
+    Cambiar: app.secret_key = 'clave-secreta-simple-taurus'
+    Por:      app.secret_key = os.getenv('SECRET_KEY', 'dev-fallback')
+
+  admin.py linea 11:
+    Cambiar: app.secret_key = 'admin-secret-key-taurus-2024'
+    Por:      app.secret_key = os.getenv('ADMIN_SECRET_KEY', 'dev-fallback')
+
+  .env — agregar:
+    SECRET_KEY=cambiar-en-produccion
+    ADMIN_SECRET_KEY=cambiar-en-produccion
+
+  1.3 Eliminar prints de debug
+  ------------------------------
+  modules/admin.py: eliminar print("DEBUG: ...")
+  app.py: reemplazar print() por logging.warning() / logging.error()
+
+  1.4 Eliminar acciones destructivas via GET
+  ---------------------------------------------
+  Cambiar @route(... methods=['GET']) a methods=['POST'] en:
+    - tipoubicacion.py: eliminar()
+    - materiales.py: eliminar()
+    - categorias.py: eliminar()
+    - clases_pedido.py: eliminar()
+    - proveedores.py: eliminar()
+    - zonas.py: eliminar()
+    - unidades.py: eliminar()
+    - rutas.py: eliminar()
+
+  En templates, cambiar links de eliminar a <form method="POST">.
+
+Entregable: Sin fugas de tenant, sin secretos hardcodeados, sin debug prints.
 
 
-FASE 5 — ADMIN PANEL (Semana 4-5)
 ========================================================================
-Objetivo: Admin panel funcional para gestion de clientes.
-
-5.1 Gestion de roles y permisos
----------------------------------
-Crear ruta en modules/admin.py:
-  /admin/roles — listar roles y sus permisos
-  /admin/roles/guardar — crear/editar rol
-  /admin/roles/permisos — gestionar rutas permitidas por rol
-
-  Necesita tabla roles_rutas ya documentada (Fase 3).
-
-5.2 Cambio de password para admins
--------------------------------------
-Crear ruta en modules/admin.py:
-  /admin/cambiar-password — form para cambiar password propio
-  Verificar password actual antes de cambiar
-
-5.3 Dashboard de admin
-------------------------
-Crear template admin_dashboard.html con:
-  - Total de tenants activos/inactivos
-  - Total de usuarios por tenant
-  - Ultimas acciones en audit log
-  - Estado del sistema (DB conectada, version, etc.)
-
-5.4 Eliminar prints de debug
--------------------------------
-Archivo: modules/admin.py lineas 196-198
-  Eliminar print("DEBUG: ...")
-
-Entregable: Admin panel completo con roles, passwords y dashboard.
-
-
-FASE 6 — FRONTEND (Semana 5-6)
+FASE 2 — MULTI-ENGINE: SCHEMA PORTABLE (4-5 dias)
 ========================================================================
-Objetivo: UI mas limpia, consistente y usable.
+Objetivo: Que el WMS pueda instalarse con MySQL, PostgreSQL, SQLServer o SQLite
+sin cambiar codigo Python. Los .sql de migracion se mantienen MySQL
+pero el schema de arranque se genera desde Python.
 
-6.1 Extraer CSS compartido
-----------------------------
-Crear: static/css/components.css
-  - Extraer de materiales.css las clases compartidas:
-    .modal-overlay, .modal-card, .modal-header, .modal-body,
-    .modal-footer, .btn-add, .table-card, .header-actions,
-    .form-row, .form-group, .btn-pri, .btn-sec, .btn-icon, .bottom
-  - Eliminar duplicados de materiales.css, ubicaciones.css,
-    unidades.css, tipoubicacion.css
-  - Agregar components.css a base.html
+  2.1 Generador de schema desde Python
+  ----------------------------------------
+  Crear: modules/schema_generator.py
 
-6.2 Configuracion centralizada de DataTables
-----------------------------------------------
-Crear: static/js/datatable_config.js
-  - Definir configuracion base con idioma espanol
-  - Funcion initDataTable(selector, options) que aplique config base
-  - Reemplazar bloques duplicados en cada archivo JS
+  Funcion: generate_schema(engine) -> SQL script
+    - Lee definicion de tablas desde un diccionario Python
+    - Genera DDL compatible con el engine seleccionado:
+      * AUTO_INCREMENT -> SERIAL/GENERATED/IDENTITY
+      * TINYINT(1) -> BOOLEAN/BIT
+      * ENUM -> CHECK constraint o VARCHAR+CHECK
+      * COMMENT -> se omite (no portable)
+      * ENGINE/CHARSET -> se omite
+      * ON UPDATE CURRENT_TIMESTAMP -> se omite (trigger si necesario)
+      * LONGTEXT -> TEXT
+      * INT(11) -> INTEGER
+      * AFTER column -> se omite
 
-6.3 Eliminar inline styles
------------------------------
-Prioridad: pedidos.html y recepciones.html
-  - Mover estilos de filtros, botones de accion, badges de estado
-    a clases CSS en components.css o page-specific CSS
-  - Usar clases existentes donde sea posible
+  Tablas a definir (orden de creacion por FK):
+    Admin: admin_usuarios, tenants, usuarios, configuracion,
+           roles_rutas, audit_logs
+    WMS:   tipoubicacion, zonas, ubicaciones, categorias, unidades_medida,
+           proveedores, clientes, rutas, transportes, transporte_rutas,
+           clases_pedido, materiales, material_proveedor,
+           material_presentaciones, stockcontable, pedidos_cabecera,
+           pedidos_detalle, recepciones_cabecera, recepciones_detalle,
+           omc, omc_contenedores, inventarios_cabecera,
+           inventarios_detalle
 
-6.4 Mejorar manejo de errores AJAX
--------------------------------------
-  - Crear funcion showLoading() / hideLoading()
-  - Reemplazar alert() por flash messages o modales de error
-  - Agregar spinner en botones durante llamadas AJAX
+  2.2 Adaptar db_config.py para init de schema
+  -----------------------------------------------
+  Agregar funcion: init_database(engine, db_name)
+    - Genera schema via schema_generator
+    - Ejecuta contra la BD target
+    - Si es SQLite, crea archivo .db automaticamente
+    - Si es MySQL/PostgreSQL, crea DATABASE si no existe
 
-6.5 Limpieza de base.html
----------------------------
-  - Eliminar carga duplicada de jQuery
-  - Verificar que solo se carga una vez
+  Integrar con la UI de configuracion-db existente:
+    - Boton "Inicializar base de datos" despues de testear conexion
+    - Genera tablas + datos semilla basicos
 
-Entregable: CSS unificado, JS centralizado, menos inline styles.
+  2.3 Datos semilla desde Python
+  --------------------------------
+  Crear: modules/seed_data.py
+    - Datos iniciales para tipoubicacion, zonas, clases_pedido
+    - Usar INSERT ... ON CONFLICT DO NOTHING (portable)
+    - Ejecutar despues del schema
+
+  2.4 Corregir queries raw en Python
+  -------------------------------------
+  modules/admin.py:557:
+    Reemplazar "LIMIT %s OFFSET %s" por limit_sql() con offset
+    (necesita extender limit_sql para soportar offset)
+
+  modules/sql_dialect.py:
+    Agregar limit_with_offset(n, offset=0) para SQL Server:
+      OFFSET {offset} ROWS FETCH NEXT {n} ROWS ONLY
+    Para MySQL/PostgreSQL/SQLite: LIMIT {n} OFFSET {offset}
+
+  2.5 schema_generator.py funcional
+  ---------------------------------------------------
+  - Genera DDL multi-engine desde definiciones de tablas
+  - CLI: python schema_generator.py --engine mysql|postgresql|sqlite
+  - python schema_generator.py --all genera los 3 archivos
+
+Entregable: App que crea su propia BD en MySQL/PostgreSQL/SQLite
+desde la UI de configuracion. schema_generator.py funcional.
 
 
-FASE 7 — TESTING (Semana 6-7)
 ========================================================================
-Objetivo: Cobertura basica para modulos criticos.
-
-7.1 Setup de testing
-----------------------
-Instalar: pip install pytest
-
-Crear: tests/conftest.py
-  - Fixture de conexion DB de prueba
-  - Fixture de Flask test client
-  - Fixture de sesion autenticada
-  - Base de datos de prueba dedicada (no usar la de dev)
-
-7.2 Tests de seguridad (PRIORIDAD)
-------------------------------------
-Crear: tests/test_tenant_isolation.py
-  - Test: usuario de tenant A no puede ver materiales de tenant B
-  - Test: usuario de tenant A no puede eliminar pedidos de tenant B
-  - Test: usuario de tenant A no puede exportar ubicaciones de tenant B
-  - Test: cada ruta con filtro tenant retorna solo datos propios
-
-7.3 Tests de modulos criticos
--------------------------------
-Crear: tests/test_pedidos.py
-  - Test: crear pedido con items
-  - Test: verificar stock
-  - Test: preparar pedido
-  - Test: despachar pedido
-  - Test: eliminar/anular pedido
-
-Crear: tests/test_recepciones.py
-  - Test: crear recepcion con items
-  - Test: cerrar recepcion (genera stock)
-  - Test: anular recepcion
-
-Crear: tests/test_stockcontable.py
-  - Test: upsert_posicion crea stock
-  - Test: upsert_posicion actualiza stock existente
-
-7.4 Tests de auth
--------------------
-Crear: tests/test_auth.py
-  - Test: login con credenciales correctas
-  - Test: login con credenciales incorrectas
-  - Test: sesion expira despues de 8 horas
-  - Test: usuario sin permiso no accede a ruta protegida
-
-Entregable: Suite basica de tests para modulos core + seguridad.
-
-
-FASE 8 — PREPARACION PARA DEMO (Semana 7-8)
+FASE 3 — FLUJO COMPLETO DE DEMO (3-4 dias)
 ========================================================================
-Objetivo: Tener una demo funcional y estable.
+Objetivo: Que el ciclo Receive -> Store -> Pick -> Ship funcione
+sin errores de punta a punta.
 
-8.1 Seed data realista
-------------------------
-Crear: migrations/seed_demo.sql
-  - Datos de prueba representativos (no los seeds actuales que son
-    muy basicos)
-  - 5-10 materiales con codigos de barras reales
-  - 3-5 clientes, 3-5 proveedores
-  - 10-15 ubicaciones distribuidas en zonas
-  - 5-10 pedidos en diferentes estados
-  - 3-5 recepciones en diferentes estados
+  3.1 Verificar flujo Recepcion
+  --------------------------------
+  Pasos del flujo:
+    1. Login -> Dashboard
+    2. Crear material con codigo de barras
+    3. Crear ubicacion (asociada a tipo + zona)
+    4. Crear recepcion -> agregar items -> cerrar recepcion
+    5. Verificar que se genero stock en StockContable
+    6. Verificar que se genero OMC de recepcion
 
-8.2 Verificar flujo completo
--------------------------------
-Manual testing del ciclo:
-  1. Login -> Dashboard
-  2. Crear material con barcode
-  3. Crear ubicacion
-  4. Crear recepcion -> agregar items -> cerrar (verificar stock)
-  5. Crear pedido -> verificar stock -> preparar
-  6. Despachar pedido
-  7. Verificar que todo quedo registrado correctamente
+  Puntos de fallo conocidos:
+    - recepciones.py al cerrar: genera movimientos "Saliendo/Entrando"
+      Verificar que los INSERT usan la columna 'descripcion' correcta
+    - omc.py al crear OMC desde recepcion: verificar columnas
+    - stockcontable.py upsert_posicion: verificar que funciona con
+      el nuevo nombre de columna
 
-8.3 Limpiar archivos innecesarios
------------------------------------
-  - Renombrar crear_tablas.py -> crear_tablas_legacy.py
-  - Renombrar crear_datos_ejemplo.py -> (verificar si se usa)
-  - Renombrar _fix_mysql_user.py -> (verificar si se usa)
-  - Renombrar alta_usuario.py -> (verificar si se usa)
-  - Renombrar generate_password.py -> (verificar si se usa)
+  3.2 Verificar flujo Pedido/Picking
+  ------------------------------------
+  Pasos del flujo:
+    1. Crear pedido con items
+    2. Verificar stock disponible
+    3. Preparar pedido (masivo o individual)
+    4. Verificar que se genero OMC de picking
+    5. Verificar estados del pedido cambiaron
 
-8.4 Actualizar AGENTS.md
----------------------------
-  - Reflejar los cambios realizados en las fases 1-7
-  - Actualizar la seccion de gotchas
-  - Agregar comandos de testing
+  Puntos de fallo conocidos:
+    - pedidos.py: verificar que la busqueda de contenedores funciona
+      con el nombre de columna 'descripcion' correcto
+    - omc.py: verificar GROUP BY con la columna renombrada
 
-Entregable: Demo funcional, archivos limpios, AGENTS.md actualizado.
+  3.3 Verificar flujo Despacho
+  -------------------------------
+  Pasos del flujo:
+    1. Filtrar pedidos preparados
+    2. Marcar como despachado
+    3. Verificar que el pedido quedo en estado Despachado
+
+  Nota: despacho.py es minimal (84 lineas). No genera movimiento
+  de stock al despachar. Para MVP, esto es aceptable.
+
+  3.4 Verificar flujo Inventario
+  --------------------------------
+  Pasos del flujo:
+    1. Crear inventario (por ubicacion, material, o todo)
+    2. Contar items (AJAX por linea)
+    3. Cerrar inventario
+    4. Verificar ajustes de stock
+
+  3.5 Verificar Import/Export
+  -----------------------------
+    - Importar materiales desde XLSX
+    - Exportar materiales a CSV
+    - Importar ubicaciones
+    - Verificar que los datos importados aparecen en la lista
+
+Entregable: Flujo completo Receive->Store->Pick->Ship verificado
+y funcional. Cada paso documentado con screenshots.
 
 
-FASE 9 — FEATURES COMERCIALES (Post-demo, opcional)
 ========================================================================
-Objetivo: Diferenciadores para la venta.
+FASE 4 — ADMIN PANEL Y SEGURIDAD (2-3 dias)
+========================================================================
+Objetivo: Admin panel funcional para gestion de tenants en la demo.
 
-9.1 Reportes basicos
-----------------------
-  - Reporte de stock por ubicacion/zona
-  - Reporte de pedidos por periodo
-  - Reporte de movimientos (OMC) por fecha
-  - Export a PDF (usando weasyprint o similar)
+  4.1 CRUD de tenants completo
+  --------------------------------
+  Verificar que funciona:
+    - Crear tenant con configuracion de BD propia
+    - Editar parametros del tenant
+    - Activar/desactivar tenant
+    - Test connection funciona para cada engine
 
-9.2 Modulo movil (Wireframe)
--------------------------------
-  - Definir pantallas: picking, recepcion, inventario
-  - Definir flujo de escaneo de barcode
-  - Evaluar frameworks: PWA con Flask, o app nativa
+  4.2 CRUD de usuarios
+  -----------------------
+  Verificar que funciona:
+    - Crear usuario asignado a tenant
+    - Cambiar password
+    - Asignar rol (SUPERADMIN/ADMIN/OPERADOR/CONSULTA)
+    - Login con el nuevo usuario funciona
 
-9.3 API basica para integraciones
------------------------------------
-  - Endpoint /api/v1/materiales (GET)
-  - Endpoint /api/v1/pedidos (GET, POST)
-  - Autenticacion via API key por tenant
-  - Usar la columna api_key que se agrega en migracion pendiente
+  4.3 Roles y permisos basicos
+  -------------------------------
+  Verificar que la tabla roles_rutas funciona:
+    - OPERADOR solo ve rutas asignadas
+    - CONSULTA no puede editar
+    - ADMIN ve todo
 
-Entregable: Features adicionales para pitch comercial.
+  4.4 Dashboard de admin
+  -------------------------
+  Crear template admin_dashboard.html con:
+    - Total de tenants activos
+    - Total de usuarios
+    - Ultimas acciones de audit log
+    - Estado de conexion DB
+
+Entregable: Admin panel funcional para gestionar la instancia
+de la demo.
+
+
+========================================================================
+FASE 5 — UI/UX PARA DEMO (2-3 dias)
+========================================================================
+Objetivo: que la interfaz se vea profesional en la presentacion.
+
+  5.1 CSS consistente
+  ----------------------
+  Crear: static/css/components.css
+    - Extraer estilos compartidos (modales, botones, tablas)
+    - Eliminar duplicados entre modulos
+    - Agregar a base.html
+
+  5.2 DataTables centralizado
+  ------------------------------
+  Crear: static/js/datatable_config.js
+    - Config base con idioma espanol
+    - Funcion initDataTable(selector, options)
+    - Reemplazar configuracion duplicada en cada JS
+
+  5.3 Eliminar inline styles
+  ------------------------------
+  Prioridad: pedidos.html, recepciones.html
+    - Mover filtros y badges a clases CSS
+
+  5.4 Loading states
+  ----------------------
+    - Agregar spinner en botones durante llamadas AJAX
+    - Reemplazar alert() por flash messages
+
+  5.5 Sidebar limpio
+  --------------------
+    - Verificar que no hay rutas rotas en el sidebar
+    - Verificar que los iconos cargan correctamente
+
+Entregable: UI limpia, consistente, sin elementos rotos.
+
+
+========================================================================
+FASE 6 — TESTS MINIMOS PARA DEMO (2-3 dias)
+========================================================================
+Objetivo: Tener cobertura basica que valide que nada esta roto.
+
+  6.1 Setup
+  -----------
+  Crear: tests/conftest.py
+    - Fixture de Flask test client
+    - Fixture de sesion autenticada
+    - Base de datos SQLite en memoria para tests
+
+  6.2 Tests criticos
+  --------------------
+  Crear: tests/test_auth.py
+    - Login correcto/incorrecto
+    - Sesion expira
+
+  Crear: tests/test_tenant_isolation.py
+    - Usuario A no ve datos de tenant B
+    - Export de A no incluye datos de B
+
+  Crear: tests/test_flujo_basico.py
+    - Crear material -> crear ubicacion -> crear recepcion
+    - Verificar que stock se genera correctamente
+
+  6.3 Ejecucion
+  -----------------
+  Agregar a requirements.txt: pytest
+  Comando: pytest tests/ -v
+
+Entregable: Suite basica que pasa, integrada en el workflow.
+
+
+========================================================================
+FASE 7 — PREPARACION PARA DEMO (1-2 dias)
+========================================================================
+Objetivo: Entorno de demo listo para presentar.
+
+  7.1 Seed data realista
+  -------------------------
+  Crear: migrations/seed_demo.sql
+    - 10 materiales con codigos de barras
+    - 5 clientes, 3 proveedores
+    - 15 ubicaciones en 3 zonas
+    - 5 pedidos en diferentes estados
+    - 3 recepciones en diferentes estados
+    - 2 transportes con rutas
+
+  7.2 Verificar flujo completo en demo
+  ---------------------------------------
+  Checklist de la presentacion:
+    [ ] Login -> Dashboard con datos
+    [ ] Navegar por cada modulo (verificar que carga)
+    [ ] Crear material -> ver en lista
+    [ ] Crear recepcion -> cerrar -> ver stock
+    [ ] Crear pedido -> preparar -> ver OMC
+    [ ] Despachar pedido
+    [ ] Hacer inventario
+    [ ] Importar desde Excel
+    [ ] Exportar a CSV
+    [ ] Admin: crear tenant, crear usuario
+    [ ] Cambiar de tenant -> verificar aislamiento
+
+  7.3 Limpiar archivos
+  -----------------------
+    - Renombrar crear_tablas.py -> crear_tablas_legacy.py
+    - Verificar que crear_datos_ejemplo.py funciona
+    - Eliminar o marcar como legacy los scripts auxiliares
+
+  7.4 Documentacion para demo
+  ------------------------------
+  Crear: docs/DEMO_GUIDE.md
+    - Pasos para instalar desde cero
+    - Cargar seed data
+    - URL de acceso
+    - Credenciales por defecto
+    - Comandos utiles
+
+Entregable: Demo ejecutable en < 30 minutos desde cero.
 
 
 ========================================================================
 RESUMEN DE TIMELINE
 ========================================================================
 
-  Semana 0 (1-2 dias)  → Fase 0: Preparacion (en progreso)
-  Semana 1             → Fase 1: Seguridad critica (filtros tenant + secretos)
-  Semana 2             → Fase 2: Protecciones basicas (CSRF, rate limit, DELETE)
-  Semana 3             → Fase 3: BD y migraciones [3.1 y 3.4 COMPLETADOS]
-  Semana 3-4           → Fase 4: Limpieza de codigo
-  Semana 4-5           → Fase 5: Admin panel
-  Semana 5-6           → Fase 6: Frontend
-  Semana 6-7           → Fase 7: Testing
-  Semana 7-8           → Fase 8: Demo funcional
-  Post-demo            → Fase 9: Features comerciales
+  Fase 0 (2-3 dias)  -> Correcciones criticas (columna, DB config)
+  Fase 1 (3-4 dias)  -> Seguridad minima (tenant filters, secrets)
+  Fase 2 (4-5 dias)  -> Multi-engine schema generator
+  Fase 3 (3-4 dias)  -> Flujo completo Receive->Store->Pick->Ship
+  Fase 4 (2-3 dias)  -> Admin panel funcional
+  Fase 5 (2-3 dias)  -> UI/UX para demo
+  Fase 6 (2-3 dias)  -> Tests minimos
+  Fase 7 (1-2 dias)  -> Preparacion demo
 
-Total estimado: 6-8 semanas para demo comercial viable
-
- Avance actual: schema_completo.sql creado y listo para usar.
- El script crea ambas bases de datos desde cero con todas las tablas,
- procedimientos almacenados, y datos semilla iniciales.
+  Total estimado: 19-27 dias (4-6 semanas)
+  Minimo absoluto (sin Fase 2+6): 12-17 dias (2.5-3.5 semanas)
 
 
 ========================================================================
 DEPENDENCIAS ENTRE FASES
 ========================================================================
 
-  Fase 0 (prep) ──> Fase 1 (seguridad) ──> Fase 2 (protecciones)
-                                              │
-  Fase 3 (BD) [3.1, 3.4 DONE] ──────────────>│
-                                              │
-  Fase 4 (limpieza) ──> Fase 5 (admin) ──────┤
-                                              │
-  Fase 6 (frontend) ─────────────────────────┤
-                                              │
-  Fase 7 (testing) ──────────────────────────┤
-                                              │
-  Fase 8 (demo) <────────────────────────────┘
+  Fase 0 (correcciones) ──> Fase 1 (seguridad)
+         │
+         └──> Fase 2 (multi-engine) [puede parallelizar con Fase 1]
+                    │
+  Fase 3 (flujo) <─┘──> Fase 4 (admin) [puede parallelizar]
+                    │
+  Fase 5 (UI) <─────┘
+         │
+  Fase 6 (tests) <───┘ (necesita Fase 0+1 minimo)
+         │
+  Fase 7 (demo) <────┘ (validacion final)
 
-Notas:
-  - Fases 3, 4 y 5 pueden hacerse en paralelo
-  - Fase 6 (frontend) puede empezar despues de Fase 1
-  - Fase 7 (testing) necesita Fase 1 minimo (tests de tenant isolation)
-  - Fase 8 es la validacion final de todo
-  - [X] Fase 3.1 (schema_completo.sql) COMPLETADO - bloqueador para demo
+  Notas:
+    - Fase 2 (multi-engine) es la mas compleja pero NO bloqueadora
+      para una demo con MySQL. Puede pospuesta si el demo es solo MySQL.
+    - Fase 6 (tests) es opcional para la primera demo, recomendable
+      para iteraciones posteriores.
+    - Fase 3 (flujo) es la mas critica: sin esto no hay demo.
 
 
 ========================================================================
-COMANDOS UTILES PARA EL DESARROLLO
+QUE NECESITA LA DEMO vs QUE PUEDE ESPERAR
+========================================================================
+
+  NECESARIO para demo:
+    [X] Columna tipoubicacion corregida
+    [ ] Filtros tenant_id en todas las rutas
+    [ ] Secretos en .env
+    [ ] Flujo completo Receive->Store->Pick->Ship funcionando
+    [ ] Datos de demo realistas
+    [ ] Admin panel para crear tenants/usuarios
+
+  PUEDE ESPERAR (post-demo):
+    [ ] Multi-engine (SQLite/PostgreSQL/SQLServer)
+    [ ] Tests automatizados
+    [ ] CSRF protection
+    [ ] Rate limiting
+    [ ] CSS/JS refactorizado
+    [ ] API REST
+    [ ] Reportes PDF
+    [ ] Modulo movil/PWA
+
+
+========================================================================
+ARCHIVOS PENDIENTES DE VERIFICAR
+========================================================================
+
+  Pendientes en migrations/ (NO en procesados/):
+    - add_db_engine_config.sql -> EJECUTAR
+
+  Pendientes en migrations/procesados/ (verificar si se aplicaron):
+    - add_soporte_picking_tipoubicacion.sql
+    - add_sidebar_preferences.sql (puede estar incompleta)
+
+  Nota: schema_generator.py genera el DDL completo para cualquier engine.
+  Usar: python schema_generator.py --engine mysql > schema_mysql.sql
+
+
+========================================================================
+COMANDOS UTILES
 ========================================================================
 
   # Arrancar apps
@@ -528,49 +514,20 @@ COMANDOS UTILES PARA EL DESARROLLO
   python admin.py      # Admin en http://localhost:5001
 
   # Buscar rutas sin filtro tenant
-  grep -rn "SELECT.*FROM" modules/*.py | grep -v "tenant_id"
-  grep -rn "UPDATE.*SET" modules/*.py | grep -v "tenant_id"
-  grep -rn "DELETE FROM" modules/*.py | grep -v "tenant_id"
+  rg "SELECT.*FROM" modules/*.py | rg -v "tenant_id"
+  rg "UPDATE.*SET" modules/*.py | rg -v "tenant_id"
+  rg "DELETE FROM" modules/*.py | rg -v "tenant_id"
 
   # Buscar prints de debug
-  grep -rn "print(" app.py modules/*.py admin.py
+  rg "print\(" app.py modules/*.py admin.py
 
-  # Buscar GET methods en rutas de eliminar
-  grep -rn "methods=\['GET'\]" modules/*.py
+  # Verificar nombre de columna tipoubicacion
+  rg "descipc" modules/*.py templates/*.html static/js/*.js
 
   # Ejecutar tests
   pytest tests/ -v
-  pytest tests/test_tenant_isolation.py -v
 
   # Verificar migraciones pendientes
   ls migrations/*.sql  # los que NO estan en procesados/
 
-========================================================================
-
-
-========================================================================
-NOTA TECNICA: PROBLEMA DE ENCODING EN WINDOWS (resuelto)
-========================================================================
-
- Problema: El cliente MySQL/MariaDB en Windows lee archivos SQL usando
- la codificacion del sistema (CP1252 para Windows en español), NO UTF-8.
- Esto causa que caracteres acentuados como 'ó' (0xC3 0xB3 en UTF-8)
- se interpreten como dos caracteres separados ('Ã³'), rompiendo el SQL.
-
- Solucion implementada en schema_completo.sql:
-   1. Archivo 100% ASCII-safe (sin caracteres acentuados en comentarios)
-   2. La columna 'descipción' de tipoubicacion se crea como 'descipcion'
-      y se renombra via prepared statement al final del script:
-      
-      SET @new_col = CONCAT('descipci', UNHEX('C3B3'));
-      SET @sql = CONCAT('ALTER TABLE tipoubicacion CHANGE COLUMN ...');
-      PREPARE stmt FROM @sql;
-      EXECUTE stmt;
-   
-   3. UNHEX('C3B3') inyecta directamente los bytes UTF-8 correctos
-      (0xC3 0xB3) para el caracter 'ó', evitando conversiones de charset.
-
- Lesson learned: En entornos Windows/XAMPP, siempre usar archivos SQL
- 100% ASCII y generar caracteres especiales via UNHEX() o CHAR() en
- prepared statements cuando sea necesario.
 ========================================================================

@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Taurus WMS — Schema Generator</title>
+<style>
+:root {
+    --bg: #0f1117;
+    --bg-card: #1a1d27;
+    --bg-input: #252833;
+    --bg-hover: #2a2d3a;
+    --border: #2e3142;
+    --border-focus: #4f7df7;
+    --text: #e4e6f0;
+    --text-dim: #8b8fa3;
+    --text-muted: #5c6078;
+    --accent: #4f7df7;
+    --accent-hover: #6b91ff;
+    --green: #34d399;
+    --green-bg: rgba(52,211,153,0.1);
+    --red: #f87171;
+    --red-bg: rgba(248,113,113,0.1);
+    --yellow: #fbbf24;
+    --yellow-bg: rgba(251,191,36,0.1);
+    --radius: 10px;
+    --radius-sm: 6px;
+    --shadow: 0 4px 24px rgba(0,0,0,0.3);
+    --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    --mono: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.5;
+}
+
+.app {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    min-height: 100vh;
+}
+
+/* ---- SIDEBAR ---- */
+.sidebar {
+    background: var(--bg-card);
+    border-right: 1px solid var(--border);
+    padding: 28px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    overflow-y: auto;
+    max-height: 100vh;
+    position: sticky;
+    top: 0;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+}
+
+.logo-icon {
+    width: 38px;
+    height: 38px;
+    background: var(--accent);
+    border-radius: var(--radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+}
+
+.logo-text h1 {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.3px;
+}
+
+.logo-text span {
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.section-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* ---- ENGINE SELECTOR ---- */
+.engine-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.engine-btn {
+    background: var(--bg-input);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 10px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+
+.engine-btn:hover {
+    border-color: var(--text-muted);
+    background: var(--bg-hover);
+}
+
+.engine-btn.active {
+    border-color: var(--accent);
+    background: rgba(79,125,247,0.08);
+}
+
+.engine-btn .icon {
+    font-size: 22px;
+    line-height: 1;
+}
+
+.engine-btn .label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.engine-btn .sub {
+    font-size: 10px;
+    color: var(--text-dim);
+}
+
+/* ---- FORM ---- */
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.field label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-dim);
+}
+
+.field input, .field select {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    color: var(--text);
+    font-size: 13px;
+    font-family: var(--mono);
+    outline: none;
+    transition: border-color 0.15s;
+}
+
+.field input:focus, .field select:focus {
+    border-color: var(--border-focus);
+}
+
+.field input::placeholder {
+    color: var(--text-muted);
+}
+
+.row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.row-3 {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 10px;
+}
+
+/* ---- BUTTONS ---- */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 11px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 600;
+    font-family: var(--font);
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-primary {
+    background: var(--accent);
+    color: #fff;
+}
+.btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+
+.btn-outline {
+    background: transparent;
+    border-color: var(--border);
+    color: var(--text);
+}
+.btn-outline:hover:not(:disabled) {
+    background: var(--bg-hover);
+    border-color: var(--text-muted);
+}
+
+.btn-success {
+    background: var(--green);
+    color: #0f1117;
+}
+.btn-success:hover:not(:disabled) { background: #4ade80; }
+
+.btn-danger {
+    background: transparent;
+    border-color: var(--red);
+    color: var(--red);
+}
+.btn-danger:hover:not(:disabled) {
+    background: var(--red-bg);
+}
+
+.btn-group {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-group .btn {
+    flex: 1;
+}
+
+/* ---- TOGGLE ---- */
+.toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+}
+
+.toggle-row span {
+    font-size: 13px;
+    color: var(--text-dim);
+}
+
+.toggle {
+    position: relative;
+    width: 38px;
+    height: 22px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.toggle.active {
+    background: var(--accent);
+    border-color: var(--accent);
+}
+
+.toggle::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.2s;
+}
+
+.toggle.active::after {
+    transform: translateX(16px);
+}
+
+/* ---- MAIN AREA ---- */
+.main {
+    padding: 28px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    overflow-y: auto;
+}
+
+.header-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.header-bar h2 {
+    font-size: 20px;
+    font-weight: 700;
+}
+
+.header-bar .stats {
+    display: flex;
+    gap: 20px;
+}
+
+.stat {
+    text-align: right;
+}
+
+.stat .val {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--accent);
+}
+
+.stat .lbl {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* ---- TABS ---- */
+.tabs {
+    display: flex;
+    gap: 4px;
+    background: var(--bg-card);
+    border-radius: var(--radius);
+    padding: 4px;
+    border: 1px solid var(--border);
+    width: fit-content;
+}
+
+.tab {
+    padding: 8px 18px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.15s;
+    border: none;
+    background: transparent;
+    font-family: var(--font);
+}
+
+.tab:hover { color: var(--text); }
+.tab.active {
+    background: var(--accent);
+    color: #fff;
+}
+
+/* ---- OUTPUT PANEL ---- */
+.output-panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 400px;
+    overflow: hidden;
+}
+
+.output-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-hover);
+}
+
+.output-header .title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dim);
+}
+
+.output-body {
+    flex: 1;
+    overflow: auto;
+    padding: 16px;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.7;
+    color: var(--text);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.output-body .line-comment { color: var(--text-muted); }
+.output-body .line-keyword { color: #c792ea; }
+.output-body .line-string { color: #c3e88d; }
+.output-body .line-number { color: #f78c6c; }
+.output-body .line-success { color: var(--green); }
+.output-body .line-error { color: var(--red); }
+.output-body .line-info { color: var(--accent); }
+.output-body .line-warning { color: var(--yellow); }
+
+/* ---- EMPTY STATE ---- */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 60px 20px;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+.empty-state .icon {
+    font-size: 48px;
+    opacity: 0.3;
+}
+
+.empty-state h3 {
+    font-size: 16px;
+    color: var(--text-dim);
+}
+
+.empty-state p {
+    font-size: 13px;
+    max-width: 320px;
+}
+
+/* ---- LOADING ---- */
+.spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid transparent;
+    border-top-color: currentColor;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ---- PROGRESS BAR ---- */
+.progress-bar {
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.progress-bar.active { opacity: 1; }
+
+.progress-bar .fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    animation: progress-indeterminate 1.5s ease-in-out infinite;
+    width: 40%;
+}
+
+@keyframes progress-indeterminate {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(350%); }
+}
+
+/* ---- RESULT BADGE ---- */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.badge-success { background: var(--green-bg); color: var(--green); }
+.badge-error { background: var(--red-bg); color: var(--red); }
+.badge-info { background: rgba(79,125,247,0.1); color: var(--accent); }
+
+/* ---- SCROLLBAR ---- */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ---- RESPONSIVE ---- */
+@media (max-width: 900px) {
+    .app {
+        grid-template-columns: 1fr;
+    }
+    .sidebar {
+        position: static;
+        max-height: none;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+    }
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <div class="logo">
+            <div class="logo-icon">T</div>
+            <div class="logo-text">
+                <h1>Taurus WMS</h1>
+                <span>Schema Generator</span>
+            </div>
+        </div>
+
+        <!-- ENGINE -->
+        <div class="section">
+            <div class="section-title">Motor de BD</div>
+            <div class="engine-grid">
+                <div class="engine-btn active" data-engine="mysql" onclick="selectEngine('mysql', this)">
+                    <div class="icon">🐬</div>
+                    <div class="label">MySQL</div>
+                    <div class="sub">InnoDB</div>
+                </div>
+                <div class="engine-btn" data-engine="postgresql" onclick="selectEngine('postgresql', this)">
+                    <div class="icon">🐘</div>
+                    <div class="label">PostgreSQL</div>
+                    <div class="sub">14+</div>
+                </div>
+                <div class="engine-btn" data-engine="sqlite" onclick="selectEngine('sqlite', this)">
+                    <div class="icon">🪶</div>
+                    <div class="label">SQLite</div>
+                    <div class="sub">File-based</div>
+                </div>
+                <div class="engine-btn" data-engine="sqlserver" onclick="selectEngine('sqlserver', this)">
+                    <div class="icon">🏢</div>
+                    <div class="label">SQL Server</div>
+                    <div class="sub">2019+</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CONNECTION -->
+        <div class="section">
+            <div class="section-title">Conexion</div>
+            <div class="field">
+                <label>Host</label>
+                <input type="text" id="host" value="{{ config.host }}" placeholder="localhost">
+            </div>
+            <div class="field">
+                <label>Usuario</label>
+                <input type="text" id="user" value="{{ config.user }}" placeholder="root">
+            </div>
+            <div class="field">
+                <label>Password</label>
+                <input type="password" id="password" placeholder="***">
+            </div>
+            <div class="field">
+                <label>Puerto</label>
+                <input type="text" id="port" value="{{ config.port }}" placeholder="3306">
+            </div>
+            <div class="field">
+                <label>Base de datos</label>
+                <input type="text" id="database" value="{{ config.database }}" placeholder="taurus_wms">
+            </div>
+            <button class="btn btn-outline" onclick="testConnection()" id="btn-test" style="width:100%">
+                Probar conexion
+            </button>
+        </div>
+
+        <!-- OPTIONS -->
+        <div class="section">
+            <div class="section-title">Opciones</div>
+            <div class="toggle-row">
+                <span>Incluir DROP</span>
+                <div class="toggle" id="opt-drop" onclick="toggleOpt(this)"></div>
+            </div>
+            <div class="toggle-row">
+                <span>Solo admin DB</span>
+                <div class="toggle" id="opt-admin-only" onclick="toggleOpt(this)"></div>
+            </div>
+            <div class="toggle-row">
+                <span>Solo WMS DB</span>
+                <div class="toggle" id="opt-wms-only" onclick="toggleOpt(this)"></div>
+            </div>
+        </div>
+
+        <!-- ACTIONS -->
+        <div class="section" style="margin-top:auto; padding-top:16px; border-top:1px solid var(--border);">
+            <button class="btn btn-primary" onclick="generateSchema()" id="btn-generate" style="width:100%">
+                Generar SQL
+            </button>
+            <div class="btn-group">
+                <button class="btn btn-success" onclick="executeSchema()" id="btn-execute">
+                    Ejecutar
+                </button>
+                <button class="btn btn-outline" onclick="downloadSchema()" id="btn-download">
+                    Descargar
+                </button>
+            </div>
+            <button class="btn btn-outline" onclick="downloadAll()" id="btn-download-all" style="width:100%">
+                Descargar los 4 engines
+            </button>
+        </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="main">
+        <div class="header-bar">
+            <h2 id="main-title">SQL Preview</h2>
+            <div class="stats">
+                <div class="stat">
+                    <div class="val" id="stat-lines">-</div>
+                    <div class="lbl">Lineas</div>
+                </div>
+                <div class="stat">
+                    <div class="val" id="stat-size">-</div>
+                    <div class="lbl">Tamano</div>
+                </div>
+                <div class="stat">
+                    <div class="val" id="stat-tables">-</div>
+                    <div class="lbl">Tablas</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="progress-bar" id="progress">
+            <div class="fill"></div>
+        </div>
+
+        <div class="output-panel">
+            <div class="output-header">
+                <div class="title" id="output-title">Salida</div>
+                <div id="output-badge"></div>
+            </div>
+            <div class="output-body" id="output">
+                <div class="empty-state">
+                    <div class="icon">&#9998;</div>
+                    <h3>Listo para generar</h3>
+                    <p>Selecciona un motor de base de datos y haz clic en "Generar SQL" para ver el schema.</p>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+let currentEngine = 'mysql';
+let currentSQL = '';
+
+function selectEngine(engine, el) {
+    currentEngine = engine;
+    document.querySelectorAll('.engine-btn').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+
+    const ports = { mysql: '3306', postgresql: '5432', sqlite: '0', sqlserver: '1433' };
+    const defaults = {
+        mysql: { host: 'localhost', user: 'taurus', db: 'taurus_wms' },
+        postgresql: { host: 'localhost', user: 'taurus', db: 'taurus_wms' },
+        sqlite: { host: '', user: '', db: 'taurus_wms.db' },
+        sqlserver: { host: 'localhost', user: 'sa', db: 'taurus_wms' },
+    };
+    document.getElementById('port').value = ports[engine] || '3306';
+    if (defaults[engine]) {
+        document.getElementById('host').value = defaults[engine].host;
+        document.getElementById('user').value = defaults[engine].user;
+        document.getElementById('database').value = defaults[engine].db;
+    }
+}
+
+function toggleOpt(el) {
+    el.classList.toggle('active');
+}
+
+function getOpts() {
+    return {
+        drop: document.getElementById('opt-drop').classList.contains('active'),
+        adminOnly: document.getElementById('opt-admin-only').classList.contains('active'),
+        wmsOnly: document.getElementById('opt-wms-only').classList.contains('active'),
+    };
+}
+
+function showLoading(btnId, loading) {
+    const btn = document.getElementById(btnId);
+    if (!btn) return;
+    if (loading) {
+        btn.dataset.origHtml = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner"></span> Procesando...';
+        btn.disabled = true;
+    } else {
+        btn.innerHTML = btn.dataset.origHtml || btn.innerHTML;
+        btn.disabled = false;
+    }
+}
+
+function setProgress(on) {
+    document.getElementById('progress').classList.toggle('active', on);
+}
+
+function formatSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function countTables(sql) {
+    return (sql.match(/CREATE TABLE/gi) || []).length;
+}
+
+function highlightSQL(sql) {
+    const keywords = ['CREATE', 'TABLE', 'IF', 'NOT', 'EXISTS', 'INSERT', 'INTO',
+        'VALUES', 'PRIMARY', 'KEY', 'FOREIGN', 'REFERENCES', 'ON', 'DELETE', 'UPDATE',
+        'CASCADE', 'SET', 'NULL', 'RESTRICT', 'INDEX', 'UNIQUE', 'CONSTRAINT',
+        'DEFAULT', 'ENGINE', 'CHARSET', 'COLLATE', 'AUTO_INCREMENT', 'IDENTITY',
+        'PRAGMA', 'SERIAL', 'BIGSERIAL', 'BOOLEAN', 'CHECK', 'IN', 'DO', 'NOTHING',
+        'DATABASE', 'USE', 'DROP', 'ALTER', 'ADD', 'COLUMN', 'TYPE', 'AS', 'SELECT',
+        'UNION', 'ALL', 'ORDER', 'BY', 'GROUP', 'CONCAT', 'SEPARATOR', 'LIMIT',
+        'OFFSET', 'ROWS', 'FETCH', 'NEXT', 'ONLY', 'NAMES', 'CONNECT'];
+
+    let lines = sql.split('\n');
+    let result = [];
+    let inComment = false;
+
+    for (let line of lines) {
+        let trimmed = line.trim();
+
+        if (trimmed.startsWith('--')) {
+            result.push('<span class="line-comment">' + escapeHtml(line) + '</span>');
+            continue;
+        }
+        if (trimmed.startsWith('/*')) { inComment = true; }
+        if (inComment) {
+            result.push('<span class="line-comment">' + escapeHtml(line) + '</span>');
+            if (trimmed.includes('*/')) inComment = false;
+            continue;
+        }
+        if (!trimmed) { result.push(''); continue; }
+
+        let highlighted = escapeHtml(line);
+        let re = /\b([A-Z_]+)\b/g;
+        let parts = [];
+        let lastIdx = 0;
+        let match;
+
+        while ((match = re.exec(trimmed)) !== null) {
+            if (keywords.includes(match[1])) {
+                let before = trimmed.substring(lastIdx, match.index);
+                parts.push(escapeHtml(before));
+                parts.push('<span class="line-keyword">' + match[1] + '</span>');
+                lastIdx = match.index + match[0].length;
+            }
+        }
+        if (parts.length > 0) {
+            parts.push(escapeHtml(trimmed.substring(lastIdx)));
+            result.push(parts.join(''));
+        } else {
+            result.push(highlighted);
+        }
+    }
+    return result.join('\n');
+}
+
+function escapeHtml(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+async function generateSchema() {
+    showLoading('btn-generate', true);
+    setProgress(true);
+    document.getElementById('output-title').textContent = 'Generando...';
+    document.getElementById('output-badge').innerHTML = '';
+    currentSQL = '';
+
+    try {
+        const resp = await fetch('/api/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ engine: currentEngine }),
+        });
+        const data = await resp.json();
+
+        if (data.ok) {
+            currentSQL = data.sql;
+            document.getElementById('stat-lines').textContent = data.lines.toLocaleString();
+            document.getElementById('stat-size').textContent = formatSize(data.size);
+            document.getElementById('stat-tables').textContent = countTables(data.sql);
+            document.getElementById('main-title').textContent = `SQL — ${currentEngine.toUpperCase()}`;
+            document.getElementById('output-title').textContent = `${currentEngine.toUpperCase()} — ${data.lines} lineas`;
+            document.getElementById('output-badge').innerHTML =
+                `<span class="badge badge-success">Generado</span>`;
+            document.getElementById('output').innerHTML = highlightSQL(data.sql);
+        } else {
+            document.getElementById('output').innerHTML =
+                `<div class="line-error">ERROR: ${escapeHtml(data.error)}</div>`;
+            document.getElementById('output-badge').innerHTML =
+                `<span class="badge badge-error">Error</span>`;
+        }
+    } catch (e) {
+        document.getElementById('output').innerHTML =
+            `<div class="line-error">Error de conexion: ${escapeHtml(e.message)}</div>`;
+    } finally {
+        showLoading('btn-generate', false);
+        setProgress(false);
+    }
+}
+
+async function executeSchema() {
+    if (!confirm(`Ejecutar schema en ${currentEngine.toUpperCase()}?\nHost: ${document.getElementById('host').value}\nDB: ${document.getElementById('database').value}`)) {
+        return;
+    }
+
+    showLoading('btn-execute', true);
+    setProgress(true);
+    document.getElementById('main-title').textContent = `Ejecutando en ${currentEngine.toUpperCase()}...`;
+    document.getElementById('output-title').textContent = 'Ejecutando...';
+    document.getElementById('output-badge').innerHTML = '';
+    document.getElementById('output').innerHTML = '<span class="line-info">Conectando a la base de datos...</span>';
+
+    const opts = getOpts();
+
+    try {
+        const resp = await fetch('/api/execute', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                engine: currentEngine,
+                host: document.getElementById('host').value,
+                port: document.getElementById('port').value,
+                database: document.getElementById('database').value,
+                user: document.getElementById('user').value,
+                password: document.getElementById('password').value,
+                drop: opts.drop,
+            }),
+        });
+        const data = await resp.json();
+
+        let html = '';
+        if (data.ok) {
+            html += `<span class="line-success">OK: ${data.executed} sentencias ejecutadas de ${data.total_statements} totales.</span>\n`;
+            document.getElementById('output-badge').innerHTML =
+                `<span class="badge badge-success">OK</span>`;
+            document.getElementById('main-title').textContent = 'Ejecucion completada';
+        } else {
+            html += `<span class="line-warning">${data.executed || 0} sentencias ejecutadas de ${data.total_statements || '?'} totales.</span>\n`;
+            if (data.error) {
+                html += `\n<span class="line-error">ERROR: ${escapeHtml(data.error)}</span>\n`;
+            }
+            if (data.errors && data.errors.length) {
+                html += `\n<span class="line-error">${data.errors.length} errores:</span>\n`;
+                for (let e of data.errors.slice(0, 20)) {
+                    html += `<span class="line-error">  > ${escapeHtml(e.error)}</span>\n`;
+                    html += `<span class="line-comment">    ${escapeHtml(e.sql)}</span>\n`;
+                }
+                if (data.errors.length > 20) {
+                    html += `<span class="line-comment">  ... y ${data.errors.length - 20} errores mas</span>\n`;
+                }
+            }
+            document.getElementById('output-badge').innerHTML =
+                `<span class="badge badge-error">${data.errors ? data.errors.length : 1} errores</span>`;
+            document.getElementById('main-title').textContent = 'Ejecucion con errores';
+        }
+
+        document.getElementById('output').innerHTML = html;
+    } catch (e) {
+        document.getElementById('output').innerHTML =
+            `<span class="line-error">Error de conexion: ${escapeHtml(e.message)}</span>`;
+    } finally {
+        showLoading('btn-execute', false);
+        setProgress(false);
+    }
+}
+
+async function downloadSchema() {
+    showLoading('btn-download', true);
+    try {
+        const resp = await fetch('/api/download', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ engine: currentEngine }),
+        });
+        const data = await resp.json();
+        if (data.ok) {
+            window.location.href = `/api/download?file=${encodeURIComponent(data.filename)}`;
+        }
+    } catch (e) {
+        alert('Error: ' + e.message);
+    } finally {
+        showLoading('btn-download', false);
+    }
+}
+
+async function downloadAll() {
+    showLoading('btn-download-all', true);
+    try {
+        const resp = await fetch('/api/download_all', { method: 'POST' });
+        const data = await resp.json();
+        if (data.ok) {
+            alert(`Archivos generados en /schemas/:\n${data.files.map(f => `  ${f.filename} (${formatSize(f.size)})`).join('\n')}`);
+        }
+    } catch (e) {
+        alert('Error: ' + e.message);
+    } finally {
+        showLoading('btn-download-all', false);
+    }
+}
+
+async function testConnection() {
+    showLoading('btn-test', true);
+    const badge = document.getElementById('output-badge');
+
+    try {
+        const resp = await fetch('/api/test_connection', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                engine: currentEngine,
+                host: document.getElementById('host').value,
+                port: document.getElementById('port').value,
+                database: document.getElementById('database').value,
+                user: document.getElementById('user').value,
+                password: document.getElementById('password').value,
+            }),
+        });
+        const data = await resp.json();
+
+        if (data.ok) {
+            let html = `<span class="line-success">Conexion exitosa</span>\n`;
+            html += `<span class="line-info">Motor: ${currentEngine.toUpperCase()}</span>\n`;
+            html += `<span class="line-info">Version: ${escapeHtml(data.version)}</span>\n`;
+            html += `<span class="line-info">Tablas existentes: ${data.table_count}</span>\n`;
+            if (data.tables.length > 0) {
+                html += `\n<span class="line-comment">Tablas:</span>\n`;
+                for (let t of data.tables) {
+                    html += `  <span class="line-keyword">${escapeHtml(t)}</span>\n`;
+                }
+            }
+            document.getElementById('output').innerHTML = html;
+            document.getElementById('stat-tables').textContent = data.table_count;
+            document.getElementById('main-title').textContent = 'Conexion OK';
+            badge.innerHTML = `<span class="badge badge-success">Conectado</span>`;
+        } else {
+            let html = `<span class="line-error">Error: ${escapeHtml(data.error || 'Error desconocido')}</span>\n`;
+            if (data.trace) {
+                html += `\n<span class="line-comment">${escapeHtml(data.trace)}</span>`;
+            }
+            document.getElementById('output').innerHTML = html;
+            document.getElementById('main-title').textContent = 'Error de conexion';
+            badge.innerHTML = `<span class="badge badge-error">Error</span>`;
+        }
+    } catch (e) {
+        document.getElementById('output').innerHTML =
+            `<span class="line-error">No se pudo conectar: ${escapeHtml(e.message)}</span>`;
+    } finally {
+        showLoading('btn-test', false);
+    }
+}
+
+// Load SQL on page load
+window.addEventListener('DOMContentLoaded', () => {
+    generateSchema();
+});
+</script>
+
+</body>
+</html>

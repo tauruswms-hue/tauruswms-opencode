@@ -4,6 +4,7 @@ from modules.db_config import get_db_connection
 from modules.batch_utils import (parse_file, export_csv, export_json, export_xlsx,
                                   plantilla_csv, plantilla_json, plantilla_xlsx,
                                   int_or_none, bool_col)
+from modules.sql_dialect import execute_insert
 
 transportes_bp = Blueprint('transportes', __name__)
 
@@ -77,10 +78,8 @@ def guardar():
                 cursor.execute(sql, params + (t_id, tenant_id, tenant_id))
                 current_id = t_id
             else:
-                sql = """INSERT INTO transportes (codigo, razonsocial, cuit, telefono, email, activo, id_muelle_salida, tenant_id)
-                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
-                cursor.execute(sql, params + (tenant_id,))
-                current_id = cursor.lastrowid
+                current_id = execute_insert(cursor, """INSERT INTO transportes (codigo, razonsocial, cuit, telefono, email, activo, id_muelle_salida, tenant_id)
+                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""", params + (tenant_id,))
 
             cursor.execute("DELETE FROM transporte_rutas WHERE id_transporte = %s", (current_id,))
             for i in range(len(rutas_ids)):

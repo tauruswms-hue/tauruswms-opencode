@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session
 from modules.db_config import get_db_connection
+from modules.sql_dialect import quote
 from modules.batch_utils import (parse_file, export_csv, export_json, export_xlsx,
                                   plantilla_csv, plantilla_json, plantilla_xlsx,
                                   bool_col)
@@ -39,10 +40,10 @@ def guardar():
     try:
         with conn.cursor() as cursor:
             if t_id and t_id.strip():
-                sql = "UPDATE tipoubicacion SET descipción=%s, soporte_picking=%s WHERE id=%s AND (%s IS NULL OR tenant_id = %s)"
+                sql = f"UPDATE tipoubicacion SET {quote('descripcion')}=%s, soporte_picking=%s WHERE id=%s AND (%s IS NULL OR tenant_id = %s)"
                 cursor.execute(sql, (descripcion, soporte_picking, t_id, tenant_id, tenant_id))
             else:
-                sql = "INSERT INTO tipoubicacion (descipción, soporte_picking, tenant_id) VALUES (%s, %s, %s)"
+                sql = f"INSERT INTO tipoubicacion ({quote('descripcion')}, soporte_picking, tenant_id) VALUES (%s, %s, %s)"
                 cursor.execute(sql, (descripcion, soporte_picking, tenant_id))
 
             conn.commit()
@@ -55,7 +56,7 @@ def guardar():
     return redirect(url_for('tipoubicacion.listar'))
 
 
-@tipoubicacion_bp.route('/tipoubicacion/eliminar/<int:id>')
+@tipoubicacion_bp.route('/tipoubicacion/eliminar/<int:id>', methods=['POST'])
 def eliminar(id):
     tenant_id = get_tenant_filter()
     conn = get_db_connection()
@@ -110,13 +111,13 @@ def importar():
             try:
                 with conn.cursor() as cursor:
                     cursor.execute(
-                        "SELECT id FROM tipoubicacion WHERE descipción = %s AND (%s IS NULL OR tenant_id = %s)",
+                        f"SELECT id FROM tipoubicacion WHERE {quote('descripcion')} = %s AND (%s IS NULL OR tenant_id = %s)",
                         (descripcion, tenant_id, tenant_id))
                     if cursor.fetchone():
                         omitidos.append(descripcion)
                         continue
                     cursor.execute(
-                        "INSERT INTO tipoubicacion (descipción, soporte_picking, tenant_id) VALUES (%s, %s, %s)",
+                        f"INSERT INTO tipoubicacion ({quote('descripcion')}, soporte_picking, tenant_id) VALUES (%s, %s, %s)",
                         (descripcion, bool_col(row.get('soporte_picking', '0')), tenant_id))
                     insertados += 1
             except Exception as e:
@@ -136,11 +137,11 @@ def exportar(formato):
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            cursor.execute("""
-                SELECT descipción AS descripcion, soporte_picking
+            cursor.execute(f"""
+                SELECT {quote('descripcion')} AS descripcion, soporte_picking
                 FROM tipoubicacion
                 WHERE (%s IS NULL OR tenant_id = %s)
-                ORDER BY descipción
+                ORDER BY {quote('descripcion')}
             """, (tenant_id, tenant_id))
             rows = cursor.fetchall()
     finally:

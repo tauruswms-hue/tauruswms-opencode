@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for, flash
 import datetime
 from modules.db_config import get_db_connection
+from modules.sql_dialect import execute_insert, limit_sql
 
 inventario_bp = Blueprint('inventario', __name__)
 
@@ -9,11 +10,11 @@ def get_tenant_filter():
     return session.get('tenant_id')
 
 
-def _siguiente_numero(cursor):
+def _siguiente_numero(cursor, tenant_id):
     anio = datetime.date.today().year
     cursor.execute(
-        "SELECT numero FROM inventarios_cabecera WHERE numero LIKE %s ORDER BY id DESC LIMIT 1",
-        (f'INV-{anio}-%',)
+        f"SELECT numero FROM inventarios_cabecera WHERE numero LIKE %s AND (%s IS NULL OR tenant_id = %s) ORDER BY id DESC {limit_sql(1)}",
+        (f'INV-{anio}-%', tenant_id, tenant_id)
     )
     row = cursor.fetchone()
     if row:
@@ -49,18 +50,20 @@ def listar():
                 SELECT DISTINCT u.id, u.codigo, u.descipcion
                 FROM stockcontable sc
                 JOIN ubicaciones u ON sc.Ubicacion = u.id
-                WHERE sc.StockTotal > 0 OR sc.StockDisponible > 0
+                WHERE (sc.StockTotal > 0 OR sc.StockDisponible > 0)
+                  AND (%s IS NULL OR u.tenant_id = %s)
                 ORDER BY u.codigo
-            """)
+            """, (tenant_id, tenant_id))
             ubicaciones = cursor.fetchall()
 
             cursor.execute("""
                 SELECT DISTINCT m.id, m.codigo, m.nombre
                 FROM stockcontable sc
                 JOIN materiales m ON sc.Material = m.id
-                WHERE sc.StockTotal > 0 OR sc.StockDisponible > 0
+                WHERE (sc.StockTotal > 0 OR sc.StockDisponible > 0)
+                  AND (%s IS NULL OR m.tenant_id = %s)
                 ORDER BY m.codigo
-            """)
+            """, (tenant_id, tenant_id))
             materiales = cursor.fetchall()
 
         return render_template('inventario.html',
@@ -85,7 +88,7 @@ def crear():
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            numero = _siguiente_numero(cursor)
+            numero = _siguiente_numero(cursor, tenant_id)
 
             where_extra = "AND (sc.StockTotal > 0 OR sc.StockDisponible > 0)"
             params = []
@@ -112,19 +115,18 @@ def crear():
                 flash('No se encontraron posiciones de stock con los filtros seleccionados.', 'warning')
                 return redirect(url_for('inventario.listar'))
 
-            cursor.execute(
+            id_inventario = execute_insert(cursor,
                 "INSERT INTO inventarios_cabecera (numero, descripcion, usuario_creacion, tenant_id) VALUES (%s, %s, %s, %s)",
                 (numero, descripcion or None, usuario, tenant_id)
             )
-            id_inventario = cursor.lastrowid
 
             cursor.executemany("""
                 INSERT INTO inventarios_detalle
-                    (id_inventario, id_ubicacion, id_material, id_contenedor, lote, tipo_stock, stock_sistema)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    (id_inventario, id_ubicacion, id_material, id_contenedor, lote, tipo_stock, stock_sistema, tenant_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """, [
                 (id_inventario, p['Ubicacion'], p['Material'],
-                 p['IDContenedor'], p['Lote'], p['TipoStock'], p['StockTotal'])
+                 p['IDContenedor'], p['Lote'], p['TipoStock'], p['StockTotal'], tenant_id)
                 for p in posiciones
             ])
 
@@ -166,8 +168,9 @@ def ver_inventario(id_inventario):
                 LEFT JOIN ubicaciones u ON d.id_ubicacion = u.id
                 LEFT JOIN materiales  m ON d.id_material  = m.id
                 WHERE d.id_inventario = %s
+                  AND (%s IS NULL OR d.tenant_id = %s)
                 ORDER BY u.codigo, m.codigo, d.id_contenedor
-            """, (id_inventario,))
+            """, (id_inventario, tenant_id, tenant_id))
             lineas = cursor.fetchall()
 
         return render_template('inventario_detalle.html',
@@ -220,7 +223,8 @@ def guardar_conteo(id_linea):
                     fecha_conteo   = %s,
                     usuario_conteo = %s
                 WHERE id = %s
-            """, (cantidad, ahora, usuario, id_linea))
+                  AND (%s IS NULL OR tenant_id = %s)
+            """, (cantidad, ahora, usuario, id_linea, tenant_id, tenant_id))
         conn.commit()
         return jsonify({
             'ok': True,

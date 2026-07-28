@@ -90,9 +90,9 @@
                         <button class="btn-icon edit" onclick='editMaterial({{ m | tojson }})' style="color: #3498db; border:none; background:none; cursor:pointer;">
                             <i class="fas fa-edit"></i>
                         </button>
-                        <a href="{{ url_for('materiales.eliminar', id=m.id) }}" class="btn-icon delete" onclick="return confirm('¿Eliminar material?')" style="color: #e74c3c; text-decoration:none;">
-                            <i class="fas fa-trash"></i>
-                        </a>
+                        <form method="POST" action="{{ url_for('materiales.eliminar', id=m.id) }}" style="display:inline;" onsubmit="return confirm('¿Eliminar material?')">
+                            <button type="submit" class="btn-icon delete" style="color: #e74c3c; border:none; background:none; cursor:pointer;"><i class="fas fa-trash"></i></button>
+                        </form>
                     </td>
                 </tr>
                 {% endfor %}

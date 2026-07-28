@@ -41,7 +41,7 @@
                 {% for t in tipos %}
                 <tr>
                     <td>{{ t.id }}</td>
-                    <td><strong>{{ t.descipción }}</strong></td>
+                    <td><strong>{{ t.descripcion }}</strong></td>
                     <td style="text-align:center;">
                         {% if t.soporte_picking %}
                             <span style="color:#27ae60; font-size:1.1rem;" title="Sí"><i class="fas fa-check-circle"></i></span>
@@ -53,9 +53,9 @@
                         <button class="btn-icon edit" onclick='editTipo({{ t | tojson }})'>
                             <i class="fas fa-edit"></i>
                         </button>
-                        <a href="{{ url_for('tipoubicacion.eliminar', id=t.id) }}" class="btn-icon delete" onclick="return confirm('¿Eliminar este tipo?')">
-                            <i class="fas fa-trash"></i>
-                        </a>
+                        <form method="POST" action="{{ url_for('tipoubicacion.eliminar', id=t.id) }}" style="display:inline;" onsubmit="return confirm('¿Eliminar este tipo?')">
+                            <button type="submit" class="btn-icon delete"><i class="fas fa-trash"></i></button>
+                        </form>
                     </td>
                 </tr>
                 {% endfor %}

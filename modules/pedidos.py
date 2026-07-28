@@ -6,6 +6,7 @@ import os
 import json
 from modules.batch_utils import parse_file, float_or_zero, plantilla_csv, plantilla_json, plantilla_xlsx
 from modules.db_config import get_db_connection, _get_admin_connection
+from modules.sql_dialect import upsert_incremental_sql, cast_as_int, substring_index, year as year_func, quote, execute_insert, limit_sql
 
 pedidos_bp = Blueprint('pedidos', __name__)
 
@@ -34,9 +35,9 @@ def listar():
             """
             cursor.execute(sql, (tenant_id, tenant_id))
             pedidos = cursor.fetchall()
-            cursor.execute("SELECT id_ruta, nombre_ruta FROM rutas ORDER BY nombre_ruta")
+            cursor.execute("SELECT id_ruta, nombre_ruta FROM rutas WHERE (%s IS NULL OR tenant_id = %s) ORDER BY nombre_ruta", (tenant_id, tenant_id))
             rutas = cursor.fetchall()
-            cursor.execute("SELECT id_transporte, razonsocial FROM transportes WHERE activo = 1 ORDER BY razonsocial")
+            cursor.execute("SELECT id_transporte, razonsocial FROM transportes WHERE activo = 1 AND (%s IS NULL OR tenant_id = %s) ORDER BY razonsocial", (tenant_id, tenant_id))
             transportes = cursor.fetchall()
             cursor.execute("SELECT id_transporte, id_ruta FROM transporte_rutas")
             transporte_rutas = cursor.fetchall()
@@ -82,9 +83,9 @@ def ver_detalle(id_pedido):
                 FROM pedidos_detalle d
                 JOIN materiales m ON d.id_material = m.id
                 LEFT JOIN unidades_medida un ON m.unidad_medida_id = un.id_unidad
-                WHERE d.id_pedido = %s
+                WHERE d.id_pedido = %s AND (%s IS NULL OR d.tenant_id = %s)
             """
-            cursor.execute(sql_det, (id_pedido,))
+            cursor.execute(sql_det, (id_pedido, tenant_id, tenant_id))
             items = cursor.fetchall()
         return render_template('pedidos_detalle_ver.html', pedido=pedido, items=items)
     finally:
@@ -152,7 +153,7 @@ def editar(id_pedido):
             rel_transp_rutas = cursor.fetchall()
             cursor.execute("SELECT id, codigo, nombre FROM materiales WHERE activo = 1 AND (%s IS NULL OR tenant_id = %s)", (tenant_id, tenant_id))
             materiales = cursor.fetchall()
-            cursor.execute("SELECT * FROM pedidos_detalle WHERE id_pedido = %s", (id_pedido,))
+            cursor.execute("SELECT * FROM pedidos_detalle WHERE id_pedido = %s AND (%s IS NULL OR tenant_id = %s)", (id_pedido, tenant_id, tenant_id))
             detalle = cursor.fetchall()
             cursor.execute("SELECT id_clase, nombre FROM clases_pedido WHERE activo = 1 AND (%s IS NULL OR tenant_id = %s)", (tenant_id, tenant_id))
             clases = cursor.fetchall()
@@ -187,16 +188,16 @@ def guardar():
 
                 sql_cab = """UPDATE pedidos_cabecera SET id_cliente=%s, id_clase=%s, fecha_pedido=%s,
                              id_ruta=%s, id_transporte=%s, direccion_entrega=%s, observaciones=%s
-                             WHERE id_pedido=%s"""
+                             WHERE id_pedido=%s AND (%s IS NULL OR tenant_id = %s)"""
                 cursor.execute(sql_cab, (d.get('id_cliente'), d.get('id_clase') or None,
                                          d.get('fecha_pedido'),
                                          d.get('id_ruta') or None, d.get('id_transporte') or None,
-                                         d.get('direccion_entrega'), d.get('observaciones'), id_pedido))
-                cursor.execute("DELETE FROM pedidos_detalle WHERE id_pedido = %s", (id_pedido,))
+                                         d.get('direccion_entrega'), d.get('observaciones'), id_pedido, tenant_id, tenant_id))
+                cursor.execute("DELETE FROM pedidos_detalle WHERE id_pedido = %s AND (%s IS NULL OR tenant_id = %s)", (id_pedido, tenant_id, tenant_id))
             else:
                 anio = datetime.now().year
                 cursor.execute(
-                    "SELECT COUNT(*) AS total FROM pedidos_cabecera WHERE YEAR(fecha_pedido) = %s AND (%s IS NULL OR tenant_id = %s)",
+                    f"SELECT COUNT(*) AS total FROM pedidos_cabecera WHERE {year_func('fecha_pedido')} = %s AND (%s IS NULL OR tenant_id = %s)",
                     (anio, tenant_id, tenant_id)
                 )
                 seq = cursor.fetchone()['total'] + 1
@@ -205,17 +206,16 @@ def guardar():
                 sql_cab = """INSERT INTO pedidos_cabecera (nro_pedido, id_cliente, id_clase, fecha_pedido, id_ruta,
                              id_transporte, direccion_entrega, observaciones, estado, tenant_id)
                              VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'Pendiente', %s)"""
-                cursor.execute(sql_cab, (nro_pedido, d.get('id_cliente'), d.get('id_clase') or None,
+                id_pedido = execute_insert(cursor, sql_cab, (nro_pedido, d.get('id_cliente'), d.get('id_clase') or None,
                                          d.get('fecha_pedido'),
                                          d.get('id_ruta') or None, d.get('id_transporte') or None,
                                          d.get('direccion_entrega'), d.get('observaciones'), tenant_id))
-                id_pedido = cursor.lastrowid
 
-            sql_det = "INSERT INTO pedidos_detalle (id_pedido, id_material, cantidad, tipo_stock) VALUES (%s, %s, %s, %s)"
+            sql_det = "INSERT INTO pedidos_detalle (id_pedido, id_material, cantidad, tipo_stock, tenant_id) VALUES (%s, %s, %s, %s, %s)"
             for i in range(len(items)):
                 if items[i] and cantidades[i]:
                     ts = tipos_stock[i] if i < len(tipos_stock) else 'Libre Venta'
-                    cursor.execute(sql_det, (id_pedido, items[i], cantidades[i], ts or 'Libre Venta'))
+                    cursor.execute(sql_det, (id_pedido, items[i], cantidades[i], ts or 'Libre Venta', tenant_id))
 
             # --- OMC AUTOMÁTICA con todos los contenedores (solo pedidos nuevos) ---
             if not d.get('id_pedido'):
@@ -227,8 +227,8 @@ def guardar():
                 id_transporte = d.get('id_transporte') or None
                 if id_transporte:
                     cursor.execute(
-                        "SELECT id_muelle_salida FROM transportes WHERE id_transporte = %s",
-                        (id_transporte,)
+                        "SELECT id_muelle_salida FROM transportes WHERE id_transporte = %s AND (%s IS NULL OR tenant_id = %s)",
+                        (id_transporte, tenant_id, tenant_id)
                     )
                     row_t = cursor.fetchone()
                     if row_t:
@@ -240,7 +240,7 @@ def guardar():
                         flash(f"Contenedor {contenedor}: sin OMC — el transporte no tiene muelle de salida.", "warning")
                         continue
 
-                    cursor.execute("""
+                    cursor.execute(f"""
                         SELECT sc.Ubicacion, SUM(sc.StockDisponible) AS disp,
                                SUM(sc.StockSaliendo) AS sal, SUM(sc.StockEntrando) AS ent
                         FROM stockcontable sc
@@ -248,10 +248,11 @@ def guardar():
                         JOIN tipoubicacion tu ON u.tipoubicacion = tu.id
                         WHERE sc.IDContenedor = %s
                           AND tu.soporte_picking = 1
+                          AND (%s IS NULL OR sc.tenant_id = %s)
                         GROUP BY sc.Ubicacion
                         HAVING disp > 0 AND sal = 0 AND ent = 0
-                        LIMIT 1
-                    """, (contenedor,))
+                        {limit_sql(1)}
+                    """, (contenedor, tenant_id, tenant_id))
                     row_sc = cursor.fetchone()
 
                     if not row_sc:
@@ -264,7 +265,8 @@ def guardar():
                         SELECT o.id_omc, o.numero FROM omc o
                         JOIN omc_contenedores oc ON o.id_omc = oc.id_omc
                         WHERE oc.id_contenedor = %s AND oc.id_ubicacion_origen = %s AND o.estado = 'Pendiente'
-                    """, (contenedor, id_origen))
+                          AND (%s IS NULL OR o.tenant_id = %s)
+                    """, (contenedor, id_origen, tenant_id, tenant_id))
                     existente = cursor.fetchone()
                     if existente:
                         flash(f"Contenedor {contenedor}: ya existe OMC pendiente {existente['numero']}.", "warning")
@@ -274,10 +276,11 @@ def guardar():
 
                 if contenedores_validos:
                     # Generar UN SOLO número OMC para todos los contenedores
+                    expr_omc = cast_as_int(substring_index("numero", "-", -1))
                     cursor.execute(
-                        "SELECT MAX(CAST(SUBSTRING_INDEX(numero, '-', -1) AS UNSIGNED)) AS max_seq "
-                        "FROM omc WHERE YEAR(fecha_creacion) = %s",
-                        (ahora.year,)
+                        f"SELECT MAX({expr_omc}) AS max_seq "
+                        f"FROM omc WHERE {year_func('fecha_creacion')} = %s AND (%s IS NULL OR tenant_id = %s)",
+                        (ahora.year, tenant_id, tenant_id)
                     )
                     seq_omc = (cursor.fetchone()['max_seq'] or 0) + 1
                     omc_numero = f"OMC-{ahora.year}-{seq_omc:05d}"
@@ -290,51 +293,48 @@ def guardar():
                             SET StockSaliendo = StockDisponible, StockDisponible = 0, StockTotal = 0,
                                 UltimoMovimiento = %s, UsuarioUltimoMov = %s
                             WHERE IDContenedor = %s AND Ubicacion = %s AND StockDisponible > 0
-                        """, (ahora, usuario, cv['contenedor'], cv['id_origen']))
+                              AND (%s IS NULL OR tenant_id = %s)
+                        """, (ahora, usuario, cv['contenedor'], cv['id_origen'], tenant_id, tenant_id))
 
                         # StockEntrando en muelle
                         cursor.execute("""
                             SELECT Material, Lote, TipoStock, StockSaliendo, FechaVencimiento
                             FROM stockcontable
                             WHERE IDContenedor = %s AND Ubicacion = %s AND StockSaliendo > 0
-                        """, (cv['contenedor'], cv['id_origen']))
+                              AND (%s IS NULL OR tenant_id = %s)
+                        """, (cv['contenedor'], cv['id_origen'], tenant_id, tenant_id))
                         for rec in cursor.fetchall():
-                            cursor.execute("""
-                                INSERT INTO stockcontable
-                                    (Ubicacion, Material, Lote, TipoStock, IDContenedor,
-                                     StockTotal, StockDisponible, StockEntrando, StockSaliendo,
-                                     UltimaEntrada, UltimoMovimiento, FechaVencimiento, UsuarioUltimoMov)
-                                VALUES (%s, %s, %s, %s, %s, 0, 0, %s, 0, NULL, %s, %s, %s)
-                                ON DUPLICATE KEY UPDATE
-                                    StockEntrando = StockEntrando + VALUES(StockEntrando),
-                                    UltimoMovimiento = VALUES(UltimoMovimiento),
-                                    UsuarioUltimoMov = VALUES(UsuarioUltimoMov)
-                            """, (muelle_id, rec['Material'], rec['Lote'], rec['TipoStock'],
-                                  cv['contenedor'], rec['StockSaliendo'], ahora,
-                                  rec['FechaVencimiento'], usuario))
+                            cols_stock = ['Ubicacion', 'Material', 'Lote', 'TipoStock', 'IDContenedor',
+                                          'StockTotal', 'StockDisponible', 'StockEntrando', 'StockSaliendo',
+                                          'UltimaEntrada', 'UltimoMovimiento', 'FechaVencimiento', 'UsuarioUltimoMov']
+                            sql_ent = upsert_incremental_sql('stockcontable', cols_stock, 'Ubicacion',
+                                                             ['StockEntrando'], ['UltimoMovimiento', 'UsuarioUltimoMov'])
+                            cursor.execute(sql_ent, (muelle_id, rec['Material'], rec['Lote'], rec['TipoStock'],
+                                  cv['contenedor'], 0, 0, rec['StockSaliendo'], 0,
+                                  None, ahora, rec['FechaVencimiento'], usuario))
 
                     # Crear UNA SOLA OMC para todos los contenedores
-                    cursor.execute("""
+                    id_omc = execute_insert(cursor, """
                         INSERT INTO omc
                             (numero, id_contenedor, id_ubicacion_origen, id_ubicacion_destino,
                              id_recepcion, id_pedido, estado, observaciones,
-                             usuario_creacion, fecha_creacion)
-                        VALUES (%s, NULL, NULL, %s, NULL, %s, 'Pendiente', %s, %s, %s)
+                             usuario_creacion, fecha_creacion, tenant_id)
+                        VALUES (%s, NULL, NULL, %s, NULL, %s, 'Pendiente', %s, %s, %s, %s)
                     """, (omc_numero, muelle_id, id_pedido,
-                          f"Generada desde pedido {nro_pedido}", usuario, ahora))
-                    id_omc = cursor.lastrowid
+                          f"Generada desde pedido {nro_pedido}", usuario, ahora, tenant_id))
 
                     # Insertar cada contenedor en omc_contenedores
                     for cv in contenedores_validos:
                         cursor.execute("""
                             INSERT INTO omc_contenedores
-                                (id_omc, id_contenedor, id_contenedor_destino, id_ubicacion_origen)
-                            VALUES (%s, %s, NULL, %s)
-                        """, (id_omc, cv['contenedor'], cv['id_origen']))
+                                (id_omc, id_contenedor, id_contenedor_destino, id_ubicacion_origen, tenant_id)
+                            VALUES (%s, %s, NULL, %s, %s)
+                        """, (id_omc, cv['contenedor'], cv['id_origen'], tenant_id))
 
                     cursor.execute("""
                         UPDATE pedidos_cabecera SET estado = 'Trabajo OMC' WHERE id_pedido = %s
-                    """, (id_pedido,))
+                          AND (%s IS NULL OR tenant_id = %s)
+                    """, (id_pedido, tenant_id, tenant_id))
                     flash(f"Pedido {nro_pedido} guardado. OMC {omc_numero} generada con {len(contenedores_validos)} contenedor(es).", "success")
                 else:
                     flash(f"Pedido {nro_pedido} guardado.", "success")
@@ -352,13 +352,14 @@ def guardar():
 
 @pedidos_bp.route('/pedidos/eliminar/<int:id_pedido>')
 def eliminar(id_pedido):
+    tenant_id = get_tenant_filter()
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            cursor.execute("SELECT estado FROM pedidos_cabecera WHERE id_pedido = %s", (id_pedido,))
+            cursor.execute("SELECT estado FROM pedidos_cabecera WHERE id_pedido = %s AND (%s IS NULL OR tenant_id = %s)", (id_pedido, tenant_id, tenant_id))
             p = cursor.fetchone()
             if p and p['estado'] == 'Pendiente':
-                cursor.execute("UPDATE pedidos_cabecera SET estado = 'Anulado' WHERE id_pedido = %s", (id_pedido,))
+                cursor.execute("UPDATE pedidos_cabecera SET estado = 'Anulado' WHERE id_pedido = %s AND (%s IS NULL OR tenant_id = %s)", (id_pedido, tenant_id, tenant_id))
                 conn.commit()
                 flash("Pedido anulado.", "success")
             else:
@@ -375,6 +376,7 @@ def verificar_stock_masivo():
     if not ids:
         return jsonify({"status": "error", "message": "No hay pedidos seleccionados"}), 400
 
+    tenant_id = get_tenant_filter()
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
@@ -387,8 +389,9 @@ def verificar_stock_masivo():
                 FROM pedidos_cabecera p
                 JOIN clientes c ON p.id_cliente = c.id_cliente
                 WHERE p.id_pedido IN ({ph})
+                  AND (%s IS NULL OR p.tenant_id = %s)
                 ORDER BY p.nro_pedido
-            """, tuple(ids))
+            """, tuple(ids) + (tenant_id, tenant_id))
             pedidos = cursor.fetchall()
 
             # Detalle: cantidad solicitada por material+tipo_stock por pedido
@@ -403,8 +406,9 @@ def verificar_stock_masivo():
                 JOIN materiales m       ON d.id_material = m.id
                 LEFT JOIN unidades_medida un ON m.unidad_medida_id = un.id_unidad
                 WHERE d.id_pedido IN ({ph})
+                  AND (%s IS NULL OR d.tenant_id = %s)
                 ORDER BY m.codigo, d.tipo_stock, p.nro_pedido
-            """, tuple(ids))
+            """, tuple(ids) + (tenant_id, tenant_id))
             detalle_rows = cursor.fetchall()
 
             # Stock disponible por (material, tipo_stock)
@@ -418,8 +422,9 @@ def verificar_stock_masivo():
                            SUM(StockEntrando)   AS stock_entrando
                     FROM stockcontable
                     WHERE Material IN ({ph2})
+                      AND (%s IS NULL OR tenant_id = %s)
                     GROUP BY Material, TipoStock
-                """, tuple(material_ids))
+                """, tuple(material_ids) + (tenant_id, tenant_id))
                 for row in cursor.fetchall():
                     stock_map[(row['Material'], row['TipoStock'])] = {
                         'stock_disponible': float(row['stock_disponible'] or 0),
@@ -486,12 +491,13 @@ def preparar_masivo():
     if not ids:
         return jsonify({"status": "error", "message": "No hay pedidos seleccionados"}), 400
 
+    tenant_id = get_tenant_filter()
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            sql = "UPDATE pedidos_cabecera SET estado = 'Trabajo' WHERE id_pedido IN (%s) AND estado = 'Pendiente'" % ','.join(
-                ['%s'] * len(ids))
-            cursor.execute(sql, tuple(ids))
+            sql = "UPDATE pedidos_cabecera SET estado = 'Trabajo' WHERE id_pedido IN (%s) AND estado = 'Pendiente' AND (%s IS NULL OR tenant_id = %s)" % (','.join(
+                ['%s'] * len(ids)), '%s', '%s')
+            cursor.execute(sql, tuple(ids) + (tenant_id, tenant_id))
             conn.commit()
             return jsonify(
                 {"status": "success", "message": f"{cursor.rowcount} pedidos pasaron a estado 'Trabajo'."})
@@ -505,6 +511,7 @@ def resumen_preparar():
     if not ids:
         return jsonify({"status": "error", "message": "No hay pedidos seleccionados"}), 400
 
+    tenant_id = get_tenant_filter()
     ph = ','.join(['%s'] * len(ids))
     conn = get_db_connection()
     try:
@@ -517,7 +524,8 @@ def resumen_preparar():
                 FROM pedidos_cabecera p
                 LEFT JOIN pedidos_detalle d ON d.id_pedido = p.id_pedido
                 WHERE p.id_pedido IN ({ph})
-            """, tuple(ids))
+                  AND (%s IS NULL OR p.tenant_id = %s)
+            """, tuple(ids) + (tenant_id, tenant_id))
             row = cursor.fetchone()
 
             # Ubicaciones de picking con stock disponible para los materiales pedidos
@@ -530,7 +538,8 @@ def resumen_preparar():
                 JOIN tipoubicacion tu ON u.tipoubicacion = tu.id
                     AND tu.soporte_picking = 1
                 WHERE d.id_pedido IN ({ph})
-            """, tuple(ids))
+                  AND (%s IS NULL OR sc.tenant_id = %s)
+            """, tuple(ids) + (tenant_id, tenant_id))
             row_ubi = cursor.fetchone()
 
         return jsonify({
@@ -553,6 +562,7 @@ def cambiar_ruta_transporte():
     ids          = data.get('ids', [])
     id_ruta      = data.get('id_ruta')      # None = sin cambio
     id_transporte= data.get('id_transporte') # None = sin cambio
+    tenant_id    = get_tenant_filter()
 
     if not ids:
         return jsonify({"status": "error", "message": "No hay pedidos seleccionados"}), 400
@@ -574,8 +584,8 @@ def cambiar_ruta_transporte():
     try:
         with conn.cursor() as cursor:
             cursor.execute(
-                f"UPDATE pedidos_cabecera SET {', '.join(campos)} WHERE id_pedido IN ({ph})",
-                tuple(valores)
+                f"UPDATE pedidos_cabecera SET {', '.join(campos)} WHERE id_pedido IN ({ph}) AND (%s IS NULL OR tenant_id = %s)",
+                tuple(valores) + (tenant_id, tenant_id)
             )
             conn.commit()
             return jsonify({"status": "success",
@@ -593,6 +603,7 @@ def buscar_contenedores():
     q    = request.args.get('q',    '').strip()
     ubi  = request.args.get('ubi',  '').strip()
     tipo = request.args.get('tipo', '').strip()
+    tenant_id = get_tenant_filter()
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
@@ -602,30 +613,31 @@ def buscar_contenedores():
                        u.codigo          AS ubicacion_codigo,
                        u.descipcion      AS ubicacion_nombre,
                        tu.id             AS tipo_id,
-                       tu.descipción     AS tipo_nombre,
+                       tu.{quote('descripcion')}     AS tipo_nombre,
                        SUM(sc.StockDisponible) AS total_disponible
                 FROM stockcontable sc
                 JOIN ubicaciones u    ON sc.Ubicacion    = u.id
                 JOIN tipoubicacion tu ON u.tipoubicacion = tu.id
                 WHERE sc.IDContenedor LIKE %s
                   AND tu.soporte_picking = 1
+                  AND (%s IS NULL OR u.tenant_id = %s)
             """
-            params = [f'%{q}%']
+            params = [f'%{q}%', tenant_id, tenant_id]
             if ubi:
                 sql += " AND (u.codigo LIKE %s OR u.descipcion LIKE %s)"
                 params += [f'%{ubi}%', f'%{ubi}%']
             if tipo:
                 sql += " AND tu.id = %s"
                 params.append(int(tipo))
-            sql += """
-                GROUP BY sc.IDContenedor, sc.Ubicacion, u.id, u.codigo, u.descipcion, tu.id, tu.descipción
+            sql += f"""
+                GROUP BY sc.IDContenedor, sc.Ubicacion, u.id, u.codigo, u.descipcion, tu.id, tu.{quote('descripcion')}
                 HAVING SUM(sc.StockDisponible) > 0
                    AND SUM(sc.StockSaliendo)   = 0
                    AND SUM(sc.StockEntrando)   = 0
                 ORDER BY u.codigo, sc.IDContenedor
-                LIMIT 30
+                {limit_sql(30)}
             """
-            cursor.execute(sql, params)
+            cursor.execute(f"{sql}", params)
             return jsonify(cursor.fetchall())
     finally:
         conn.close()
@@ -649,20 +661,22 @@ def filtros_zonas():
 @pedidos_bp.route('/pedidos/filtros/tipos')
 def filtros_tipos():
     zona = request.args.get('zona', '').strip()
+    tenant_id = get_tenant_filter()
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            sql = """
-                SELECT DISTINCT tu.id, tu.`descipción` AS nombre
+            sql = f"""
+                SELECT DISTINCT tu.id, tu.{quote('descripcion')} AS nombre
                 FROM tipoubicacion tu
                 JOIN ubicaciones u ON u.tipoubicacion = tu.id
                 WHERE tu.soporte_picking = 1
+                  AND (%s IS NULL OR tu.tenant_id = %s)
             """
-            params = []
+            params = [tenant_id, tenant_id]
             if zona:
                 sql += " AND u.id_zona = %s"
                 params.append(int(zona))
-            sql += " ORDER BY tu.`descipción`"
+            sql += f" ORDER BY tu.{quote('descripcion')}"
             cursor.execute(sql, params)
             return jsonify(cursor.fetchall())
     finally:
@@ -673,6 +687,7 @@ def filtros_tipos():
 def filtros_ubicaciones():
     tipo = request.args.get('tipo', '').strip()
     zona = request.args.get('zona', '').strip()
+    tenant_id = get_tenant_filter()
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
@@ -681,8 +696,9 @@ def filtros_ubicaciones():
                 FROM ubicaciones u
                 JOIN tipoubicacion tu ON u.tipoubicacion = tu.id
                 WHERE tu.soporte_picking = 1
+                  AND (%s IS NULL OR u.tenant_id = %s)
             """
-            params = []
+            params = [tenant_id, tenant_id]
             if tipo:
                 sql += " AND u.tipoubicacion = %s"
                 params.append(int(tipo))
@@ -701,6 +717,7 @@ def filtros_contenedores():
     ubi  = request.args.get('ubi',  '').strip()
     tipo = request.args.get('tipo', '').strip()
     zona = request.args.get('zona', '').strip()
+    tenant_id = get_tenant_filter()
     # Requiere al menos un filtro para evitar devolver miles de registros
     if not ubi and not tipo and not zona:
         return jsonify([])
@@ -719,8 +736,9 @@ def filtros_contenedores():
                 WHERE tu.soporte_picking = 1
                   AND sc.IDContenedor IS NOT NULL
                   AND sc.IDContenedor != ''
+                  AND (%s IS NULL OR u.tenant_id = %s)
             """
-            params = []
+            params = [tenant_id, tenant_id]
             if ubi:
                 sql += " AND u.id = %s"
                 params.append(int(ubi))
@@ -730,13 +748,13 @@ def filtros_contenedores():
             if zona:
                 sql += " AND u.id_zona = %s"
                 params.append(int(zona))
-            sql += """
+            sql += f"""
                 GROUP BY sc.IDContenedor, sc.Ubicacion, u.id, u.codigo, u.descipcion
                 HAVING SUM(sc.StockDisponible) > 0
                    AND SUM(sc.StockSaliendo)   = 0
                    AND SUM(sc.StockEntrando)   = 0
                 ORDER BY u.codigo, sc.IDContenedor
-                LIMIT 300
+                {limit_sql(300)}
             """
             cursor.execute(sql, params)
             return jsonify(cursor.fetchall())
@@ -753,6 +771,7 @@ def contenedor_stock():
     if not contenedor:
         return jsonify({"status": "error", "message": "Contenedor requerido"}), 400
 
+    tenant_id = get_tenant_filter()
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
@@ -774,8 +793,9 @@ def contenedor_stock():
                   AND sc.StockSaliendo = 0
                   AND sc.StockEntrando = 0
                   AND tu.soporte_picking = 1
+                  AND (%s IS NULL OR u.tenant_id = %s)
                 ORDER BY m.codigo
-            """, (contenedor,))
+            """, (contenedor, tenant_id, tenant_id))
             rows = cursor.fetchall()
             if not rows:
                 return jsonify({"status": "empty", "message": "El contenedor no tiene stock disponible en ubicaciones de picking o tiene movimientos pendientes."})
@@ -849,8 +869,9 @@ def picking_json():
                 JOIN materiales m ON d.id_material = m.id
                 LEFT JOIN unidades_medida un ON m.unidad_medida_id = un.id_unidad
                 WHERE d.id_pedido IN ({ph})
+                  AND (%s IS NULL OR d.tenant_id = %s)
                 ORDER BY d.id_pedido, m.codigo
-            """, tuple(ids))
+            """, tuple(ids) + (tenant_id, tenant_id))
             detalle_rows = cursor.fetchall()
 
         material_ids = list({r['id_material'] for r in detalle_rows})
@@ -883,7 +904,7 @@ def picking_json():
                 cursor.execute(f"""
                     SELECT DISTINCT
                            u.id, u.codigo, u.descipcion AS descripcion,
-                           tu.`descipción` AS tipo_ubicacion,
+                           tu.{quote('descripcion')} AS tipo_ubicacion,
                            tu.id AS id_tipo,
                            z.codigo AS zona_codigo, z.nombre AS zona_nombre,
                            u.orden_picking
@@ -894,8 +915,9 @@ def picking_json():
                     WHERE sc.Material IN ({ph2})
                       AND sc.StockDisponible > 0
                       AND tu.soporte_picking = 1
+                      AND (%s IS NULL OR u.tenant_id = %s)
                     ORDER BY u.orden_picking, u.codigo
-                """, tuple(material_ids))
+                """, tuple(material_ids) + (tenant_id, tenant_id))
                 ubicaciones_list = [dict(r) for r in cursor.fetchall()]
 
                 # ── 4. Stock en esas ubicaciones para los materiales pedidos
@@ -921,8 +943,9 @@ def picking_json():
                         WHERE sc.Material  IN ({ph2})
                           AND sc.Ubicacion IN ({ph3})
                           AND sc.StockDisponible > 0
+                          AND (%s IS NULL OR sc.tenant_id = %s)
                         ORDER BY u.orden_picking, u.codigo, m.codigo
-                    """, tuple(material_ids) + tuple(ubi_ids))
+                    """, tuple(material_ids) + tuple(ubi_ids) + (tenant_id, tenant_id))
                     for r in cursor.fetchall():
                         row = dict(r)
                         row['stock_total']      = float(row['stock_total']      or 0)
@@ -1022,18 +1045,17 @@ def importar():
                         continue
 
                     cursor.execute(
-                        "SELECT COUNT(*) AS total FROM pedidos_cabecera WHERE YEAR(fecha_pedido) = %s AND (%s IS NULL OR tenant_id = %s)",
+                        f"SELECT COUNT(*) AS total FROM pedidos_cabecera WHERE {year_func('fecha_pedido')} = %s AND (%s IS NULL OR tenant_id = %s)",
                         (anio, tenant_id, tenant_id)
                     )
                     seq = cursor.fetchone()['total'] + 1
                     nro_pedido = f"PED-{anio}-{seq:05d}"
 
-                    cursor.execute("""
+                    id_pedido = execute_insert(cursor, """
                         INSERT INTO pedidos_cabecera
                             (nro_pedido, id_cliente, fecha_pedido, observaciones, estado, tenant_id)
                         VALUES (%s, %s, %s, %s, 'Pendiente', %s)
                     """, (nro_pedido, cliente['id_cliente'], fecha_pedido, observaciones, tenant_id))
-                    id_pedido = cursor.lastrowid
 
                     lineas_ok = 0
                     for fila_num, row in filas:

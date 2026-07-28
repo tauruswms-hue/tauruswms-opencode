@@ -51,9 +51,9 @@
                         <button class="btn-icon edit" onclick='editProveedor({{ p | tojson }})'>
                             <i class="fas fa-edit"></i>
                         </button>
-                        <a href="{{ url_for('proveedores.eliminar', id=p.id) }}" class="btn-icon delete" onclick="return confirm('¿Inactivar proveedor?')">
-                            <i class="fas fa-trash"></i>
-                        </a>
+                        <form method="POST" action="{{ url_for('proveedores.eliminar', id=p.id) }}" style="display:inline;" onsubmit="return confirm('¿Inactivar proveedor?')">
+                            <button type="submit" class="btn-icon delete"><i class="fas fa-trash"></i></button>
+                        </form>
                     </td>
                 </tr>
                 {% endfor %}

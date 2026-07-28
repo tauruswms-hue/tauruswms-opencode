@@ -1,8 +1,9 @@
-import pymysql
 import os
 from pathlib import Path
 from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash
+from modules.db_config import get_db_connection
+from modules.sql_dialect import insert_ignore_sql
 
 
 def crear_usuario(usuario, clave, mail, nombre, rol):
@@ -11,26 +12,15 @@ def crear_usuario(usuario, clave, mail, nombre, rol):
     env_path = Path('.') / '.env'
     load_dotenv(dotenv_path=env_path)
 
-    DB_CONFIG = {
-        'host': os.getenv('DB_HOST'),
-        'user': os.getenv('DB_USER'),
-        'password': os.getenv('DB_PASSWORD'),
-        'database': os.getenv('DB_NAME'),
-        'charset': os.getenv('DB_CHARSET'),
-        'port': int(os.getenv('DB_PORT'))
-    }
-
     try:
-        conn = pymysql.connect(**DB_CONFIG)
+        conn = get_db_connection()
         cursor = conn.cursor()
-        print("✅ Conectado a MySQL")
+        print("✅ Conectado a BD")
         password_hash = generate_password_hash(clave)
 
-        cursor.execute("""
-            INSERT IGNORE INTO usuarios 
-            (username, email, password_hash, nombre_completo, rol) 
-            VALUES (%s, %s, %s, %s, %s)
-        """, (usuario, mail, password_hash, nombre, rol))
+        cols = ['username', 'email', 'password_hash', 'nombre_completo', 'rol']
+        sql = insert_ignore_sql('usuarios', cols)
+        cursor.execute(sql, (usuario, mail, password_hash, nombre, rol))
 
         print("   ✅ Usuario creado: " + usuario)
         conn.commit()
