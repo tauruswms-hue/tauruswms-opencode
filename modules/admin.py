@@ -7,8 +7,14 @@ import base64
 import hashlib
 import logging
 from dotenv import load_dotenv
-from modules.db_config import _get_admin_connection
+from modules.db_config import _get_admin_connection, get_intercambio_connection, clear_config_cache
 from modules.sql_dialect import date as date_func, is_duplicate_key_error, execute_insert, limit_sql
+from modules.schema_generator import ROUTE_CATALOG
+from modules.intercambio import (
+    procesar_intercambio,
+    reintentar_todo,
+    MODULOS,
+)
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -204,13 +210,16 @@ def tenants_ver(encoded_id):
             ORDER BY nombre
         """, (tenant_id,))
         usuarios = cursor.fetchall()
-        
+
+        cursor.execute("SELECT nombre FROM roles WHERE activo = 1 ORDER BY nombre")
+        roles = cursor.fetchall()
+
         cursor.close()
     finally:
         conn.close()
     
     log_audit('ACCESS', 'tenants', {'id': tenant_id})
-    return render_template('admin_tenant_detail.html', tenant=tenant, usuarios=usuarios)
+    return render_template('admin_tenant_detail.html', tenant=tenant, usuarios=usuarios, roles=roles)
 
 
 @admin_bp.route('/tenants/guardar', methods=['POST'])
@@ -476,6 +485,182 @@ def usuarios():
     return render_template('admin_usuarios.html', usuarios=usuarios, tenants=tenants, tenant_id=tenant_id)
 
 
+@admin_bp.route('/roles')
+@admin_required
+def roles():
+    if session.get('admin_rol') != 'SUPERADMIN':
+        flash('Solo SUPERADMIN puede gestionar roles', 'danger')
+        return redirect(url_for('admin.tenants'))
+
+    conn = _get_admin_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT r.id, r.nombre, r.descripcion, r.activo,
+                   (SELECT COUNT(*) FROM usuarios u WHERE u.rol = r.nombre) as total_usuarios,
+                   (SELECT COUNT(*) FROM roles_rutas rr WHERE rr.rol = r.nombre) as total_rutas
+            FROM roles r
+            ORDER BY r.nombre
+        """)
+        roles = cursor.fetchall()
+        cursor.close()
+    finally:
+        conn.close()
+
+    log_audit('ACCESS', 'roles')
+    return render_template('admin_roles.html', roles=roles)
+
+
+@admin_bp.route('/roles/guardar', methods=['POST'])
+@admin_required
+def roles_guardar():
+    if session.get('admin_rol') != 'SUPERADMIN':
+        flash('Solo SUPERADMIN puede gestionar roles', 'danger')
+        return redirect(url_for('admin.tenants'))
+
+    d = request.form
+    rol_id = d.get('id')
+    nombre = (d.get('nombre') or '').strip().upper()
+    descripcion = (d.get('descripcion') or '').strip()
+    activo = 1 if d.get('activo') else 0
+
+    if not nombre:
+        flash('El nombre del rol es obligatorio', 'danger')
+        return redirect(url_for('admin.roles'))
+
+    conn = _get_admin_connection()
+    try:
+        cursor = conn.cursor()
+        if rol_id:
+            cursor.execute("SELECT nombre FROM roles WHERE id = %s", (rol_id,))
+            anterior = cursor.fetchone()
+            cursor.execute("""
+                UPDATE roles SET nombre = %s, descripcion = %s, activo = %s WHERE id = %s
+            """, (nombre, descripcion, activo, rol_id))
+            if anterior and anterior['nombre'] != nombre:
+                cursor.execute("UPDATE roles_rutas SET rol = %s WHERE rol = %s", (nombre, anterior['nombre']))
+                cursor.execute("UPDATE usuarios SET rol = %s WHERE rol = %s", (nombre, anterior['nombre']))
+            msg = 'Rol actualizado correctamente'
+            log_audit('UPDATE', 'roles', {'id': rol_id, 'nombre': nombre})
+        else:
+            cursor.execute("""
+                INSERT INTO roles (nombre, descripcion, activo) VALUES (%s, %s, %s)
+            """, (nombre, descripcion, activo))
+            msg = 'Rol creado correctamente'
+            log_audit('CREATE', 'roles', {'nombre': nombre})
+
+        conn.commit()
+        flash(msg, 'success')
+        cursor.close()
+    except Exception as e:
+        conn.rollback()
+        if is_duplicate_key_error(e):
+            flash('Ya existe un rol con ese nombre', 'danger')
+        else:
+            flash(f'Error: {str(e)}', 'danger')
+        log_audit('ERROR', 'roles', {'error': str(e)})
+    finally:
+        conn.close()
+
+    return redirect(url_for('admin.roles'))
+
+
+@admin_bp.route('/roles/eliminar/<int:rol_id>')
+@admin_required
+def roles_eliminar(rol_id):
+    if session.get('admin_rol') != 'SUPERADMIN':
+        flash('Solo SUPERADMIN puede gestionar roles', 'danger')
+        return redirect(url_for('admin.tenants'))
+
+    conn = _get_admin_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT nombre FROM roles WHERE id = %s", (rol_id,))
+        rol = cursor.fetchone()
+        if not rol:
+            flash('Rol no encontrado.', 'warning')
+            cursor.close()
+            return redirect(url_for('admin.roles'))
+
+        cursor.execute("SELECT COUNT(*) as total FROM usuarios WHERE rol = %s AND activo = 1", (rol['nombre'],))
+        if cursor.fetchone()['total'] > 0:
+            flash('No se puede desactivar el rol porque tiene usuarios asignados', 'danger')
+            cursor.close()
+            return redirect(url_for('admin.roles'))
+
+        cursor.execute("UPDATE roles SET activo = FALSE WHERE id = %s", (rol_id,))
+        conn.commit()
+        flash('Rol desactivado.', 'success')
+        log_audit('DELETE', 'roles', {'id': rol_id, 'nombre': rol['nombre']})
+        cursor.close()
+    finally:
+        conn.close()
+
+    return redirect(url_for('admin.roles'))
+
+
+@admin_bp.route('/roles/activar/<int:rol_id>')
+@admin_required
+def roles_activar(rol_id):
+    if session.get('admin_rol') != 'SUPERADMIN':
+        flash('Solo SUPERADMIN puede gestionar roles', 'danger')
+        return redirect(url_for('admin.tenants'))
+
+    conn = _get_admin_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE roles SET activo = TRUE WHERE id = %s", (rol_id,))
+        conn.commit()
+        flash('Rol activado.', 'success')
+        log_audit('UPDATE', 'roles', {'id': rol_id, 'action': 'activar'})
+        cursor.close()
+    finally:
+        conn.close()
+
+    return redirect(url_for('admin.roles'))
+
+
+@admin_bp.route('/roles/rutas/<rol>', methods=['GET', 'POST'])
+@admin_required
+def roles_rutas_editar(rol):
+    if session.get('admin_rol') != 'SUPERADMIN':
+        flash('Solo SUPERADMIN puede gestionar roles', 'danger')
+        return redirect(url_for('admin.tenants'))
+
+    conn = _get_admin_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM roles WHERE nombre = %s", (rol,))
+        role = cursor.fetchone()
+        if not role:
+            flash('Rol no encontrado.', 'warning')
+            cursor.close()
+            return redirect(url_for('admin.roles'))
+
+        if request.method == 'POST':
+            nuevas = request.form.getlist('rutas')
+            cursor.execute("DELETE FROM roles_rutas WHERE rol = %s", (rol,))
+            if '*' in nuevas:
+                cursor.execute("INSERT INTO roles_rutas (rol, ruta) VALUES (%s, %s)", (rol, '*'))
+            else:
+                for ruta in nuevas:
+                    cursor.execute("INSERT INTO roles_rutas (rol, ruta) VALUES (%s, %s)", (rol, ruta))
+            conn.commit()
+            flash('Rutas asignadas correctamente', 'success')
+            log_audit('UPDATE', 'roles_rutas', {'rol': rol, 'rutas': nuevas})
+            cursor.close()
+            return redirect(url_for('admin.roles'))
+
+        cursor.execute("SELECT ruta FROM roles_rutas WHERE rol = %s", (rol,))
+        asignadas = [row['ruta'] for row in cursor.fetchall()]
+        cursor.close()
+    finally:
+        conn.close()
+
+    log_audit('ACCESS', 'roles_rutas', {'rol': rol})
+    return render_template('admin_roles_rutas.html', role=role, catalogo=ROUTE_CATALOG, asignadas=asignadas)
+
+
 @admin_bp.route('/audit')
 @admin_required
 def audit():
@@ -632,6 +817,7 @@ def configuracion_guardar():
             log_audit('CREATE', 'configuracion', {'clave': clave})
         
         conn.commit()
+        clear_config_cache()
         flash(msg, 'success')
         cursor.close()
     except Exception as e:
@@ -660,6 +846,7 @@ def configuracion_eliminar(config_id):
         cursor = conn.cursor()
         cursor.execute("DELETE FROM configuracion WHERE id = %s", (config_id,))
         conn.commit()
+        clear_config_cache()
         filas = cursor.rowcount
         cursor.close()
         
@@ -678,6 +865,115 @@ def configuracion_eliminar(config_id):
     return redirect(url_for('admin.configuracion'))
 
 
+@admin_bp.route('/intercambio')
+@admin_required
+def intercambio():
+    if session.get('admin_rol') != 'SUPERADMIN':
+        flash('Solo SUPERADMIN puede monitorear el intercambio', 'danger')
+        return redirect(url_for('admin.tenants'))
+
+    conn_admin = _get_admin_connection()
+    try:
+        cursor = conn_admin.cursor()
+        cursor.execute("SELECT clave, valor, descripcion FROM configuracion WHERE clave LIKE 'INTERCAMBIO%' ORDER BY clave")
+        config_intercambio = cursor.fetchall()
+        cursor.close()
+    finally:
+        conn_admin.close()
+
+    conn_int = get_intercambio_connection()
+    try:
+        cursor_int = conn_int.cursor()
+        conteo = {'pendiente': 0, 'procesado': 0, 'error': 0}
+        errores = []
+        for m, conf in MODULOS.items():
+            cursor_int.execute(
+                f"SELECT estado, COUNT(*) AS total FROM {conf['tabla']} GROUP BY estado")
+            for r in cursor_int.fetchall():
+                conteo[r['estado']] = conteo.get(r['estado'], 0) + r['total']
+
+            cursor_int.execute(
+                f"SELECT * FROM {conf['tabla']} WHERE estado = 'error' "
+                f"ORDER BY id DESC LIMIT 100")
+            for row in cursor_int.fetchall():
+                row = dict(row)
+                if m == 'transporte_rutas':
+                    referencia = (row.get('transporte_codigo') or '') + ' -> ' + (row.get('ruta_nombre') or '')
+                    nombre = row.get('observaciones') or ''
+                elif m == 'rutas':
+                    referencia = row.get('nombre_ruta')
+                    nombre = row.get('descripcion') or ''
+                else:
+                    referencia = row.get('codigo')
+                    nombre = row.get('nombre') or row.get('razonsocial') or ''
+                errores.append({
+                    'modulo': m,
+                    'modulo_nombre': conf['nombre'],
+                    'id': row.get('id'),
+                    'tenant_codigo': row.get('tenant_codigo'),
+                    'referencia': referencia,
+                    'nombre': nombre,
+                    'intentos': row.get('intentos'),
+                    'error_mensaje': row.get('error_mensaje'),
+                })
+        errores.sort(key=lambda r: (r.get('id') or 0), reverse=True)
+        errores = errores[:100]
+
+        cursor_int.execute(
+            "SELECT * FROM intercambio_log ORDER BY id DESC LIMIT 20")
+        logs = cursor_int.fetchall()
+    finally:
+        conn_int.close()
+
+    log_audit('ACCESS', 'intercambio')
+    return render_template('admin_intercambio.html',
+                           config_intercambio=config_intercambio,
+                           conteo=conteo,
+                           errores=errores,
+                           logs=logs)
+
+
+@admin_bp.route('/intercambio/procesar', methods=['POST'])
+@admin_required
+def intercambio_procesar():
+    if session.get('admin_rol') != 'SUPERADMIN':
+        flash('Solo SUPERADMIN puede procesar el intercambio', 'danger')
+        return redirect(url_for('admin.tenants'))
+
+    try:
+        resultado = procesar_intercambio(usuario=session.get('admin_username'))
+        if resultado.get('aviso'):
+            flash(resultado['aviso'], 'warning')
+        elif resultado['errores'] == 0:
+            flash(f"Intercambio procesado: {resultado['procesados']} registro(s) aplicados.", 'success')
+        else:
+            flash(f"Intercambio procesado: {resultado['procesados']} aplicados, "
+                  f"{resultado['errores']} con error.", 'warning')
+        log_audit('PROCESS', 'intercambio',
+                  {'procesados': resultado['procesados'], 'errores': resultado['errores']})
+    except Exception as e:
+        flash(f"Error al procesar el intercambio: {str(e)}", 'danger')
+        log_audit('ERROR', 'intercambio', {'error': str(e)})
+    return redirect(url_for('admin.intercambio'))
+
+
+@admin_bp.route('/intercambio/reintentar', methods=['POST'])
+@admin_required
+def intercambio_reintentar():
+    if session.get('admin_rol') != 'SUPERADMIN':
+        flash('Solo SUPERADMIN puede reintentar registros', 'danger')
+        return redirect(url_for('admin.tenants'))
+
+    try:
+        n = reintentar_todo()
+        flash(f"{n} registro(s) en error devuelto(s) a pendiente.", 'info')
+        log_audit('UPDATE', 'intercambio', {'reintentados': n})
+    except Exception as e:
+        flash(f"Error: {str(e)}", 'danger')
+        log_audit('ERROR', 'intercambio', {'error': str(e)})
+    return redirect(url_for('admin.intercambio'))
+
+
 @admin_bp.route('/parametros/editar/<int:tenant_id>', methods=['GET', 'POST'])
 @admin_required
 def parametros_editar(tenant_id):
@@ -694,7 +990,7 @@ def parametros_editar(tenant_id):
         
         cursor_admin.execute("""
             SELECT id, nombre, razon_social, cuit, direccion, telefono, email,
-                   nombredelalmacen, metodosdepicking,
+                   nombredelalmacen, metodosdepicking, metodo_picking_default,
                    bajostock, dias_filtro_fechas, proveedor_api_ia, api_key, modelo_api_ia,
                    contexto, prompt
             FROM tenants WHERE id = %s
@@ -703,8 +999,14 @@ def parametros_editar(tenant_id):
         
         if request.method == 'POST':
             d = request.form
-            metodo = d.get('metodosdepicking', 'fifo')
-            picking_json = json.dumps(metodo)
+            metodos = request.form.getlist('metodosdepicking')
+            if not metodos:
+                metodos = ['fifo']
+            picking_json = json.dumps(metodos)
+
+            metodo_default = (d.get('metodo_picking_default') or '').strip().lower()
+            if metodo_default not in metodos:
+                metodo_default = metodos[0]
             
             cursor_admin.execute("""
                 UPDATE tenants SET
@@ -716,6 +1018,7 @@ def parametros_editar(tenant_id):
                     email = %s,
                     nombredelalmacen = %s,
                     metodosdepicking = %s,
+                    metodo_picking_default = %s,
                     bajostock = %s,
                     dias_filtro_fechas = %s,
                     proveedor_api_ia = %s,
@@ -733,6 +1036,7 @@ def parametros_editar(tenant_id):
                 d.get('email', ''),
                 d.get('nombredelalmacen', ''),
                 picking_json,
+                metodo_default,
                 float(d.get('bajostock') or 0),
                 int(d.get('dias_filtro_fechas') or 30),
                 d.get('proveedor_api_ia', ''),
@@ -760,6 +1064,7 @@ def parametros_editar(tenant_id):
                 'email': tenant_actual.get('email') or '',
                 'nombredelalmacen': tenant_actual.get('nombredelalmacen') or '',
                 'metodosdepicking': tenant_actual.get('metodosdepicking') or '"fifo"',
+                'metodo_picking_default': tenant_actual.get('metodo_picking_default') or 'libre',
                 'bajostock': tenant_actual.get('bajostock') or 0,
                 'dias_filtro_fechas': tenant_actual.get('dias_filtro_fechas') or 30,
                 'proveedor_api_ia': tenant_actual.get('proveedor_api_ia') or '',

@@ -1,7 +1,7 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, send_file, session
+﻿from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, send_file, session
 from modules.batch_utils import (parse_file, export_csv, export_json, export_xlsx,
                                   plantilla_csv, plantilla_json, plantilla_xlsx,
-                                  int_or_none, bool_col)
+                                  bool_col)
 from modules.db_config import get_db_connection
 
 clientes_bp = Blueprint('clientes', __name__)
@@ -93,7 +93,7 @@ def guardar():
     finally:
         conn.close()
     return redirect(url_for('clientes.listar'))
-# ── Batch ─────────────────────────────────────────────────────────────────────
+# â”€â”€ Batch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 _CAMPOS_EXPORT = ['codigo', 'razonsocial', 'cuit', 'direccion', 'localidad', 'provincia',
                   'telefono', 'email', 'contacto_nombre',
                   'id_ruta', 'nombre_ruta', 'id_transporte_predeterminado', 'nombre_transporte',
@@ -103,8 +103,34 @@ _CAMPOS_IMPORT = ['codigo', 'razonsocial', 'cuit', 'direccion', 'localidad', 'pr
                   'id_ruta', 'id_transporte_predeterminado', 'activo']
 _EJEMPLO_IMPORT = ['CLI001', 'Cliente de Ejemplo S.A.', '20-87654321-0',
                    'Av. Corrientes 1234', 'Buenos Aires', 'Buenos Aires',
-                   '011-5555-6666', 'cliente@ejemplo.com', 'Juan Pérez',
-                   '1', '1', '1']
+                   '011-5555-6666', 'cliente@ejemplo.com', 'Juan PÃ©rez',
+                   'Zona Centro', 'TRA005', '1']
+
+
+def _resolver_ruta(cursor, ref, tenant_id):
+    """Resuelve id_ruta: acepta un ID numérico o el nombre de la ruta."""
+    if not ref:
+        return None
+    if ref.isdigit():
+        return int(ref)
+    cursor.execute(
+        "SELECT id_ruta FROM rutas WHERE nombre_ruta = %s AND (%s IS NULL OR tenant_id = %s)",
+        (ref, tenant_id, tenant_id))
+    row = cursor.fetchone()
+    return row['id_ruta'] if row else None
+
+
+def _resolver_transporte(cursor, ref, tenant_id):
+    """Resuelve id_transporte: acepta un ID numérico o el codigo del transporte."""
+    if not ref:
+        return None
+    if ref.isdigit():
+        return int(ref)
+    cursor.execute(
+        "SELECT id_transporte FROM transportes WHERE codigo = %s AND (%s IS NULL OR tenant_id = %s)",
+        (ref, tenant_id, tenant_id))
+    row = cursor.fetchone()
+    return row['id_transporte'] if row else None
 
 
 @clientes_bp.route('/clientes/importar', methods=['POST'])
@@ -112,27 +138,35 @@ def importar():
     tenant_id = get_tenant_filter()
     file = request.files.get('archivo')
     if not file or not file.filename:
-        return jsonify({'error': 'No se proporcionó archivo'}), 400
+        return jsonify({'error': 'No se proporcionÃ³ archivo'}), 400
     try:
-        rows = parse_file(file)
+        rows = parse_file(file, request.form.get('hoja'))
     except Exception as e:
         return jsonify({'error': f'Error al leer el archivo: {str(e)}'}), 400
 
-    insertados, omitidos, errores = 0, [], []
+    insertados, actualizados, omitidos, errores = 0, 0, [], []
     conn = get_db_connection()
     try:
         for i, row in enumerate(rows, 1):
             codigo = str(row.get('codigo', '') or '').strip()
             razon = str(row.get('razonsocial', '') or '').strip()
             if not codigo or not razon:
-                errores.append({'fila': i, 'codigo': codigo or '(vacío)',
-                                'razon': 'Código y Razón Social son obligatorios'})
+                errores.append({'fila': i, 'codigo': codigo or '(vacÃ­o)',
+                                'razon': 'CÃ³digo y RazÃ³n Social son obligatorios'})
                 continue
             try:
                 with conn.cursor() as cursor:
+                    id_ruta = _resolver_ruta(cursor, str(row.get('id_ruta', '') or '').strip(), tenant_id)
+                    id_transporte = _resolver_transporte(cursor, str(row.get('id_transporte_predeterminado', '') or '').strip(), tenant_id)
                     cursor.execute("SELECT id_cliente FROM clientes WHERE codigo = %s AND (%s IS NULL OR tenant_id = %s)", (codigo, tenant_id, tenant_id))
-                    if cursor.fetchone():
-                        omitidos.append(codigo)
+                    existing = cursor.fetchone()
+                    if existing:
+                        cursor.execute("""
+                            UPDATE clientes
+                            SET id_ruta = %s, id_transporte_predeterminado = %s
+                            WHERE id_cliente = %s
+                        """, (id_ruta, id_transporte, existing['id_cliente']))
+                        actualizados += 1
                         continue
                     cursor.execute("""
                         INSERT INTO clientes
@@ -149,8 +183,8 @@ def importar():
                         str(row.get('telefono', '') or '').strip() or None,
                         str(row.get('email', '') or '').strip() or None,
                         str(row.get('contacto_nombre', '') or '').strip() or None,
-                        int_or_none(row.get('id_ruta')),
-                        int_or_none(row.get('id_transporte_predeterminado')),
+                        id_ruta,
+                        id_transporte,
                         bool_col(row.get('activo', '1')),
                         tenant_id
                     ))
@@ -163,7 +197,8 @@ def importar():
         return jsonify({'error': str(e)}), 500
     finally:
         conn.close()
-    return jsonify({'insertados': insertados, 'omitidos': omitidos, 'errores': errores})
+    return jsonify({'insertados': insertados, 'actualizados': actualizados,
+                    'omitidos': omitidos, 'errores': errores})
 
 
 @clientes_bp.route('/clientes/exportar/<formato>')
@@ -194,7 +229,7 @@ def exportar(formato):
         return export_json(rows, _CAMPOS_EXPORT, 'clientes.json')
     elif formato == 'xlsx':
         return export_xlsx(rows, _CAMPOS_EXPORT, 'clientes.xlsx')
-    return 'Formato no válido', 400
+    return 'Formato no vÃ¡lido', 400
 
 
 @clientes_bp.route('/clientes/plantilla/<formato>')
@@ -205,4 +240,4 @@ def plantilla(formato):
         return plantilla_json(_CAMPOS_IMPORT, _EJEMPLO_IMPORT, 'plantilla_clientes.json')
     elif formato == 'xlsx':
         return plantilla_xlsx(_CAMPOS_IMPORT, _EJEMPLO_IMPORT, 'plantilla_clientes.xlsx')
-    return 'Formato no válido', 400
+    return 'Formato no vÃ¡lido', 400

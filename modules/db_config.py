@@ -7,6 +7,7 @@ load_dotenv()
 
 _cached_config = None
 _db_engine = None
+_intercambio_config_cache = None
 
 
 def _get_env(key, default=''):
@@ -126,10 +127,90 @@ def get_db_config():
 
 
 def clear_config_cache():
-    global _cached_config, _db_engine
+    global _cached_config, _db_engine, _intercambio_config_cache
     _cached_config = None
     _db_engine = None
+    _intercambio_config_cache = None
     set_engine('mysql')
+
+
+def get_intercambio_config():
+    """Configuracion de la base de intercambio (taurus_intercambio).
+
+    Lee las claves INTERCAMBIO_* de la tabla configuracion de taurus_admin;
+    si faltan, usa el fallback de variables de entorno DB_INTERCAMBIO_*.
+    """
+    global _intercambio_config_cache
+    if _intercambio_config_cache is not None:
+        return _intercambio_config_cache.copy()
+
+    config = {
+        'INTERCAMBIO_HOST':      _get_env('DB_INTERCAMBIO_HOST', 'localhost'),
+        'INTERCAMBIO_PORT':      _get_env('DB_INTERCAMBIO_PORT', '3306'),
+        'INTERCAMBIO_NAME':      _get_env('DB_INTERCAMBIO_NAME', 'taurus_intercambio'),
+        'INTERCAMBIO_USER':      _get_env('DB_INTERCAMBIO_USER', 'taurus'),
+        'INTERCAMBIO_PASSWORD':  _get_env('DB_INTERCAMBIO_PASSWORD', 'Taurus_2001'),
+        'INTERCAMBIO_CHAR_SET':  _get_env('DB_INTERCAMBIO_CHAR_SET', 'utf8mb4'),
+        'INTERCAMBIO_ENGINE':    _get_env('DB_INTERCAMBIO_ENGINE', 'mysql'),
+    }
+
+    try:
+        conn = _get_admin_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT clave, valor FROM configuracion WHERE clave LIKE 'INTERCAMBIO%'")
+            rows = cursor.fetchall()
+            cursor.close()
+        finally:
+            conn.close()
+        for row in rows:
+            clave = row['clave']
+            valor = row['valor']
+            if clave in config and valor is not None:
+                config[clave] = str(valor)
+    except Exception:
+        pass
+
+    _intercambio_config_cache = config
+    return config.copy()
+
+
+def get_intercambio_connection():
+    engine = get_intercambio_config().get('INTERCAMBIO_ENGINE', 'mysql').strip().lower()
+    driver = _get_driver_for_engine(engine)
+    config = get_intercambio_config()
+
+    if engine == 'sqlite':
+        conn = driver.connect(config['INTERCAMBIO_NAME'])
+        conn.row_factory = driver.Row
+        return conn
+
+    connect_kwargs = dict(
+        host=config['INTERCAMBIO_HOST'],
+        user=config['INTERCAMBIO_USER'],
+        password=config['INTERCAMBIO_PASSWORD'],
+        database=config['INTERCAMBIO_NAME'],
+        port=int(config.get('INTERCAMBIO_PORT', 3306)),
+    )
+    if engine == 'mysql':
+        connect_kwargs['charset'] = config.get('INTERCAMBIO_CHAR_SET', 'utf8mb4')
+        connect_kwargs['cursorclass'] = driver.cursors.DictCursor
+    elif engine == 'postgresql':
+        connect_kwargs['options'] = f"-c client_encoding={config.get('INTERCAMBIO_CHAR_SET', 'UTF8')}"
+        from psycopg2.extras import RealDictCursor
+        connect_kwargs['cursor_factory'] = RealDictCursor
+    elif engine == 'sqlserver':
+        connect_kwargs = dict(
+            server=config['INTERCAMBIO_HOST'],
+            user=config['INTERCAMBIO_USER'],
+            password=config['INTERCAMBIO_PASSWORD'],
+            database=config['INTERCAMBIO_NAME'],
+        )
+        port = config.get('INTERCAMBIO_PORT', '1433')
+        if port:
+            connect_kwargs['port'] = int(port)
+
+    return driver.connect(**connect_kwargs)
 
 
 def get_db_connection():

@@ -119,12 +119,45 @@
                                     <input type="text" class="form-control" name="nombredelalmacen" value="{{ param.nombredelalmacen or '' }}">
                                 </div>
                                 <div class="col-md-4 mb-3">
-                                    <label class="form-label">Método de Picking</label>
-                                    <select class="form-select" name="metodosdepicking">
-                                        <option value="fifo" {% if 'fifo' in (param.metodosdepicking or '') %}selected{% endif %}>FIFO</option>
-                                        <option value="lifo" {% if 'lifo' in (param.metodosdepicking or '') %}selected{% endif %}>LIFO</option>
-                                        <option value="fefo" {% if 'fefo' in (param.metodosdepicking or '') %}selected{% endif %}>FEFO</option>
-                                    </select>
+                                    <label class="form-label">Métodos de Picking habilitados</label>
+                                    <div class="d-flex flex-column gap-1">
+                                        <div class="form-check d-flex justify-content-between align-items-center pe-1">
+                                            <div>
+                                                <input class="form-check-input" type="checkbox" name="metodosdepicking" value="fifo" id="mk-fifo" {% if 'fifo' in (param.metodosdepicking or '') %}checked{% endif %}>
+                                                <label class="form-check-label" for="mk-fifo">FIFO</label>
+                                            </div>
+                                            <label class="form-check-label mb-0 small text-secondary" title="Usar como método por defecto">
+                                                <input class="form-check-input" type="radio" name="metodo_picking_default" value="fifo" id="mk-default-fifo" {% if (param.metodo_picking_default or 'libre') == 'fifo' %}checked{% endif %}> Def.
+                                            </label>
+                                        </div>
+                                        <div class="form-check d-flex justify-content-between align-items-center pe-1">
+                                            <div>
+                                                <input class="form-check-input" type="checkbox" name="metodosdepicking" value="lifo" id="mk-lifo" {% if 'lifo' in (param.metodosdepicking or '') %}checked{% endif %}>
+                                                <label class="form-check-label" for="mk-lifo">LIFO</label>
+                                            </div>
+                                            <label class="form-check-label mb-0 small text-secondary" title="Usar como método por defecto">
+                                                <input class="form-check-input" type="radio" name="metodo_picking_default" value="lifo" id="mk-default-lifo" {% if (param.metodo_picking_default or 'libre') == 'lifo' %}checked{% endif %}> Def.
+                                            </label>
+                                        </div>
+                                        <div class="form-check d-flex justify-content-between align-items-center pe-1">
+                                            <div>
+                                                <input class="form-check-input" type="checkbox" name="metodosdepicking" value="fefo" id="mk-fefo" {% if 'fefo' in (param.metodosdepicking or '') %}checked{% endif %}>
+                                                <label class="form-check-label" for="mk-fefo">FEFO</label>
+                                            </div>
+                                            <label class="form-check-label mb-0 small text-secondary" title="Usar como método por defecto">
+                                                <input class="form-check-input" type="radio" name="metodo_picking_default" value="fefo" id="mk-default-fefo" {% if (param.metodo_picking_default or 'libre') == 'fefo' %}checked{% endif %}> Def.
+                                            </label>
+                                        </div>
+                                        <div class="form-check d-flex justify-content-between align-items-center pe-1">
+                                            <div>
+                                                <input class="form-check-input" type="checkbox" name="metodosdepicking" value="libre" id="mk-libre" {% if 'libre' in (param.metodosdepicking or '') %}checked{% endif %}>
+                                                <label class="form-check-label" for="mk-libre">Picking Libre</label>
+                                            </div>
+                                            <label class="form-check-label mb-0 small text-secondary" title="Usar como método por defecto">
+                                                <input class="form-check-input" type="radio" name="metodo_picking_default" value="libre" id="mk-default-libre" {% if (param.metodo_picking_default or 'libre') == 'libre' %}checked{% endif %}> Def.
+                                            </label>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="col-md-4 mb-3">
                                     <label class="form-label">Bajo Stock (umbral mínimo)</label>
@@ -186,6 +219,24 @@
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        function sincronizarMetodosPicking() {
+            var cbs = document.querySelectorAll('input[name="metodosdepicking"]');
+            var radios = document.querySelectorAll('input[name="metodo_picking_default"]');
+            var activo = null;
+            radios.forEach(function(r) { if (r.checked) activo = r.value; });
+            var enabled = [];
+            cbs.forEach(function(cb) { if (cb.checked) enabled.push(cb.value); });
+            radios.forEach(function(r) { r.disabled = enabled.indexOf(r.value) === -1; });
+            if (enabled.indexOf(activo) === -1) {
+                radios.forEach(function(r) { r.checked = (r.value === enabled[0]); });
+                if (!enabled.length) radios.forEach(function(r) { r.checked = false; });
+            }
+        }
+        document.querySelectorAll('input[name="metodosdepicking"]').forEach(function(cb) {
+            cb.addEventListener('change', sincronizarMetodosPicking);
+        });
+        sincronizarMetodosPicking();
+
         function formatCuit(input) {
             let value = input.value.replace(/[^0-9]/g, '');
             if (value.length > 2 && value.length <= 10) {

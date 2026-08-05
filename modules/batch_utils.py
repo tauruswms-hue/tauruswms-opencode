@@ -9,15 +9,19 @@ from flask import send_file
 
 # ── Parsers ──────────────────────────────────────────────────────────────────
 
-def parse_file(file):
-    """Parsea un archivo CSV, JSON o XLSX y retorna lista de dicts con claves en minúscula."""
+def parse_file(file, hoja=None):
+    """Parsea un archivo CSV, JSON o XLSX y retorna lista de dicts con claves en minúscula.
+
+    `hoja` (solo XLSX): nombre de la pestaña a leer. Si no se indica, se usa la
+    pestaña activa (la primera). Si el archivo tiene una sola pestaña, se asume esa.
+    """
     name = file.filename.lower()
     if name.endswith('.csv'):
         return _parse_csv(file)
     elif name.endswith('.json'):
         return _parse_json(file)
     elif name.endswith('.xlsx'):
-        return _parse_xlsx(file)
+        return _parse_xlsx(file, hoja)
     raise ValueError('Formato no soportado. Use CSV, JSON o XLSX')
 
 
@@ -34,9 +38,28 @@ def _parse_json(file):
     return [{k.lower(): v for k, v in row.items()} for row in data]
 
 
-def _parse_xlsx(file):
+def xlsx_sheetnames(file):
+    """Retorna la lista de nombres de pestañas de un archivo XLSX."""
+    file.seek(0)
+    wb = openpyxl.load_workbook(file, read_only=True)
+    try:
+        return list(wb.sheetnames)
+    finally:
+        wb.close()
+        file.seek(0)
+
+
+def _parse_xlsx(file, hoja=None):
     wb = openpyxl.load_workbook(file, read_only=True, data_only=True)
-    ws = wb.active
+    if hoja:
+        if hoja not in wb.sheetnames:
+            raise ValueError(
+                f'La hoja "{hoja}" no existe en el archivo. '
+                f'Hojas disponibles: {", ".join(wb.sheetnames)}'
+            )
+        ws = wb[hoja]
+    else:
+        ws = wb.active
     rows = list(ws.iter_rows(values_only=True))
     if not rows:
         return []

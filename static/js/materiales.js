@@ -19,12 +19,10 @@ function validarEAN(barcode) {
 
 $(document).ready(function() {
     $('#tablaMateriales').DataTable({
-        "scrollY": "calc(100vh - 390px)",
+        "paging": false,                    // todas las filas en el cuerpo; el scroll lo maneja la grilla
+        "scrollY": "calc(100vh - 300px)",
         "scrollX": true,
         "scrollCollapse": true,
-        "pageLength": 25,
-        "lengthMenu": [[10, 25, 50, 100], [10, 25, 50, 100]],
-        "pagingType": "full_numbers",
         "language": {
             sProcessing:   "Procesando...",
             sLengthMenu:   "Mostrar _MENU_ registros",
@@ -255,6 +253,14 @@ function openModal() {
     $('#listaProveedoresCuerpo').empty();
     $('#listaPresentacionesCuerpo').empty();
     $('#modalTitle').text('Nuevo Material');
+    var $selMetodo = $('#form_metodo_picking');
+    if ($selMetodo.length) {
+        var valorDefault = typeof metodoPickingDefault !== 'undefined' && metodoPickingDefault ? metodoPickingDefault : 'libre';
+        if (!$selMetodo.find('option[value="' + valorDefault + '"]').length) {
+            valorDefault = $selMetodo.find('option').first().val();
+        }
+        $selMetodo.val(valorDefault);
+    }
     agregarFilaProveedor();
     $('#modalMateriales').css('display', 'flex').hide().fadeIn(150);
 }
@@ -277,6 +283,11 @@ function editMaterial(data) {
     $('#form_peso_bruto').val(data.peso_bruto || '');
     $('#form_peso_neto').val(data.peso_neto || '');
     $('input[name="trazabilidad"][value="' + (data.trazabilidad || 'ninguna') + '"]').prop('checked', true);
+    var $selMetodo = $('#form_metodo_picking');
+    if ($selMetodo.length) {
+        $selMetodo.val(data.metodo_picking || 'libre');
+        if (!$selMetodo.val()) $selMetodo.val($selMetodo.find('option').first().val());
+    }
 
     let misProvs = relacionesExistentes.filter(r => r.id_material == data.id);
 

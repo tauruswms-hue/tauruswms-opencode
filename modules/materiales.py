@@ -5,11 +5,62 @@ import json
 import io
 from dotenv import load_dotenv
 import openpyxl
-from modules.db_config import get_db_connection
+from modules.db_config import get_db_connection, _get_admin_connection
 from modules.sql_dialect import cast_as_char, execute_insert
 
 load_dotenv()
 materiales_bp = Blueprint('materiales', __name__)
+
+PICKING_METODOS_LABELS = {
+    'fifo': 'FIFO (Primero en entrar, primero en salir)',
+    'lifo': 'LIFO (Último en entrar, primero en salir)',
+    'fefo': 'FEFO (Próximo a vencer)',
+    'libre': 'Picking Libre',
+}
+
+
+def _get_picking_metodos(tenant_id):
+    """Devuelve la lista de métodos de picking habilitados para el tenant."""
+    if not tenant_id:
+        return list(PICKING_METODOS_LABELS.keys())
+    conn = _get_admin_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT metodosdepicking FROM tenants WHERE id = %s", (tenant_id,))
+            row = cursor.fetchone()
+    finally:
+        conn.close()
+    if not row or not row.get('metodosdepicking'):
+        return list(PICKING_METODOS_LABELS.keys())
+    try:
+        metodos = json.loads(row['metodosdepicking'])
+    except Exception:
+        metodos = row['metodosdepicking']
+    if isinstance(metodos, str):
+        metodos = [metodos]
+    metodos = [m for m in metodos if m in PICKING_METODOS_LABELS]
+    return metodos or list(PICKING_METODOS_LABELS.keys())
+
+
+def _get_picking_metodo_default(tenant_id):
+    """Devuelve el método de picking por defecto configurado para el tenant."""
+    if not tenant_id:
+        return 'libre'
+    conn = _get_admin_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT metodo_picking_default FROM tenants WHERE id = %s", (tenant_id,))
+            row = cursor.fetchone()
+    finally:
+        conn.close()
+    default = (row.get('metodo_picking_default') or 'libre') if row else 'libre'
+    return default if default in PICKING_METODOS_LABELS else 'libre'
+
+
+def _metodo_picking_valido(metodo, default='libre'):
+    if metodo in PICKING_METODOS_LABELS:
+        return metodo
+    return default if default in PICKING_METODOS_LABELS else 'libre'
 
 
 def validar_ean(barcode):
@@ -100,7 +151,10 @@ def listar():
                                proveedores=proveedores,
                                relaciones=relaciones,
                                presentaciones=presentaciones,
-                               unidades=unidades)
+                               unidades=unidades,
+                               picking_metodos=[{'value': m, 'label': PICKING_METODOS_LABELS[m]} for m in _get_picking_metodos(tenant_id)],
+                               picking_metodo_default=_get_picking_metodo_default(tenant_id),
+                               picking_labels=PICKING_METODOS_LABELS)
     finally:
         conn.close()
 
@@ -147,26 +201,31 @@ def guardar():
             peso_neto = float(d.get('peso_neto') or 0) or None
             categoria_id = int(d.get('categoria_id') or 0) or None
             unidad_id = int(d.get('unidad_medida_id') or 0) or None
+            metodo_picking = _metodo_picking_valido((d.get('metodo_picking') or '').strip().lower(),
+                                                    _get_picking_metodo_default(tenant_id))
 
             if m_id:
                 cursor.execute("""
                     UPDATE materiales SET
                         codigo = %s, nombre = %s, descripcion = %s, codigo_barras = %s,
                         categoria_id = %s, stock_minimo = %s, stock_maximo = %s,
-                        unidad_medida_id = %s, trazabilidad = %s, peso_bruto = %s, peso_neto = %s
+                        unidad_medida_id = %s, trazabilidad = %s, metodo_picking = %s,
+                        peso_bruto = %s, peso_neto = %s
                     WHERE id = %s AND (%s IS NULL OR tenant_id = %s)
                 """, (d.get('codigo'), d.get('nombre'), d.get('descripcion') or '', 
                       barcode or None, categoria_id, stock_min, stock_max,
-                      unidad_id, trazabilidad, peso_bruto, peso_neto, m_id, tenant_id, tenant_id))
+                      unidad_id, trazabilidad, metodo_picking, peso_bruto, peso_neto,
+                      m_id, tenant_id, tenant_id))
                 current_id = int(m_id)
             else:
                 current_id = execute_insert(cursor, """
                     INSERT INTO materiales (codigo, nombre, descripcion, codigo_barras, categoria_id,
-                        stock_minimo, stock_maximo, unidad_medida_id, trazabilidad, peso_bruto, peso_neto, tenant_id)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        stock_minimo, stock_maximo, unidad_medida_id, trazabilidad, metodo_picking,
+                        peso_bruto, peso_neto, tenant_id)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """, (d.get('codigo'), d.get('nombre'), d.get('descripcion') or '', 
                       barcode or None, categoria_id, stock_min, stock_max,
-                      unidad_id, trazabilidad, peso_bruto, peso_neto, tenant_id))
+                      unidad_id, trazabilidad, metodo_picking, peso_bruto, peso_neto, tenant_id))
 
             cursor.execute("DELETE FROM material_proveedor WHERE id_material = %s AND (%s IS NULL OR tenant_id = %s)", (current_id, tenant_id, tenant_id))
             for i, prov_id in enumerate(prov_ids):
@@ -213,9 +272,17 @@ def _parse_json(file):
     return [{k.lower(): v for k, v in row.items()} for row in data]
 
 
-def _parse_xlsx(file):
+def _parse_xlsx(file, hoja=None):
     wb = openpyxl.load_workbook(file, read_only=True, data_only=True)
-    ws = wb.active
+    if hoja:
+        if hoja not in wb.sheetnames:
+            raise ValueError(
+                f'La hoja "{hoja}" no existe en el archivo. '
+                f'Hojas disponibles: {", ".join(wb.sheetnames)}'
+            )
+        ws = wb[hoja]
+    else:
+        ws = wb.active
     rows = list(ws.iter_rows(values_only=True))
     if not rows:
         return []
@@ -245,7 +312,7 @@ def importar():
         elif filename.endswith('.json'):
             rows = _parse_json(file)
         elif filename.endswith('.xlsx'):
-            rows = _parse_xlsx(file)
+            rows = _parse_xlsx(file, request.form.get('hoja'))
         else:
             return jsonify({'error': 'Formato no soportado. Use CSV, JSON o XLSX'}), 400
     except Exception as e:
@@ -254,6 +321,8 @@ def importar():
     insertados = 0
     omitidos = []
     errores = []
+
+    metodo_default = _get_picking_metodo_default(tenant_id)
 
     conn = get_db_connection()
     try:
@@ -282,6 +351,9 @@ def importar():
                     if traz not in ('lote', 'serie', 'ninguna'):
                         traz = 'ninguna'
 
+                    metodo_picking = _metodo_picking_valido(str(row.get('metodo_picking', '') or '').strip().lower(),
+                                                            metodo_default)
+
                     barcode_import = str(row.get('codigo_barras', '') or '').strip()
                     valido_cb, error_cb = validar_ean(barcode_import)
                     if not valido_cb:
@@ -298,9 +370,10 @@ def importar():
                         INSERT INTO materiales
                             (codigo, nombre, descripcion, codigo_barras,
                              categoria_id, stock_minimo, stock_maximo,
-                             unidad_medida_id, trazabilidad, peso_bruto, peso_neto,
+                             unidad_medida_id, trazabilidad, metodo_picking,
+                             peso_bruto, peso_neto,
                              tenant_id)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """, (
                         codigo,
                         nombre,
@@ -311,6 +384,7 @@ def importar():
                         _float_or_zero(row.get('stock_maximo')),
                         _int_or_none(row.get('unidad_medida_id')),
                         traz,
+                        metodo_picking,
                         _float_or_zero(row.get('peso_bruto')) or None,
                         _float_or_zero(row.get('peso_neto')) or None,
                         tenant_id,
@@ -344,7 +418,7 @@ def exportar(formato):
     tenant_id = get_tenant_filter()
     CAMPOS = ['codigo', 'nombre', 'descripcion', 'codigo_barras',
               'categoria_id', 'categoria_nombre', 'stock_minimo', 'stock_maximo',
-              'unidad_medida_id', 'unidad_medida_nombre', 'trazabilidad',
+              'unidad_medida_id', 'unidad_medida_nombre', 'trazabilidad', 'metodo_picking',
               'peso_bruto', 'peso_neto',
               'id_proveedor_habitual', 'proveedor_habitual_nombre', 'codigo_referencia_prov']
 
@@ -356,6 +430,7 @@ def exportar(formato):
                        m.categoria_id, c.nombre AS categoria_nombre,
                        m.stock_minimo, m.stock_maximo,
                        m.unidad_medida_id, u.nombre AS unidad_medida_nombre, m.trazabilidad,
+                       m.metodo_picking,
                        m.peso_bruto, m.peso_neto,
                        mp.id_proveedor AS id_proveedor_habitual,
                        p.razonsocial AS proveedor_habitual_nombre,
@@ -426,9 +501,9 @@ def plantilla(formato):
     tenant_id = get_tenant_filter()
     HEADERS = ['codigo', 'nombre', 'descripcion', 'codigo_barras',
                'categoria_id', 'stock_minimo', 'stock_maximo', 'unidad_medida_id', 'trazabilidad',
-               'peso_bruto', 'peso_neto', 'id_proveedor_habitual', 'codigo_referencia_prov']
+               'metodo_picking', 'peso_bruto', 'peso_neto', 'id_proveedor_habitual', 'codigo_referencia_prov']
     EJEMPLO = ['MAT001', 'Ejemplo Material', 'Descripción opcional', '',
-                '1', '0.00', '100.00', '1', 'ninguna', '0.500', '0.450', '1', 'REF-PROV-001']
+                '1', '0.00', '100.00', '1', 'ninguna', 'libre', '0.500', '0.450', '1', 'REF-PROV-001']
 
     # Obtener categorias, unidades y proveedores
     conn = get_db_connection()

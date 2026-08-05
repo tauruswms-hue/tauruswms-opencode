@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, send_file, session
+﻿from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, send_file, session
 from modules.db_config import get_db_connection
 from modules.batch_utils import (parse_file, export_csv, export_json, export_xlsx,
                                  plantilla_csv, plantilla_json, plantilla_xlsx)
@@ -40,7 +40,7 @@ def guardar():
                 cursor.execute(sql, (d.get('codigo'), d.get('nombre'), d.get('descripcion'), 1 if d.get('activo') else 0, tenant_id))
 
             conn.commit()
-            flash("Categoría guardada con éxito", "success")
+            flash("CategorÃ­a guardada con Ã©xito", "success")
     except Exception as e:
         conn.rollback()
         flash(f"Error: {str(e)}", "danger")
@@ -57,15 +57,15 @@ def eliminar(id):
         with conn.cursor() as cursor:
             cursor.execute("UPDATE categorias SET activo = 0 WHERE id_categoria = %s AND (%s IS NULL OR tenant_id = %s)", (id, tenant_id, tenant_id))
             conn.commit()
-            flash("Categoría inactivada", "success")
+            flash("CategorÃ­a inactivada", "success")
     finally:
         conn.close()
     return redirect(url_for('categorias.listar'))
 
 
-# ── Batch ─────────────────────────────────────────────────────────────────────
+# â”€â”€ Batch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 _CAMPOS = ['codigo', 'nombre', 'descripcion', 'activo']
-_EJEMPLO = ['CAT001', 'Novelas', 'Libros de ficción y narrativa', '1']
+_EJEMPLO = ['CAT001', 'Novelas', 'Libros de ficciÃ³n y narrativa', '1']
 
 
 @categorias_bp.route('/categorias/importar', methods=['POST'])
@@ -73,9 +73,9 @@ def importar():
     tenant_id = get_tenant_filter()
     file = request.files.get('archivo')
     if not file or not file.filename:
-        return jsonify({'error': 'No se proporcionó archivo'}), 400
+        return jsonify({'error': 'No se proporcionÃ³ archivo'}), 400
     try:
-        rows = parse_file(file)
+        rows = parse_file(file, request.form.get('hoja'))
     except Exception as e:
         return jsonify({'error': f'Error al leer el archivo: {str(e)}'}), 400
 
@@ -86,7 +86,7 @@ def importar():
             codigo = str(row.get('codigo', '') or '').strip()
             nombre = str(row.get('nombre', '') or '').strip()
             if not codigo or not nombre:
-                errores.append({'fila': i, 'codigo': codigo or '(vacío)', 'razon': 'Código y Nombre son obligatorios'})
+                errores.append({'fila': i, 'codigo': codigo or '(vacÃ­o)', 'razon': 'CÃ³digo y Nombre son obligatorios'})
                 continue
             try:
                 with conn.cursor() as cursor:
@@ -94,7 +94,7 @@ def importar():
                     if cursor.fetchone():
                         omitidos.append(codigo)
                         continue
-                    activo = 1 if str(row.get('activo', '1')).strip().lower() in ('1', 'true', 'si', 'sí', 'yes') else 0
+                    activo = 1 if str(row.get('activo', '1')).strip().lower() in ('1', 'true', 'si', 'sÃ­', 'yes') else 0
                     cursor.execute("""
                         INSERT INTO categorias (codigo, nombre, descripcion, activo, tenant_id)
                         VALUES (%s, %s, %s, %s, %s)
@@ -139,7 +139,7 @@ def exportar(formato):
         return export_json(rows, _CAMPOS, 'categorias.json')
     elif formato == 'xlsx':
         return export_xlsx(rows, _CAMPOS, 'categorias.xlsx')
-    return 'Formato no válido', 400
+    return 'Formato no vÃ¡lido', 400
 
 
 @categorias_bp.route('/categorias/plantilla/<formato>')
@@ -150,4 +150,4 @@ def plantilla(formato):
         return plantilla_json(_CAMPOS, _EJEMPLO, 'plantilla_categorias.json')
     elif formato == 'xlsx':
         return plantilla_xlsx(_CAMPOS, _EJEMPLO, 'plantilla_categorias.xlsx')
-    return 'Formato no válido', 400
+    return 'Formato no vÃ¡lido', 400

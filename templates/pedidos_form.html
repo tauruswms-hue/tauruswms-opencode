@@ -109,7 +109,7 @@
                     <input type="text" name="direccion_entrega" id="log_direccion" value="{{ pedido.direccion_entrega if edit_mode else '' }}" style="width:100%; padding:8px;">
                 </div>
                 <div>
-                    <label style="display:block; font-weight:bold; margin-bottom:5px;">Ruta / Zona</label>
+                    <label style="display:block; font-weight:bold; margin-bottom:5px;">Ruta</label>
                     <select name="id_ruta" id="log_id_ruta" style="width:100%; padding:8px;">
                         <option value="">-- Seleccionar --</option>
                         {% for r in rutas %}
@@ -164,33 +164,41 @@
     const transportesMuelles = {{ transportes_muelles | tojson if not edit_mode else '{}' }};
 
     $(document).ready(function() {
+        // El combo de transporte siempre muestra todos los transportes;
+        // al elegir ruta se preselecciona el transporte configurado (si existe)
+        function transporteConfiguradoDeRuta(idRuta) {
+            if (!idRuta) return '';
+            const match = relTranspRutas.find(r => r.id_ruta == idRuta);
+            return match ? match.id_transporte : '';
+        }
+
+        function poblarTransportes(preSeleccion) {
+            const $comboT = $('#log_id_transporte');
+            $comboT.empty().append('<option value="">-- Seleccionar --</option>');
+            transportesDB.forEach(t => {
+                $comboT.append(`<option value="${t.id_transporte}">${t.razonsocial}</option>`);
+            });
+            $comboT.val(preSeleccion || '');
+        }
+
         // Lógica de cambio de cliente
         $('#select_cliente').on('change', function() {
             const opt = $(this).find('option:selected');
             if(!opt.val()) return;
 
-            // Solo auto-completar si NO estamos editando o si el usuario cambia el cliente manualmente
             $('#log_direccion').val(opt.data('direccion'));
-            $('#log_id_ruta').val(opt.data('ruta')).trigger('change');
+            const idRuta = opt.data('ruta') || '';
+            $('#log_id_ruta').val(idRuta);
 
-            setTimeout(() => {
-                $('#log_id_transporte').val(opt.data('transporte'));
-            }, 50);
+            // Prioridad: transporte predeterminado del cliente; si no, el de la ruta
+            let transporte = opt.data('transporte');
+            if (!transporte) transporte = transporteConfiguradoDeRuta(idRuta);
+            poblarTransportes(transporte);
         });
 
-        // Filtrado de transportes por ruta
+        // Al elegir ruta: preseleccionar su transporte configurado (si lo tiene)
         $('#log_id_ruta').on('change', function() {
-            const idRuta = $(this).val();
-            const $comboT = $('#log_id_transporte');
-            $comboT.empty().append('<option value="">-- Seleccionar --</option>');
-
-            const validos = relTranspRutas.filter(r => r.id_ruta == idRuta).map(r => r.id_transporte);
-
-            transportesDB.forEach(t => {
-                if(validos.includes(t.id_transporte)) {
-                    $comboT.append(`<option value="${t.id_transporte}">${t.razonsocial}</option>`);
-                }
-            });
+            poblarTransportes(transporteConfiguradoDeRuta($(this).val()));
         });
 
         // Carga inicial
@@ -199,14 +207,14 @@
             detalleExistente.forEach(item => {
                 agregarFila(item.id_material, item.cantidad, item.tipo_stock || 'Libre Venta');
             });
-            // Disparar el filtro de transporte para que se vea el actual
-            $('#log_id_ruta').trigger('change');
-            setTimeout(() => {
-                $('#log_id_transporte').val("{{ pedido.id_transporte if edit_mode else '' }}");
-            }, 50);
+            // Mostrar el transporte guardado del pedido, o el configurado de su ruta
+            const idRutaGuardada = {{ pedido.id_ruta|tojson if edit_mode else 'null' }};
+            const idTranspGuardado = {{ pedido.id_transporte|tojson if edit_mode else 'null' }};
+            poblarTransportes(idTranspGuardado || transporteConfiguradoDeRuta(idRutaGuardada));
         } else {
-            // Si es nuevo, una fila vacía
+            // Si es nuevo, una fila vacía y todos los transportes disponibles
             agregarFila();
+            poblarTransportes('');
         }
     });
 

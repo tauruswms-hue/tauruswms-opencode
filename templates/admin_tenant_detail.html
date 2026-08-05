@@ -230,9 +230,9 @@
                         <div class="mb-2">
                             <label class="form-label">Rol *</label>
                             <select name="rol" id="usuarioRol" class="form-select" required>
-                                <option value="OPERADOR">OPERADOR</option>
-                                <option value="ADMIN">ADMIN</option>
-                                <option value="CONSULTA">CONSULTA</option>
+                                {% for rol in roles %}
+                                <option value="{{ rol.nombre }}">{{ rol.nombre }}</option>
+                                {% endfor %}
                             </select>
                         </div>
                         <div class="mb-2">

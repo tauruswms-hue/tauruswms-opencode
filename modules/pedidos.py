@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session, current_app, Response
+﻿from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session, current_app, Response
 from datetime import datetime, date
 from decimal import Decimal
 from collections import defaultdict, OrderedDict
@@ -15,7 +15,7 @@ def get_tenant_filter():
     return session.get('tenant_id')
 
 
-# --- LISTADO Y CONSOLA DE GESTIÓN ---
+# --- LISTADO Y CONSOLA DE GESTIÃ“N ---
 @pedidos_bp.route('/pedidos')
 def listar():
     tenant_id = get_tenant_filter()
@@ -217,7 +217,7 @@ def guardar():
                     ts = tipos_stock[i] if i < len(tipos_stock) else 'Libre Venta'
                     cursor.execute(sql_det, (id_pedido, items[i], cantidades[i], ts or 'Libre Venta', tenant_id))
 
-            # --- OMC AUTOMÁTICA con todos los contenedores (solo pedidos nuevos) ---
+            # --- OMC AUTOMÃTICA con todos los contenedores (solo pedidos nuevos) ---
             if not d.get('id_pedido'):
                 contenedores = [c.strip().upper() for c in request.form.getlist('contenedores[]') if c.strip()]
                 ahora   = datetime.now()
@@ -237,7 +237,7 @@ def guardar():
                 contenedores_validos = []
                 for contenedor in contenedores:
                     if not muelle_id:
-                        flash(f"Contenedor {contenedor}: sin OMC — el transporte no tiene muelle de salida.", "warning")
+                        flash(f"Contenedor {contenedor}: sin OMC â€” el transporte no tiene muelle de salida.", "warning")
                         continue
 
                     cursor.execute(f"""
@@ -256,7 +256,7 @@ def guardar():
                     row_sc = cursor.fetchone()
 
                     if not row_sc:
-                        flash(f"Contenedor {contenedor}: sin OMC — sin stock disponible en ubicación de picking o con movimientos pendientes.", "warning")
+                        flash(f"Contenedor {contenedor}: sin OMC â€” sin stock disponible en ubicaciÃ³n de picking o con movimientos pendientes.", "warning")
                         continue
 
                     id_origen = row_sc['Ubicacion']
@@ -275,7 +275,7 @@ def guardar():
                     contenedores_validos.append({'contenedor': contenedor, 'id_origen': id_origen})
 
                 if contenedores_validos:
-                    # Generar UN SOLO número OMC para todos los contenedores
+                    # Generar UN SOLO nÃºmero OMC para todos los contenedores
                     expr_omc = cast_as_int(substring_index("numero", "-", -1))
                     cursor.execute(
                         f"SELECT MAX({expr_omc}) AS max_seq "
@@ -339,7 +339,7 @@ def guardar():
                 else:
                     flash(f"Pedido {nro_pedido} guardado.", "success")
             else:
-                flash("Pedido guardado con éxito.", "success")
+                flash("Pedido guardado con Ã©xito.", "success")
 
             conn.commit()
     except Exception as e:
@@ -363,7 +363,7 @@ def eliminar(id_pedido):
                 conn.commit()
                 flash("Pedido anulado.", "success")
             else:
-                flash("No se puede anular un pedido que no está pendiente.", "warning")
+                flash("No se puede anular un pedido que no estÃ¡ pendiente.", "warning")
     finally:
         conn.close()
     return redirect(url_for('pedidos.listar'))
@@ -448,7 +448,7 @@ def verificar_stock_masivo():
                     'cantidad':   float(r['cantidad'])
                 })
 
-            # Construir líneas del informe
+            # Construir lÃ­neas del informe
             lineas = []
             for (mid, ts), t in totales.items():
                 st = stock_map.get((mid, ts), {'stock_disponible': 0.0, 'stock_entrando': 0.0})
@@ -644,7 +644,7 @@ def buscar_contenedores():
 
 
 # ============================================================================
-# AJAX: Filtros en cascada para selección de contenedores
+# AJAX: Filtros en cascada para selecciÃ³n de contenedores
 # ============================================================================
 @pedidos_bp.route('/pedidos/filtros/zonas')
 def filtros_zonas():
@@ -763,7 +763,7 @@ def filtros_contenedores():
 
 
 # ============================================================================
-# AJAX: Stock de un contenedor en ubicación de picking (para auto-rellenar materiales)
+# AJAX: Stock de un contenedor en ubicaciÃ³n de picking (para auto-rellenar materiales)
 # ============================================================================
 @pedidos_bp.route('/pedidos/contenedor_stock')
 def contenedor_stock():
@@ -809,7 +809,7 @@ def contenedor_stock():
 
 
 # ============================================================================
-# GENERACIÓN DE JSON DE PICKING
+# GENERACIÃ“N DE JSON DE PICKING
 # ============================================================================
 def _picking_serial(obj):
     """Serializador para tipos no serializables por defecto en JSON."""
@@ -840,7 +840,7 @@ def picking_json():
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            # ── 1. Cabecera de pedidos ────────────────────────────────────
+            # â”€â”€ 1. Cabecera de pedidos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             cursor.execute(f"""
                 SELECT p.id_pedido, p.nro_pedido, p.fecha_pedido, p.estado,
                        p.direccion_entrega, p.observaciones,
@@ -860,7 +860,7 @@ def picking_json():
             """, tuple(ids) + (tenant_id, tenant_id))
             pedidos_cab = cursor.fetchall()
 
-            # ── 2. Detalle de pedidos ─────────────────────────────────────
+            # â”€â”€ 2. Detalle de pedidos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             cursor.execute(f"""
                 SELECT d.id_pedido, d.id_material, d.cantidad, d.tipo_stock,
                        m.codigo AS material_codigo, m.nombre AS material_nombre,
@@ -900,7 +900,7 @@ def picking_json():
         if material_ids:
             ph2 = ','.join(['%s'] * len(material_ids))
             with conn.cursor() as cursor:
-                # ── 3. Ubicaciones picking con stock de los materiales ────
+                # â”€â”€ 3. Ubicaciones picking con stock de los materiales â”€â”€â”€â”€
                 cursor.execute(f"""
                     SELECT DISTINCT
                            u.id, u.codigo, u.descipcion AS descripcion,
@@ -920,7 +920,7 @@ def picking_json():
                 """, tuple(material_ids) + (tenant_id, tenant_id))
                 ubicaciones_list = [dict(r) for r in cursor.fetchall()]
 
-                # ── 4. Stock en esas ubicaciones para los materiales pedidos
+                # â”€â”€ 4. Stock en esas ubicaciones para los materiales pedidos
                 ubi_ids = [u['id'] for u in ubicaciones_list]
                 if ubi_ids:
                     ph3 = ','.join(['%s'] * len(ubi_ids))
@@ -952,7 +952,7 @@ def picking_json():
                         row['stock_disponible'] = float(row['stock_disponible'] or 0)
                         stock_list.append(row)
 
-        # ── Armar documento ───────────────────────────────────────────────
+        # â”€â”€ Armar documento â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         ahora   = datetime.now()
         usuario = session.get('nombre', 'sistema')
 
@@ -969,7 +969,7 @@ def picking_json():
             "stock_picking":       stock_list,
         }
 
-        # ── Guardar en picking_docs/YYYY-MM/ ─────────────────────────────
+        # â”€â”€ Guardar en picking_docs/YYYY-MM/ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         mes_dir  = ahora.strftime('%Y-%m')
         pick_dir = os.path.join(current_app.root_path, 'picking_docs', mes_dir)
         os.makedirs(pick_dir, exist_ok=True)
@@ -978,7 +978,7 @@ def picking_json():
         with open(filepath, 'w', encoding='utf-8') as fh:
             json.dump(documento, fh, ensure_ascii=False, indent=2, default=_picking_serial)
 
-        # ── Devolver como descarga ────────────────────────────────────────
+        # â”€â”€ Devolver como descarga â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         json_str = json.dumps(documento, ensure_ascii=False, indent=2, default=_picking_serial)
         return Response(
             json_str,
@@ -1000,7 +1000,7 @@ _CAMPOS_IMPORT_PED = [
     'material_codigo', 'cantidad', 'tipo_stock'
 ]
 _EJEMPLO_IMPORT_PED = [
-    'IMPORT-2024-001', 'CLI001', '2024-01-15', 'Importación masiva',
+    'IMPORT-2024-001', 'CLI001', '2024-01-15', 'ImportaciÃ³n masiva',
     'MAT001', '50', 'Libre Venta'
 ]
 
@@ -1009,9 +1009,9 @@ _EJEMPLO_IMPORT_PED = [
 def importar():
     file = request.files.get('archivo')
     if not file or not file.filename:
-        return jsonify({'error': 'No se proporcionó archivo'}), 400
+        return jsonify({'error': 'No se proporcionÃ³ archivo'}), 400
     try:
-        rows = parse_file(file)
+        rows = parse_file(file, request.form.get('hoja'))
     except Exception as e:
         return jsonify({'error': f'Error al leer el archivo: {str(e)}'}), 400
 
@@ -1078,7 +1078,7 @@ def importar():
                         lineas_ok += 1
 
                     if lineas_ok == 0:
-                        errores.append({'fila': filas[0][0], 'codigo': agrupador, 'razon': 'Ninguna línea de material válida'})
+                        errores.append({'fila': filas[0][0], 'codigo': agrupador, 'razon': 'Ninguna lÃ­nea de material vÃ¡lida'})
                     else:
                         insertados += 1
 
@@ -1103,4 +1103,4 @@ def plantilla(formato):
         return plantilla_json(_CAMPOS_IMPORT_PED, _EJEMPLO_IMPORT_PED, 'plantilla_pedidos.json')
     elif formato == 'xlsx':
         return plantilla_xlsx(_CAMPOS_IMPORT_PED, _EJEMPLO_IMPORT_PED, 'plantilla_pedidos.xlsx')
-    return 'Formato no válido', 400
+    return 'Formato no vÃ¡lido', 400

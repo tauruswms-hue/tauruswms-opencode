@@ -34,8 +34,10 @@ from modules.zonas import zonas_bp
 from modules.omc import omc_bp
 from modules.inventario import inventario_bp
 from modules.despacho import despacho_bp
+from modules.intercambio import intercambio_bp
 from modules.db_config import get_db_config, clear_config_cache, get_db_connection, _get_admin_connection, get_db_engine
 from modules.sql_dialect import quote as sql_quote, set_engine
+from modules.schema_generator import ROUTE_CATALOG
 
 
 app = Flask(__name__)
@@ -57,6 +59,7 @@ app.register_blueprint(zonas_bp)
 app.register_blueprint(omc_bp)
 app.register_blueprint(inventario_bp)
 app.register_blueprint(despacho_bp)
+app.register_blueprint(intercambio_bp)
 
 env_path = Path('.') / '.env'
 load_dotenv(dotenv_path=env_path)
@@ -110,9 +113,12 @@ def verificar_mysql():
 
 
 def obtener_rutas_por_rol(rol):
-    """Obtiene las rutas habilitadas para un rol específico"""
+    """Obtiene las rutas habilitadas para un rol específico.
+
+    roles_rutas vive en taurus_admin, no en taurus_wms.
+    """
     try:
-        conn = get_db_connection()
+        conn = _get_admin_connection()
         cursor = conn.cursor()
 
         # Verificar si el rol tiene acceso a todas las rutas (*)
@@ -136,19 +142,80 @@ def obtener_rutas_por_rol(rol):
         return []
 
 
+def _match_permiso(permiso, path, ruta):
+    """Evalúa si un patrón de permiso coincide con el path/endpoint actual."""
+    if permiso == path or (ruta and permiso == ruta):
+        return True
+    if permiso.endswith('/*'):
+        base = permiso[:-2]
+        return path == base or path.startswith(base + '/')
+    if permiso.endswith('*'):
+        return path.startswith(permiso[:-1])
+    return False
+
+
+def _ruta_en_catalogo(path):
+    """Indica si el path actual es una ruta gestionada por roles (ROUTE_CATALOG)."""
+    for grupo in ROUTE_CATALOG:
+        for permiso in grupo['rutas']:
+            if _match_permiso(permiso, path, None):
+                return True
+    return False
+
+
 def verificar_permiso_ruta(ruta, rol):
-    """Verifica si un rol tiene permiso para acceder a una ruta específica"""
+    """Verifica si un rol tiene permiso para acceder a la ruta actual.
+
+    Los permisos se evalúan contra el path real (request.path) con soporte de
+    comodines:
+      - exacto:      "/materiales"
+      - prefijo:     "/inventario/*" cubre "/inventario" y "/inventario/crear"
+      - parcial:     "/recepciones/buscar_*" cubre cualquier subruta
+      - acceso total: "*"
+
+    Las rutas que no están en ROUTE_CATALOG no se controlan por roles: solo
+    requieren autenticación (login, logout, index, helpers internos, etc.).
+    """
     if not rol:
         return False
 
-    rutas_habilitadas = obtener_rutas_por_rol(rol)
+    # SUPERADMIN tiene acceso total (coherente con el middleware)
+    if rol == 'SUPERADMIN':
+        return True
+
+    rutas_habilitadas = session.get('rutas_permitidas')
+    if rutas_habilitadas is None:
+        rutas_habilitadas = obtener_rutas_por_rol(rol)
 
     # Si tiene acceso total (*)
     if '*' in rutas_habilitadas:
         return True
 
-    # Verificar si la ruta está en la lista de rutas habilitadas
-    return ruta in rutas_habilitadas
+    path = request.path
+
+    # Rutas no gestionadas por roles: solo requieren autenticación
+    if not _ruta_en_catalogo(path):
+        return True
+
+    return any(_match_permiso(permiso, path, ruta) for permiso in rutas_habilitadas)
+
+
+def tiene_permiso_ruta(path_objetivo):
+    """Indica si el usuario actual tiene permiso sobre una ruta (para la UI)."""
+    rol = session.get('rol')
+    if not rol:
+        return False
+    if rol == 'SUPERADMIN':
+        return True
+    rutas = session.get('rutas_permitidas')
+    if not rutas:
+        rutas = obtener_rutas_por_rol(rol)
+    if '*' in rutas:
+        return True
+    return any(_match_permiso(permiso, path_objetivo, None) for permiso in rutas)
+
+
+app.jinja_env.globals['tiene_permiso_ruta'] = tiene_permiso_ruta
 
 
 def verificar_permiso_decorator(f):
@@ -478,6 +545,21 @@ def test_db_connection():
 # RUTAS DE GESTIÓN (TODAS PROTEGIDAS CON EL DECORADOR)
 # ============================================================================
 
+@app.route('/api/xlsx_sheetnames', methods=['POST'])
+def api_xlsx_sheetnames():
+    """Lista las pestañas de un archivo XLSX para que el importador permita elegir."""
+    from modules.batch_utils import xlsx_sheetnames
+    file = request.files.get('archivo')
+    if not file or file.filename == '':
+        return jsonify({'error': 'No se proporcionó archivo'}), 400
+    if not file.filename.lower().endswith('.xlsx'):
+        return jsonify({'error': 'El archivo no es XLSX'}), 400
+    try:
+        return jsonify({'hojas': xlsx_sheetnames(file)})
+    except Exception as e:
+        return jsonify({'error': f'Error al leer el archivo: {str(e)}'}), 400
+
+
 @app.route('/ubicaciones')
 @verificar_permiso_decorator
 def ubicaciones():
@@ -633,9 +715,15 @@ def verificar_autenticacion_y_permisos():
             flash('La sesión ha expirado. Por favor, inicie sesión nuevamente.', 'info')
             return redirect(url_for('login'))
 
-    # Para rutas que no tienen el decorador pero requieren verificación
-    # Nota: La mayoría de las rutas ya tienen @verificar_permiso_decorator
-    # Este middleware asegura que todas las rutas (excepto públicas) al menos requieran autenticación
+    # Verificar permisos por rol (aplica a todos los tenants, de forma global).
+    # Se recalculan las rutas permitidas en cada request para que los cambios
+    # hechos en el panel admin (roles_rutas) apliquen sin esperar re-login.
+    rol = session.get('rol')
+    if rol:
+        session['rutas_permitidas'] = obtener_rutas_por_rol(rol)
+        if rol != 'SUPERADMIN' and not verificar_permiso_ruta(request.endpoint, rol):
+            flash('No tiene permisos para acceder a esta página', 'error')
+            return redirect(url_for('index'))
 
 
 # ============================================================================

@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Taurus Suite - Roles y Rutas</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root { --primary-color: #1a365d; }
+        body { background: #f8f9fa; }
+        .admin-header {
+            background: var(--primary-color);
+            color: white;
+            padding: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-header">
+        <div class="container">
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-2">
+                    <img src="{{ url_for('static', filename='logo/Taurussuite.jpg') }}" alt="Taurus Suite" style="height: 40px;">
+                    <h4 class="mb-0">Taurus Suite</h4>
+                </div>
+                <div class="d-flex align-items-center gap-3">
+                    <span><i class="fas fa-user me-1"></i>{{ session.admin_nombre }} ({{ session.admin_rol }})</span>
+                    <a href="{{ url_for('admin.logout') }}" class="btn btn-outline-light btn-sm">
+                        <i class="fas fa-sign-out-alt"></i> Salir
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="container py-4">
+        <ul class="nav nav-pills mb-4">
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('admin.tenants') }}">
+                    <i class="fas fa-building me-1"></i>Tenants
+                </a>
+            </li>
+            {% if session.admin_rol == 'SUPERADMIN' %}
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('admin.usuarios') }}">
+                    <i class="fas fa-users me-1"></i>Todos los Usuarios
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link active" href="{{ url_for('admin.roles') }}">
+                    <i class="fas fa-user-tag me-1"></i>Roles y Rutas
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('admin.audit') }}">
+                    <i class="fas fa-clipboard-list me-1"></i>Auditoría
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('admin.intercambio') }}">
+                    <i class="fas fa-exchange-alt me-1"></i>Intercambio
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('admin.configuracion') }}">
+                    <i class="fas fa-cog me-1"></i>Configuración
+                </a>
+            </li>
+            {% endif %}
+        </ul>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    {% if category == 'error' %}
+                    <div class="alert alert-danger alert-dismissible fade show">
+                    {% else %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show">
+                    {% endif %}
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-user-tag me-2"></i>Roles</h5>
+                <button class="btn btn-primary btn-sm" onclick="nuevoRol()">
+                    <i class="fas fa-plus"></i> Nuevo Rol
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Rol</th>
+                                <th>Descripción</th>
+                                <th>Usuarios</th>
+                                <th>Rutas</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for rol in roles %}
+                            <tr>
+                                <td><strong>{{ rol.nombre }}</strong></td>
+                                <td>{{ rol.descripcion or '-' }}</td>
+                                <td>
+                                    <span class="badge bg-secondary">{{ rol.total_usuarios }}</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-info text-dark">{{ rol.total_rutas }}</span>
+                                </td>
+                                <td>
+                                    {% if rol.activo %}
+                                        <span class="badge bg-success">Activo</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Inactivo</span>
+                                    {% endif %}
+                                </td>
+                                <td style="white-space: nowrap;">
+                                    <a href="{{ url_for('admin.roles_rutas_editar', rol=rol.nombre) }}" class="btn btn-outline-primary btn-sm" title="Asignar rutas">
+                                        <i class="fas fa-route"></i>
+                                    </a>
+                                    <button class="btn btn-outline-secondary btn-sm" onclick='editarRol({{ rol|tojson }})' title="Editar">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    {% if rol.activo %}
+                                    <button class="btn btn-outline-danger btn-sm" onclick="eliminarRol('{{ url_for('admin.roles_eliminar', rol_id=rol.id) }}')" title="Desactivar">
+                                        <i class="fas fa-ban"></i>
+                                    </button>
+                                    {% else %}
+                                    <button class="btn btn-outline-success btn-sm" onclick="activarRol('{{ url_for('admin.roles_activar', rol_id=rol.id) }}')" title="Activar">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal fade" id="modalRol" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalTitulo">Nuevo Rol</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="{{ url_for('admin.roles_guardar') }}">
+                    <div class="modal-body">
+                        <input type="hidden" name="id" id="rolId">
+                        <div class="mb-2">
+                            <label class="form-label">Nombre *</label>
+                            <input type="text" name="nombre" id="rolNombre" class="form-control text-uppercase" placeholder="Ej: GERENTE" required>
+                            <div class="form-text">Se guarda en mayúsculas. El rol ADMIN conserva acceso total.</div>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Descripción</label>
+                            <textarea name="descripcion" id="rolDescripcion" class="form-control" rows="2"></textarea>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" name="activo" id="rolActivo" class="form-check-input" checked>
+                            <label class="form-check-label" for="rolActivo">Activo</label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Guardar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let modal;
+        document.addEventListener('DOMContentLoaded', () => {
+            modal = new bootstrap.Modal(document.getElementById('modalRol'));
+        });
+        
+        function nuevoRol() {
+            document.getElementById('modalTitulo').textContent = 'Nuevo Rol';
+            document.getElementById('rolId').value = '';
+            document.querySelector('#modalRol form').reset();
+            document.getElementById('rolActivo').checked = true;
+            modal.show();
+        }
+        
+        function editarRol(rol) {
+            document.getElementById('modalTitulo').textContent = 'Editar Rol';
+            document.getElementById('rolId').value = rol.id;
+            document.getElementById('rolNombre').value = rol.nombre;
+            document.getElementById('rolDescripcion').value = rol.descripcion || '';
+            document.getElementById('rolActivo').checked = rol.activo === 1 || rol.activo === true;
+            modal.show();
+        }
+        
+        function eliminarRol(url) {
+            if (confirm('¿Desactivar este rol? Los usuarios con ese rol quedan sin acceso.')) {
+                window.location.href = url;
+            }
+        }
+        
+        function activarRol(url) {
+            if (confirm('¿Activar este rol?')) {
+                window.location.href = url;
+            }
+        }
+    </script>
+</body>
+</html>

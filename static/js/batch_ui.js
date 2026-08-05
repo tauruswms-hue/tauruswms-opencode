@@ -5,6 +5,7 @@
 
 function openModalImportar() {
     $('#importarArchivo').val('');
+    _hideSelectorHoja();
     $('#importarResultado').hide().html('');
     $('#btnEjecutarImportar').prop('disabled', false).html('<i class="fas fa-upload"></i> Importar');
     $('#modalImportar').css('display', 'flex').hide().fadeIn(150);
@@ -12,6 +13,69 @@ function openModalImportar() {
 
 function closeModalImportar() {
     $('#modalImportar').fadeOut(150);
+}
+
+// Al elegir un archivo XLSX, consulta sus pestañas para permitir elegir cuál importar.
+// Si el archivo tiene una sola pestaña, se asume esa (no se muestra selector).
+$(function() {
+    $(document).on('change', '#importarArchivo', function() {
+        var file = this.files && this.files[0];
+        if (!file || !/\.xlsx$/i.test(file.name)) {
+            _hideSelectorHoja();
+            return;
+        }
+        var fd = new FormData();
+        fd.append('archivo', file);
+        $.ajax({
+            url: '/api/xlsx_sheetnames',
+            type: 'POST',
+            data: fd,
+            processData: false,
+            contentType: false,
+            success: function(resp) {
+                var hojas = resp.hojas || [];
+                if (hojas.length > 1) {
+                    _mostrarSelectorHoja(hojas);
+                } else {
+                    _hideSelectorHoja();
+                }
+            },
+            error: function() {
+                _hideSelectorHoja();
+            }
+        });
+    });
+});
+
+function _mostrarSelectorHoja(hojas) {
+    var cont = $('#importarHojaCont');
+    if (!cont.length) {
+        var inputDiv = $('#importarArchivo').closest('div');
+        inputDiv.after(
+            '<div id="importarHojaCont" style="margin-bottom:14px;">' +
+                '<label style="font-size:0.88rem; font-weight:bold; color:#555; display:block; margin-bottom:8px;">' +
+                '<i class="fas fa-table"></i> Hoja a importar</label>' +
+                '<select id="importarHoja" style="width:100%; padding:9px; border:1px solid #bdc3c7; border-radius:6px; box-sizing:border-box; font-size:0.9rem; background:#fff;"></select>' +
+                '<small style="color:#888; display:block; margin-top:4px;">El archivo contiene varias hojas. Elegí cuál tiene los datos a importar.</small>' +
+            '</div>'
+        );
+        cont = $('#importarHojaCont');
+    }
+    var sel = $('#importarHoja').empty();
+    hojas.forEach(function(h) { sel.append('<option value="' + h + '">' + h + '</option>'); });
+    cont.show();
+}
+
+function _hideSelectorHoja() {
+    $('#importarHojaCont').hide();
+}
+
+function _hojaSeleccionada() {
+    var sel = $('#importarHoja');
+    if (sel.length && sel.is(':visible') && sel.val()) {
+        return sel.val();
+    }
+    return null;
 }
 
 /**
@@ -26,6 +90,10 @@ function ejecutarImportar(url) {
 
     var formData = new FormData();
     formData.append('archivo', fileInput.files[0]);
+    var hoja = _hojaSeleccionada();
+    if (hoja) {
+        formData.append('hoja', hoja);
+    }
 
     $('#btnEjecutarImportar').prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Procesando...');
     $('#importarResultado').hide().html('');
@@ -55,6 +123,7 @@ function ejecutarImportar(url) {
 function _mostrarResultadoBatch(resp) {
     var hayErrores  = resp.errores  && resp.errores.length  > 0;
     var hayOmitidos = resp.omitidos && resp.omitidos.length > 0;
+    var hayActualizados = resp.actualizados > 0;
     var bgColor     = hayErrores ? '#fff3cd' : '#d4edda';
     var border      = hayErrores ? '#ffc107' : '#28a745';
     var icon        = hayErrores ? 'fa-exclamation-triangle' : 'fa-check-circle';
@@ -64,6 +133,7 @@ function _mostrarResultadoBatch(resp) {
         '<p style="margin:0 0 6px; font-weight:bold; color:' + iconColor + ';"><i class="fas ' + icon + '"></i> Resultado de la importación</p>' +
         '<ul style="margin:0; padding-left:18px; font-size:0.9rem; color:#333;">' +
         '<li><strong>' + resp.insertados + '</strong> registro(s) importado(s) correctamente</li>' +
+        (hayActualizados ? '<li><strong>' + resp.actualizados + '</strong> registro(s) actualizado(s)</li>' : '') +
         '<li><strong>' + (resp.omitidos ? resp.omitidos.length : 0) + '</strong> omitido(s) por duplicado</li>' +
         '<li><strong>' + (resp.errores  ? resp.errores.length  : 0) + '</strong> error(es)</li>' +
         '</ul></div>';

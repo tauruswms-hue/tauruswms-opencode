@@ -1,11 +1,27 @@
 $(document).ready(function() {
     // Inicializar DataTable con idioma español
     $('#tablaRutas').DataTable({
+        "paging": false,                    // todas las filas en el cuerpo; el scroll lo maneja la grilla
+        "scrollY": "calc(100vh - 300px)",
+        "scrollX": true,
+        "scrollCollapse": true,
         "language": {
-            "url": "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json"
-        },
-        "pageLength": 10,
-        "responsive": true
+            sProcessing:   "Procesando...",
+            sLengthMenu:   "Mostrar _MENU_ registros",
+            sZeroRecords:  "No se encontraron resultados",
+            sEmptyTable:   "Ningún dato disponible",
+            sInfo:         "Mostrando _START_ a _END_ de _TOTAL_ registros",
+            sInfoEmpty:    "Mostrando 0 a 0 de 0 registros",
+            sInfoFiltered: "(filtrado de _MAX_ registros totales)",
+            sSearch:       "Buscar:",
+            sLoadingRecords: "Cargando...",
+            oPaginate: {
+                sFirst:    "« Primero",
+                sLast:     "Último »",
+                sNext:     "Siguiente »",
+                sPrevious: "« Anterior"
+            }
+        }
     });
 });
 

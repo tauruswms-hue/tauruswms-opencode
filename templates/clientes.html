@@ -3,6 +3,7 @@
 {% block content %}
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
 <link rel="stylesheet" href="https://cdn.datatables.net/fixedheader/3.4.0/css/fixedHeader.dataTables.min.css">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/tipoubicacion.css') }}">
 <style>
 #tablaClientes_wrapper .dataTables_scrollHead thead th { background: #f8f9fa; }
         #tablaClientes_wrapper .dataTables_scrollBody td,
@@ -23,10 +24,10 @@
                     <a href="{{ url_for('clientes.exportar', formato='json') }}" style="display:flex; align-items:center; gap:8px; padding:10px 16px; color:#333; text-decoration:none; font-size:0.9rem;" onmouseenter="this.style.background='#f5f5f5'" onmouseleave="this.style.background=''"><i class="fas fa-file-code" style="color:#e67e22; width:16px;"></i> JSON</a>
                 </div>
             </div>
-            <button onclick="openModalImportar()" style="background:#3498db; color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer; font-weight:bold;">
+            <button class="btn-add" onclick="openModalImportar()" style="background:#3498db; color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer; font-weight:bold;">
                 <i class="fas fa-file-import"></i> Importar
             </button>
-            <button onclick="openModalCliente()" style="background: #27ae60; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;">
+            <button class="btn-add" onclick="openModalCliente()" style="background: #27ae60; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;">
                 <i class="fas fa-plus"></i> Nuevo Cliente
             </button>
         </div>
@@ -58,8 +59,8 @@
                             <span style="color: #e74c3c; font-weight: bold;"><i class="fas fa-times"></i> Inactivo</span>
                         {% endif %}
                     </td>
-                    <td style="text-align: center;">
-                        <button onclick='editCliente({{ c | tojson }})' style="color: #3498db; background: none; border: none; cursor: pointer; font-size: 1.1rem;">
+                    <td class="actions-cell" style="text-align: center;">
+                        <button class="btn-icon edit" onclick='editCliente({{ c | tojson }})' style="color: #3498db; background: none; border: none; cursor: pointer; font-size: 1.1rem;">
                             <i class="fas fa-edit"></i>
                         </button>
                     </td>

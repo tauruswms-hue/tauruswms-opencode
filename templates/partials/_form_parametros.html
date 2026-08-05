@@ -14,12 +14,49 @@
             <h3><i class="fas fa-clipboard-list"></i> Lógica de Operación</h3>
             <div class="params-grid">
                 <div class="params-field">
-                    <label>Método de Picking</label>
-                    <select name="metodosdepicking">
-                        <option value="fifo" {% if config.metodosdepicking == 'fifo' %}selected{% endif %}>FIFO (Primero en entrar, primero en salir)</option>
-                        <option value="lifo" {% if config.metodosdepicking == 'lifo' %}selected{% endif %}>LIFO (Último en entrar, primero en salir)</option>
-                        <option value="fefo" {% if config.metodosdepicking == 'fefo' %}selected{% endif %}>FEFO (Próximo a vencer)</option>
-                    </select>
+                    <label>Métodos de Picking habilitados</label>
+                    <div class="params-checkboxes">
+                        <div class="params-checkbox-row">
+                            <label class="params-checkbox">
+                                <input type="checkbox" name="metodosdepicking" value="fifo" {% if 'fifo' in config.metodosdepicking %}checked{% endif %}>
+                                <span>FIFO (Primero en entrar, primero en salir)</span>
+                            </label>
+                            <label class="params-checkbox params-default" title="Usar como método por defecto">
+                                <input type="radio" name="metodo_picking_default" value="fifo" {% if config.metodo_picking_default == 'fifo' %}checked{% endif %}>
+                                <span>Por defecto</span>
+                            </label>
+                        </div>
+                        <div class="params-checkbox-row">
+                            <label class="params-checkbox">
+                                <input type="checkbox" name="metodosdepicking" value="lifo" {% if 'lifo' in config.metodosdepicking %}checked{% endif %}>
+                                <span>LIFO (Último en entrar, primero en salir)</span>
+                            </label>
+                            <label class="params-checkbox params-default" title="Usar como método por defecto">
+                                <input type="radio" name="metodo_picking_default" value="lifo" {% if config.metodo_picking_default == 'lifo' %}checked{% endif %}>
+                                <span>Por defecto</span>
+                            </label>
+                        </div>
+                        <div class="params-checkbox-row">
+                            <label class="params-checkbox">
+                                <input type="checkbox" name="metodosdepicking" value="fefo" {% if 'fefo' in config.metodosdepicking %}checked{% endif %}>
+                                <span>FEFO (Próximo a vencer)</span>
+                            </label>
+                            <label class="params-checkbox params-default" title="Usar como método por defecto">
+                                <input type="radio" name="metodo_picking_default" value="fefo" {% if config.metodo_picking_default == 'fefo' %}checked{% endif %}>
+                                <span>Por defecto</span>
+                            </label>
+                        </div>
+                        <div class="params-checkbox-row">
+                            <label class="params-checkbox">
+                                <input type="checkbox" name="metodosdepicking" value="libre" {% if 'libre' in config.metodosdepicking %}checked{% endif %}>
+                                <span>Picking Libre</span>
+                            </label>
+                            <label class="params-checkbox params-default" title="Usar como método por defecto">
+                                <input type="radio" name="metodo_picking_default" value="libre" {% if config.metodo_picking_default == 'libre' %}checked{% endif %}>
+                                <span>Por defecto</span>
+                            </label>
+                        </div>
+                    </div>
                 </div>
                 <div class="params-field">
                     <label>Alerta de Stock Bajo (%)</label>
@@ -45,3 +82,25 @@
         </div>
     </form>
 </main>
+
+<script>
+function sincronizarMetodosPicking() {
+    var cbs = document.querySelectorAll('input[name="metodosdepicking"]');
+    var radios = document.querySelectorAll('input[name="metodo_picking_default"]');
+    var activo = null;
+    radios.forEach(function(r) { if (r.checked) activo = r.value; });
+    var enabled = [];
+    cbs.forEach(function(cb) { if (cb.checked) enabled.push(cb.value); });
+    radios.forEach(function(r) { r.disabled = enabled.indexOf(r.value) === -1; });
+    if (enabled.indexOf(activo) === -1) {
+        radios.forEach(function(r) { r.checked = (r.value === enabled[0]); });
+        if (!enabled.length) radios.forEach(function(r) { r.checked = false; });
+    }
+}
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('input[name="metodosdepicking"]').forEach(function(cb) {
+        cb.addEventListener('change', sincronizarMetodosPicking);
+    });
+    sincronizarMetodosPicking();
+});
+</script>

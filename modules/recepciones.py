@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session
+﻿from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session
 from datetime import datetime
 from collections import OrderedDict
 from modules.batch_utils import parse_file, float_or_zero, plantilla_csv, plantilla_json, plantilla_xlsx
@@ -53,7 +53,7 @@ def listar():
 
 
 # ============================================================================
-# NUEVA RECEPCIÓN — formulario de cabecera
+# NUEVA RECEPCIÃ“N â€” formulario de cabecera
 # ============================================================================
 @recepciones_bp.route('/recepciones/nueva')
 def nueva():
@@ -71,9 +71,9 @@ def nueva():
                 SELECT u.id, u.codigo, u.descipcion AS nombre, t.{quote('descripcion')} AS tipo
                 FROM ubicaciones u
                 JOIN tipoubicacion t ON u.tipoubicacion = t.id
-                WHERE t.{quote('descripcion')} LIKE '%Recepci%' AND (%s IS NULL OR u.tenant_id = %s)
+                WHERE t.{quote('descripcion')} LIKE %s AND (%s IS NULL OR u.tenant_id = %s)
                 ORDER BY u.codigo
-            """, (tenant_id, tenant_id))
+            """, ('%Recepci%', tenant_id, tenant_id))
             ubicaciones_recep = cursor.fetchall()
 
         ultima_ubicacion = session.get('ultima_ubicacion_recepcion')
@@ -96,7 +96,7 @@ def guardar():
     tenant_id = get_tenant_filter()
     
     if not d.get('id_ubicacion_recep'):
-        flash("Debe seleccionar una ubicación de recepción.", "danger")
+        flash("Debe seleccionar una ubicaciÃ³n de recepciÃ³n.", "danger")
         return redirect(url_for('recepciones.nueva'))
     
     conn = get_db_connection()
@@ -137,21 +137,21 @@ def guardar():
             conn.commit()
             session['ultima_ubicacion_recepcion'] = d.get('id_ubicacion_recep')
             if d.get('redirect_to') == 'listar':
-                flash(f"Recepción {numero} creada — contenedor {contenedor}.", "success")
+                flash(f"RecepciÃ³n {numero} creada â€” contenedor {contenedor}.", "success")
                 return redirect(url_for('recepciones.listar'))
-            flash(f"Recepción {numero} creada — contenedor {contenedor}. Agregue los materiales.", "success")
+            flash(f"RecepciÃ³n {numero} creada â€” contenedor {contenedor}. Agregue los materiales.", "success")
             return redirect(url_for('recepciones.ver', id_recepcion=id_recepcion))
 
     except Exception as e:
         conn.rollback()
-        flash(f"Error al crear la recepción: {str(e)}", "danger")
+        flash(f"Error al crear la recepciÃ³n: {str(e)}", "danger")
         return redirect(url_for('recepciones.nueva'))
     finally:
         conn.close()
 
 
 # ============================================================================
-# VER / GESTIONAR RECEPCIÓN
+# VER / GESTIONAR RECEPCIÃ“N
 # ============================================================================
 @recepciones_bp.route('/recepciones/ver/<int:id_recepcion>')
 def ver(id_recepcion):
@@ -173,7 +173,7 @@ def ver(id_recepcion):
             recepcion = cursor.fetchone()
 
             if not recepcion:
-                flash("Recepción no encontrada.", "danger")
+                flash("RecepciÃ³n no encontrada.", "danger")
                 return redirect(url_for('recepciones.listar'))
 
             cursor.execute("""
@@ -235,7 +235,7 @@ def ver(id_recepcion):
 
 
 # ============================================================================
-# BÚSQUEDA DE MATERIALES (AJAX)
+# BÃšSQUEDA DE MATERIALES (AJAX)
 # ============================================================================
 @recepciones_bp.route('/recepciones/buscar_materiales/<int:id_proveedor>')
 def buscar_materiales(id_proveedor):
@@ -266,7 +266,7 @@ def buscar_materiales(id_proveedor):
 
 @recepciones_bp.route('/recepciones/buscar_barcode/<int:id_proveedor>')
 def buscar_barcode(id_proveedor):
-    """Búsqueda exacta por código de barras (usado por lector)."""
+    """BÃºsqueda exacta por cÃ³digo de barras (usado por lector)."""
     barcode = request.args.get('barcode', '').strip()
     if not barcode:
         return jsonify({})
@@ -294,7 +294,7 @@ def buscar_barcode(id_proveedor):
 
 
 # ============================================================================
-# BÚSQUEDA DE UBICACIONES (AJAX)
+# BÃšSQUEDA DE UBICACIONES (AJAX)
 # ============================================================================
 @recepciones_bp.route('/recepciones/buscar_ubicaciones')
 def buscar_ubicaciones():
@@ -310,12 +310,12 @@ def buscar_ubicaciones():
                     SELECT u.id, u.codigo, u.descipcion AS nombre, t.{quote('descripcion')} AS tipo
                     FROM ubicaciones u
                     JOIN tipoubicacion t ON u.tipoubicacion = t.id
-                    WHERE t.{quote('descripcion')} LIKE '%Recepci%'
+                    WHERE t.{quote('descripcion')} LIKE %s
                       AND (u.codigo LIKE %s OR u.descipcion LIKE %s)
                       AND (%s IS NULL OR u.tenant_id = %s)
                     ORDER BY u.codigo
                     {limit_sql(20)}
-                """, (like, like, tenant_id, tenant_id))
+                """, ('%Recepci%', like, like, tenant_id, tenant_id))
             else:
                 cursor.execute(f"""
                     SELECT u.id, u.codigo, u.descipcion AS nombre, t.{quote('descripcion')} AS tipo
@@ -332,7 +332,7 @@ def buscar_ubicaciones():
 
 
 # ============================================================================
-# GUARDAR ÍTEM (AJAX)
+# GUARDAR ÃTEM (AJAX)
 # ============================================================================
 @recepciones_bp.route('/recepciones/guardar_item', methods=['POST'])
 def guardar_item():
@@ -357,7 +357,7 @@ def guardar_item():
             )
             rec = cursor.fetchone()
             if not rec or rec['estado'] != 'Abierta':
-                return jsonify({"ok": False, "msg": "La recepción no está Abierta."})
+                return jsonify({"ok": False, "msg": "La recepciÃ³n no estÃ¡ Abierta."})
 
             if id_detalle:
                 cursor.execute("""
@@ -389,7 +389,7 @@ def guardar_item():
 
 
 # ============================================================================
-# ELIMINAR ÍTEM (AJAX)
+# ELIMINAR ÃTEM (AJAX)
 # ============================================================================
 @recepciones_bp.route('/recepciones/eliminar_item/<int:id_detalle>', methods=['POST'])
 def eliminar_item(id_detalle):
@@ -417,13 +417,13 @@ def eliminar_item(id_detalle):
 
 
 # ============================================================================
-# CERRAR RECEPCIÓN — impacta stockcontable
+# CERRAR RECEPCIÃ“N â€” impacta stockcontable
 # ============================================================================
 @recepciones_bp.route('/recepciones/cerrar/<int:id_recepcion>', methods=['POST'])
 def cerrar(id_recepcion):
     id_ubicacion_destino = request.form.get('id_ubicacion_destino')
     if not id_ubicacion_destino:
-        flash("Debe seleccionar la ubicación destino.", "warning")
+        flash("Debe seleccionar la ubicaciÃ³n destino.", "warning")
         return redirect(url_for('recepciones.ver', id_recepcion=id_recepcion))
 
     tenant_id = get_tenant_filter()
@@ -436,7 +436,7 @@ def cerrar(id_recepcion):
             )
             recepcion = cursor.fetchone()
             if not recepcion:
-                flash("La recepción no existe o ya no está Abierta.", "danger")
+                flash("La recepciÃ³n no existe o ya no estÃ¡ Abierta.", "danger")
                 return redirect(url_for('recepciones.listar'))
 
             cursor.execute("""
@@ -447,7 +447,7 @@ def cerrar(id_recepcion):
             items = cursor.fetchall()
 
             if not items:
-                flash("No hay ítems con cantidad recibida para cerrar la recepción.", "warning")
+                flash("No hay Ã­tems con cantidad recibida para cerrar la recepciÃ³n.", "warning")
                 return redirect(url_for('recepciones.ver', id_recepcion=id_recepcion))
 
             contenedor = recepcion['id_contenedor']
@@ -455,7 +455,7 @@ def cerrar(id_recepcion):
             usuario = session.get('nombre', 'sistema')
 
             for item in items:
-                # El stock queda en la ubicación de recepción como StockSaliendo
+                # El stock queda en la ubicaciÃ³n de recepciÃ³n como StockSaliendo
                 cols_stock = ['Ubicacion', 'Material', 'Lote', 'TipoStock', 'IDContenedor',
                               'StockTotal', 'StockDisponible', 'StockEntrando', 'StockSaliendo',
                               'UltimaEntrada', 'UltimoMovimiento', 'FechaVencimiento', 'UsuarioUltimoMov']
@@ -468,7 +468,7 @@ def cerrar(id_recepcion):
                     None, ahora, item['fecha_vencimiento'], usuario
                 ))
 
-                # Crear StockEntrando en la ubicación destino
+                # Crear StockEntrando en la ubicaciÃ³n destino
                 sql_entrando = upsert_incremental_sql('stockcontable', cols_stock, 'Ubicacion',
                                                       ['StockEntrando'], ['UltimoMovimiento', 'UsuarioUltimoMov'])
                 cursor.execute(sql_entrando, (
@@ -478,7 +478,7 @@ def cerrar(id_recepcion):
                     None, ahora, item['fecha_vencimiento'], usuario
                 ))
 
-            # Generar número de OMC
+            # Generar nÃºmero de OMC
             anio_omc = ahora.year
             expr_omc = cast_as_int(substring_index("numero", "-", -1))
             cursor.execute(
@@ -498,7 +498,7 @@ def cerrar(id_recepcion):
                 numero_omc, contenedor,
                 recepcion['id_ubicacion_recep'], id_ubicacion_destino,
                 id_recepcion,
-                f"Generada al cerrar recepción {recepcion['numero']}",
+                f"Generada al cerrar recepciÃ³n {recepcion['numero']}",
                 usuario, ahora, tenant_id
             ))
             cursor.execute("""
@@ -517,8 +517,8 @@ def cerrar(id_recepcion):
 
             conn.commit()
             flash(
-                f"Recepción {recepcion['numero']} cerrada. "
-                f"{len(items)} ítem(s) registrado(s). "
+                f"RecepciÃ³n {recepcion['numero']} cerrada. "
+                f"{len(items)} Ã­tem(s) registrado(s). "
                 f"OMC {numero_omc} generada para confirmar el traslado.",
                 "success"
             )
@@ -526,14 +526,14 @@ def cerrar(id_recepcion):
 
     except Exception as e:
         conn.rollback()
-        flash(f"Error al cerrar la recepción (sin cambios guardados): {str(e)}", "danger")
+        flash(f"Error al cerrar la recepciÃ³n (sin cambios guardados): {str(e)}", "danger")
         return redirect(url_for('recepciones.ver', id_recepcion=id_recepcion))
     finally:
         conn.close()
 
 
 # ============================================================================
-# ELIMINAR RECEPCIÓN (solo Abierta sin materiales)
+# ELIMINAR RECEPCIÃ“N (solo Abierta sin materiales)
 # ============================================================================
 @recepciones_bp.route('/recepciones/eliminar/<int:id_recepcion>', methods=['POST'])
 def eliminar(id_recepcion):
@@ -555,7 +555,7 @@ def eliminar(id_recepcion):
                 (id_recepcion, tenant_id, tenant_id)
             )
             if cursor.fetchone()['total'] > 0:
-                flash("No se puede eliminar: la recepción tiene materiales asignados.", "danger")
+                flash("No se puede eliminar: la recepciÃ³n tiene materiales asignados.", "danger")
                 return redirect(url_for('recepciones.ver', id_recepcion=id_recepcion))
 
             cursor.execute(
@@ -563,7 +563,7 @@ def eliminar(id_recepcion):
                 (id_recepcion, tenant_id, tenant_id)
             )
             conn.commit()
-            flash(f"Recepción {rec['numero']} eliminada.", "success")
+            flash(f"RecepciÃ³n {rec['numero']} eliminada.", "success")
     except Exception as e:
         conn.rollback()
         flash(f"Error: {str(e)}", "danger")
@@ -584,7 +584,7 @@ def confirmar_stock(id_recepcion):
             )
             recepcion = cursor.fetchone()
             if not recepcion:
-                flash("La recepción no existe o no está en estado Cerrada.", "danger")
+                flash("La recepciÃ³n no existe o no estÃ¡ en estado Cerrada.", "danger")
                 return redirect(url_for('recepciones.ver', id_recepcion=id_recepcion))
 
             ahora = datetime.now()
@@ -621,7 +621,7 @@ def confirmar_stock(id_recepcion):
 
 
 # ============================================================================
-# ANULAR RECEPCIÓN
+# ANULAR RECEPCIÃ“N
 # ============================================================================
 @recepciones_bp.route('/recepciones/anular/<int:id_recepcion>', methods=['POST'])
 def anular(id_recepcion):
@@ -645,7 +645,7 @@ def anular(id_recepcion):
                 WHERE id_recepcion = %s AND (%s IS NULL OR tenant_id = %s)
             """, (datetime.now(), usuario, id_recepcion, tenant_id, tenant_id))
             conn.commit()
-            flash(f"Recepción {rec['numero']} anulada.", "success")
+            flash(f"RecepciÃ³n {rec['numero']} anulada.", "success")
     except Exception as e:
         conn.rollback()
         flash(f"Error: {str(e)}", "danger")
@@ -663,7 +663,7 @@ _CAMPOS_IMPORT_REC = [
 ]
 _EJEMPLO_IMPORT_REC = [
     'LOTE-2024-001', 'PROV001', 'UB-RECEP', 'UB-DEPOSITO',
-    'Importación masiva', 'MAT001', 'UNICO', '', '100', 'Libre Venta'
+    'ImportaciÃ³n masiva', 'MAT001', 'UNICO', '', '100', 'Libre Venta'
 ]
 
 
@@ -671,9 +671,9 @@ _EJEMPLO_IMPORT_REC = [
 def importar():
     file = request.files.get('archivo')
     if not file or not file.filename:
-        return jsonify({'error': 'No se proporcionó archivo'}), 400
+        return jsonify({'error': 'No se proporcionÃ³ archivo'}), 400
     try:
-        rows = parse_file(file)
+        rows = parse_file(file, request.form.get('hoja'))
     except Exception as e:
         return jsonify({'error': f'Error al leer el archivo: {str(e)}'}), 400
 
@@ -714,7 +714,7 @@ def importar():
                     cursor.execute("SELECT id FROM ubicaciones WHERE codigo = %s AND (%s IS NULL OR tenant_id = %s)", (ubic_recep_cod, tenant_id, tenant_id))
                     ubic_recep = cursor.fetchone()
                     if not ubic_recep:
-                        errores.append({'fila': filas[0][0], 'codigo': agrupador, 'razon': f'Ubicación recep "{ubic_recep_cod}" no encontrada'})
+                        errores.append({'fila': filas[0][0], 'codigo': agrupador, 'razon': f'UbicaciÃ³n recep "{ubic_recep_cod}" no encontrada'})
                         continue
 
                     id_dest = None
@@ -770,7 +770,7 @@ def importar():
                         lineas_ok += 1
 
                     if lineas_ok == 0:
-                        errores.append({'fila': filas[0][0], 'codigo': agrupador, 'razon': 'Ninguna línea de material válida'})
+                        errores.append({'fila': filas[0][0], 'codigo': agrupador, 'razon': 'Ninguna lÃ­nea de material vÃ¡lida'})
                     else:
                         insertados += 1
 
@@ -795,4 +795,4 @@ def plantilla(formato):
         return plantilla_json(_CAMPOS_IMPORT_REC, _EJEMPLO_IMPORT_REC, 'plantilla_recepciones.json')
     elif formato == 'xlsx':
         return plantilla_xlsx(_CAMPOS_IMPORT_REC, _EJEMPLO_IMPORT_REC, 'plantilla_recepciones.xlsx')
-    return 'Formato no válido', 400
+    return 'Formato no vÃ¡lido', 400

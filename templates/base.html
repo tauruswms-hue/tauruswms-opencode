@@ -488,6 +488,12 @@
                         <i class="fas fa-chevron-down toggle-icon" data-section="sistema"></i>
                     </a>
                     <div class="sidebar-submenu" id="section-sistema" style="display: none;">
+                        {% if tiene_permiso_ruta('/intercambio') %}
+                        <a href="{{ url_for('intercambio.listar') }}" class="sidebar-link">
+                            <i class="fas fa-exchange-alt"></i>
+                            <span class="link-text">Intercambio</span>
+                        </a>
+                        {% endif %}
                         <a href="{{ url_for('parametros.parametros') }}" class="sidebar-link">
                             <i class="fas fa-sliders-h"></i>
                             <span class="link-text">Parámetros</span>

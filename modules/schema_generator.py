@@ -58,6 +58,22 @@ ADMIN_TABLES = [
         ],
     },
     {
+        "name": "roles",
+        "comment": "Catalogo de roles de aplicacion",
+        "columns": [
+            {"name": "id",          "type": "int",          "pk": True, "autoincrement": True},
+            {"name": "nombre",      "type": "varchar(50)",  "not_null": True, "unique": True},
+            {"name": "descripcion", "type": "varchar(255)"},
+            {"name": "activo",      "type": "boolean", "default": True},
+            {"name": "created_at",  "type": "datetime", "default": "CURRENT_TIMESTAMP"},
+            {"name": "updated_at",  "type": "datetime", "default": "CURRENT_TIMESTAMP_ON_UPDATE"},
+        ],
+        "indexes": [
+            {"columns": ["nombre"], "name": "uk_rol_nombre", "unique": True},
+            {"columns": ["activo"], "name": "idx_roles_activo"},
+        ],
+    },
+    {
         "name": "tenants",
         "columns": [
             {"name": "id",                "type": "int",      "pk": True, "autoincrement": True},
@@ -73,6 +89,7 @@ ADMIN_TABLES = [
             {"name": "updated_at",        "type": "datetime", "default": "CURRENT_TIMESTAMP_ON_UPDATE"},
             {"name": "nombredelalmacen",  "type": "varchar(200)"},
             {"name": "metodosdepicking",  "type": "text"},
+            {"name": "metodo_picking_default", "type": "varchar(20)", "not_null": True, "default": "'libre'"},
             {"name": "bajostock",         "type": "decimal(12,3)", "default": 0},
             {"name": "dias_filtro_fechas","type": "int", "default": 30},
             {"name": "contexto",          "type": "text"},
@@ -94,7 +111,7 @@ ADMIN_TABLES = [
             {"name": "password_hash",       "type": "varchar(255)", "not_null": True},
             {"name": "nombre",              "type": "varchar(100)", "not_null": True},
             {"name": "email",               "type": "varchar(100)"},
-            {"name": "rol",                 "type": "enum('ADMIN','OPERADOR','CONSULTA')", "default": "'OPERADOR'"},
+            {"name": "rol",                 "type": "varchar(50)", "default": "'OPERADOR'"},
             {"name": "tenant_id",           "type": "int", "not_null": True},
             {"name": "activo",              "type": "boolean", "default": True},
             {"name": "ultimo_acceso",       "type": "datetime"},
@@ -171,7 +188,7 @@ WMS_TABLES = [
             {"name": "created_at", "type": "datetime", "not_null": True, "default": "CURRENT_TIMESTAMP"},
         ],
         "indexes": [
-            {"columns": ["codigo"],    "name": "uk_zona_codigo", "unique": True},
+            {"columns": ["codigo", "tenant_id"], "name": "uk_zonas_codigo_tenant", "unique": True},
             {"columns": ["activo"],    "name": "idx_zona_activo"},
             {"columns": ["tenant_id"], "name": "idx_zonas_tenant"},
         ],
@@ -193,7 +210,7 @@ WMS_TABLES = [
         "name": "categorias",
         "columns": [
             {"name": "id_categoria", "type": "int",          "pk": True, "autoincrement": True},
-            {"name": "codigo",       "type": "varchar(50)",  "unique": True},
+            {"name": "codigo",       "type": "varchar(50)"},
             {"name": "nombre",       "type": "varchar(100)", "not_null": True},
             {"name": "descripcion",  "type": "text"},
             {"name": "activo",       "type": "boolean", "not_null": True, "default": True},
@@ -202,13 +219,14 @@ WMS_TABLES = [
         ],
         "indexes": [
             {"columns": ["tenant_id"], "name": "idx_categorias_tenant"},
+            {"columns": ["codigo", "tenant_id"], "name": "uk_categorias_codigo_tenant", "unique": True},
         ],
     },
     {
         "name": "proveedores",
         "columns": [
             {"name": "id",          "type": "int",           "pk": True, "autoincrement": True},
-            {"name": "codigo",      "type": "varchar(50)",   "unique": True},
+            {"name": "codigo",      "type": "varchar(50)"},
             {"name": "razonsocial", "type": "varchar(200)",  "not_null": True},
             {"name": "cuit",        "type": "varchar(50)"},
             {"name": "direccion",   "type": "varchar(255)"},
@@ -220,6 +238,7 @@ WMS_TABLES = [
         ],
         "indexes": [
             {"columns": ["tenant_id"], "name": "idx_proveedores_tenant"},
+            {"columns": ["codigo", "tenant_id"], "name": "uk_proveedores_codigo_tenant", "unique": True},
         ],
     },
     {
@@ -256,7 +275,7 @@ WMS_TABLES = [
         "name": "ubicaciones",
         "columns": [
             {"name": "id",                 "type": "int",           "pk": True, "autoincrement": True},
-            {"name": "codigo",             "type": "varchar(50)",   "not_null": True, "unique": True},
+            {"name": "codigo",             "type": "varchar(50)",   "not_null": True},
             {"name": "nombre",             "type": "varchar(100)"},
             {"name": "descipcion",         "type": "varchar(200)"},
             {"name": "tipoubicacion",      "type": "int"},
@@ -281,6 +300,7 @@ WMS_TABLES = [
         ],
         "indexes": [
             {"columns": ["tenant_id"],     "name": "idx_ubicaciones_tenant"},
+            {"columns": ["codigo", "tenant_id"], "name": "uk_ubicaciones_codigo_tenant", "unique": True},
             {"columns": ["id_zona"],       "name": "idx_ubi_zona"},
             {"columns": ["tipoubicacion"], "name": "idx_ubi_tipo"},
         ],
@@ -293,7 +313,7 @@ WMS_TABLES = [
         "name": "transportes",
         "columns": [
             {"name": "id_transporte",    "type": "int",          "pk": True, "autoincrement": True},
-            {"name": "codigo",           "type": "varchar(100)", "unique": True},
+            {"name": "codigo",           "type": "varchar(100)"},
             {"name": "razonsocial",      "type": "varchar(200)", "not_null": True},
             {"name": "cuit",             "type": "varchar(50)"},
             {"name": "telefono",         "type": "varchar(50)"},
@@ -304,6 +324,7 @@ WMS_TABLES = [
         ],
         "indexes": [
             {"columns": ["tenant_id"], "name": "idx_transportes_tenant"},
+            {"columns": ["codigo", "tenant_id"], "name": "uk_transportes_codigo_tenant", "unique": True},
         ],
         "foreign_keys": [
             {"columns": ["id_muelle_salida"], "ref_table": "ubicaciones", "ref_columns": ["id"]},
@@ -326,7 +347,7 @@ WMS_TABLES = [
         "name": "clientes",
         "columns": [
             {"name": "id_cliente",                   "type": "int",          "pk": True, "autoincrement": True},
-            {"name": "codigo",                       "type": "varchar(100)", "unique": True},
+            {"name": "codigo",                       "type": "varchar(100)"},
             {"name": "razonsocial",                  "type": "varchar(200)", "not_null": True},
             {"name": "cuit",                         "type": "varchar(50)"},
             {"name": "direccion",                    "type": "varchar(255)"},
@@ -342,6 +363,7 @@ WMS_TABLES = [
         ],
         "indexes": [
             {"columns": ["tenant_id"], "name": "idx_clientes_tenant"},
+            {"columns": ["codigo", "tenant_id"], "name": "uk_clientes_codigo_tenant", "unique": True},
         ],
         "foreign_keys": [
             {"columns": ["id_ruta"],                      "ref_table": "rutas",       "ref_columns": ["id_ruta"],       "on_delete": "SET NULL", "on_update": "CASCADE"},
@@ -352,7 +374,7 @@ WMS_TABLES = [
         "name": "materiales",
         "columns": [
             {"name": "id",               "type": "int",           "pk": True, "autoincrement": True},
-            {"name": "codigo",           "type": "varchar(100)",  "not_null": True, "unique": True},
+            {"name": "codigo",           "type": "varchar(100)",  "not_null": True},
             {"name": "codigo_barras",    "type": "varchar(100)"},
             {"name": "nombre",           "type": "varchar(255)",  "not_null": True},
             {"name": "descripcion",      "type": "text"},
@@ -361,6 +383,7 @@ WMS_TABLES = [
             {"name": "stock_maximo",     "type": "decimal(12,3)", "default": 0},
             {"name": "unidad_medida_id", "type": "int"},
             {"name": "trazabilidad",     "type": "enum('ninguna','lote','serie')", "not_null": True, "default": "'ninguna'"},
+            {"name": "metodo_picking",   "type": "varchar(20)", "not_null": True, "default": "'libre'"},
             {"name": "peso_bruto",       "type": "decimal(10,3)"},
             {"name": "peso_neto",        "type": "decimal(10,3)"},
             {"name": "costo_promedio",   "type": "decimal(12,4)", "default": 0},
@@ -374,6 +397,7 @@ WMS_TABLES = [
             {"columns": ["tenant_id"],     "name": "idx_materiales_tenant"},
             {"columns": ["categoria_id"],  "name": "idx_mat_categoria"},
             {"columns": ["codigo_barras"], "name": "idx_mat_codigo_barras"},
+            {"columns": ["codigo", "tenant_id"], "name": "uk_materiales_codigo_tenant", "unique": True},
         ],
         "foreign_keys": [
             {"columns": ["categoria_id"], "ref_table": "categorias", "ref_columns": ["id_categoria"],
@@ -412,7 +436,7 @@ WMS_TABLES = [
             {"name": "tenant_id",         "type": "int"},
         ],
         "indexes": [
-            {"columns": ["codigo_barras"], "name": "uq_pres_barcode", "unique": True},
+            {"columns": ["codigo_barras", "tenant_id"], "name": "uk_pres_barcode_tenant", "unique": True},
             {"columns": ["tenant_id"],     "name": "idx_matpres_tenant"},
         ],
         "foreign_keys": [
@@ -713,8 +737,357 @@ WMS_TABLES = [
 
 
 # ============================================================================
+# DEFINICION DE TABLAS — INTERCAMBIO DATABASE
+# ============================================================================
+
+INTERCAMBIO_TABLES = [
+    {
+        "name": "intercambio_materiales",
+        "comment": "Interfaz de materiales: el sistema de gestion externo inserta aqui los registros a sincronizar con el WMS",
+        "columns": [
+            {"name": "id",                    "type": "int",            "pk": True, "autoincrement": True},
+            {"name": "tenant_codigo",         "type": "varchar(20)",    "not_null": True},
+            {"name": "codigo",                "type": "varchar(100)",   "not_null": True},
+            {"name": "codigo_barras",         "type": "varchar(100)"},
+            {"name": "nombre",                "type": "varchar(255)",   "not_null": True},
+            {"name": "descripcion",           "type": "text"},
+            {"name": "categoria_codigo",      "type": "varchar(50)"},
+            {"name": "stock_minimo",          "type": "decimal(12,3)",  "default": 0},
+            {"name": "stock_maximo",          "type": "decimal(12,3)",  "default": 0},
+            {"name": "unidad_medida_codigo",  "type": "varchar(50)"},
+            {"name": "trazabilidad",          "type": "enum('ninguna','lote','serie')", "not_null": True, "default": "'ninguna'"},
+            {"name": "metodo_picking",        "type": "varchar(20)", "not_null": True, "default": "'libre'"},
+            {"name": "peso_bruto",            "type": "decimal(10,3)"},
+            {"name": "peso_neto",             "type": "decimal(10,3)"},
+            {"name": "costo_promedio",        "type": "decimal(12,4)",  "default": 0},
+            {"name": "ultimo_costo",          "type": "decimal(12,4)",  "default": 0},
+            {"name": "activo",                "type": "boolean",        "not_null": True, "default": True},
+            {"name": "accion",                "type": "varchar(20)",    "not_null": True, "default": "'alta'"},
+            {"name": "estado",                "type": "enum('pendiente','procesado','error')", "not_null": True, "default": "'pendiente'"},
+            {"name": "intentos",              "type": "int",            "not_null": True, "default": 0},
+            {"name": "error_mensaje",         "type": "text"},
+            {"name": "id_material_wms",       "type": "int"},
+            {"name": "fecha_carga",           "type": "datetime",       "not_null": True, "default": "CURRENT_TIMESTAMP"},
+            {"name": "fecha_procesado",       "type": "datetime"},
+            {"name": "updated_at",            "type": "datetime",       "not_null": True, "default": "CURRENT_TIMESTAMP_ON_UPDATE"},
+        ],
+        "indexes": [
+            {"columns": ["tenant_codigo"], "name": "idx_int_mat_tenant"},
+            {"columns": ["estado"],        "name": "idx_int_mat_estado"},
+            {"columns": ["codigo"],        "name": "idx_int_mat_codigo"},
+        ],
+    },
+    {
+        "name": "intercambio_rutas",
+        "comment": "Interfaz de rutas/zonas: el sistema externo inserta aqui las rutas a sincronizar con el WMS",
+        "columns": [
+            {"name": "id",                    "type": "int",            "pk": True, "autoincrement": True},
+            {"name": "tenant_codigo",         "type": "varchar(20)",    "not_null": True},
+            {"name": "nombre_ruta",           "type": "varchar(100)",   "not_null": True},
+            {"name": "descripcion",           "type": "text"},
+            {"name": "accion",                "type": "varchar(20)",    "not_null": True, "default": "'alta'"},
+            {"name": "estado",                "type": "enum('pendiente','procesado','error')", "not_null": True, "default": "'pendiente'"},
+            {"name": "intentos",              "type": "int",            "not_null": True, "default": 0},
+            {"name": "error_mensaje",         "type": "text"},
+            {"name": "id_ruta_wms",           "type": "int"},
+            {"name": "fecha_carga",           "type": "datetime",       "not_null": True, "default": "CURRENT_TIMESTAMP"},
+            {"name": "fecha_procesado",       "type": "datetime"},
+            {"name": "updated_at",            "type": "datetime",       "not_null": True, "default": "CURRENT_TIMESTAMP_ON_UPDATE"},
+        ],
+        "indexes": [
+            {"columns": ["tenant_codigo"], "name": "idx_int_rut_tenant"},
+            {"columns": ["estado"],        "name": "idx_int_rut_estado"},
+            {"columns": ["nombre_ruta"],   "name": "idx_int_rut_nombre"},
+        ],
+    },
+    {
+        "name": "intercambio_transportes",
+        "comment": "Interfaz de transportes/expresos: registros a sincronizar con el WMS",
+        "columns": [
+            {"name": "id",                    "type": "int",            "pk": True, "autoincrement": True},
+            {"name": "tenant_codigo",         "type": "varchar(20)",    "not_null": True},
+            {"name": "codigo",                "type": "varchar(100)",   "not_null": True},
+            {"name": "razonsocial",           "type": "varchar(200)",   "not_null": True},
+            {"name": "cuit",                  "type": "varchar(50)"},
+            {"name": "telefono",              "type": "varchar(50)"},
+            {"name": "email",                 "type": "varchar(100)"},
+            {"name": "muelle_codigo",         "type": "varchar(50)"},
+            {"name": "activo",                "type": "boolean",        "not_null": True, "default": True},
+            {"name": "accion",                "type": "varchar(20)",    "not_null": True, "default": "'alta'"},
+            {"name": "estado",                "type": "enum('pendiente','procesado','error')", "not_null": True, "default": "'pendiente'"},
+            {"name": "intentos",              "type": "int",            "not_null": True, "default": 0},
+            {"name": "error_mensaje",         "type": "text"},
+            {"name": "id_transporte_wms",     "type": "int"},
+            {"name": "fecha_carga",           "type": "datetime",       "not_null": True, "default": "CURRENT_TIMESTAMP"},
+            {"name": "fecha_procesado",       "type": "datetime"},
+            {"name": "updated_at",            "type": "datetime",       "not_null": True, "default": "CURRENT_TIMESTAMP_ON_UPDATE"},
+        ],
+        "indexes": [
+            {"columns": ["tenant_codigo"], "name": "idx_int_tra_tenant"},
+            {"columns": ["estado"],        "name": "idx_int_tra_estado"},
+            {"columns": ["codigo"],        "name": "idx_int_tra_codigo"},
+        ],
+    },
+    {
+        "name": "intercambio_transporte_rutas",
+        "comment": "Interfaz de asignaciones ruta <-> transporte a sincronizar con el WMS",
+        "columns": [
+            {"name": "id",                    "type": "int",            "pk": True, "autoincrement": True},
+            {"name": "tenant_codigo",         "type": "varchar(20)",    "not_null": True},
+            {"name": "transporte_codigo",     "type": "varchar(100)",   "not_null": True},
+            {"name": "ruta_nombre",           "type": "varchar(100)",   "not_null": True},
+            {"name": "observaciones",         "type": "text"},
+            {"name": "accion",                "type": "varchar(20)",    "not_null": True, "default": "'alta'"},
+            {"name": "estado",                "type": "enum('pendiente','procesado','error')", "not_null": True, "default": "'pendiente'"},
+            {"name": "intentos",              "type": "int",            "not_null": True, "default": 0},
+            {"name": "error_mensaje",         "type": "text"},
+            {"name": "fecha_carga",           "type": "datetime",       "not_null": True, "default": "CURRENT_TIMESTAMP"},
+            {"name": "fecha_procesado",       "type": "datetime"},
+            {"name": "updated_at",            "type": "datetime",       "not_null": True, "default": "CURRENT_TIMESTAMP_ON_UPDATE"},
+        ],
+        "indexes": [
+            {"columns": ["tenant_codigo"],     "name": "idx_int_trr_tenant"},
+            {"columns": ["estado"],            "name": "idx_int_trr_estado"},
+            {"columns": ["transporte_codigo"], "name": "idx_int_trr_transporte"},
+            {"columns": ["ruta_nombre"],       "name": "idx_int_trr_ruta"},
+        ],
+    },
+    {
+        "name": "intercambio_clientes",
+        "comment": "Interfaz de clientes: el sistema externo inserta aqui los clientes a sincronizar con el WMS",
+        "columns": [
+            {"name": "id",                    "type": "int",            "pk": True, "autoincrement": True},
+            {"name": "tenant_codigo",         "type": "varchar(20)",    "not_null": True},
+            {"name": "codigo",                "type": "varchar(100)",   "not_null": True},
+            {"name": "razonsocial",           "type": "varchar(200)",   "not_null": True},
+            {"name": "cuit",                  "type": "varchar(50)"},
+            {"name": "direccion",             "type": "varchar(255)"},
+            {"name": "localidad",             "type": "varchar(100)"},
+            {"name": "provincia",             "type": "varchar(100)"},
+            {"name": "telefono",              "type": "varchar(50)"},
+            {"name": "email",                 "type": "varchar(100)"},
+            {"name": "contacto_nombre",       "type": "varchar(100)"},
+            {"name": "ruta_nombre",           "type": "varchar(100)"},
+            {"name": "transporte_codigo",     "type": "varchar(100)"},
+            {"name": "activo",                "type": "boolean",        "not_null": True, "default": True},
+            {"name": "accion",                "type": "varchar(20)",    "not_null": True, "default": "'alta'"},
+            {"name": "estado",                "type": "enum('pendiente','procesado','error')", "not_null": True, "default": "'pendiente'"},
+            {"name": "intentos",              "type": "int",            "not_null": True, "default": 0},
+            {"name": "error_mensaje",         "type": "text"},
+            {"name": "id_cliente_wms",        "type": "int"},
+            {"name": "fecha_carga",           "type": "datetime",       "not_null": True, "default": "CURRENT_TIMESTAMP"},
+            {"name": "fecha_procesado",       "type": "datetime"},
+            {"name": "updated_at",            "type": "datetime",       "not_null": True, "default": "CURRENT_TIMESTAMP_ON_UPDATE"},
+        ],
+        "indexes": [
+            {"columns": ["tenant_codigo"], "name": "idx_int_cli_tenant"},
+            {"columns": ["estado"],        "name": "idx_int_cli_estado"},
+            {"columns": ["codigo"],        "name": "idx_int_cli_codigo"},
+        ],
+    },
+    {
+        "name": "intercambio_pedidos",
+        "comment": "Interfaz de pedidos: el sistema de gestion externo inserta aqui los pedidos a sincronizar con el WMS (cabecera + items en items_json)",
+        "columns": [
+            {"name": "id",                "type": "int",           "pk": True, "autoincrement": True},
+            {"name": "tenant_codigo",     "type": "varchar(20)",   "not_null": True},
+            {"name": "nro_pedido",        "type": "varchar(20)",   "not_null": True},
+            {"name": "cliente_codigo",    "type": "varchar(100)",  "not_null": True},
+            {"name": "clase_nombre",      "type": "varchar(100)"},
+            {"name": "fecha_pedido",      "type": "date",          "not_null": True},
+            {"name": "ruta_nombre",       "type": "varchar(100)"},
+            {"name": "transporte_codigo", "type": "varchar(100)"},
+            {"name": "direccion_entrega", "type": "varchar(255)"},
+            {"name": "observaciones",     "type": "text"},
+            {"name": "estado_pedido",     "type": "varchar(50)",   "not_null": True, "default": "'Pendiente'"},
+            {"name": "items_json",        "type": "text"},
+            {"name": "accion",            "type": "varchar(20)",   "not_null": True, "default": "'alta'"},
+            {"name": "estado",            "type": "enum('pendiente','procesado','error')", "not_null": True, "default": "'pendiente'"},
+            {"name": "intentos",          "type": "int",           "not_null": True, "default": 0},
+            {"name": "error_mensaje",     "type": "text"},
+            {"name": "id_pedido_wms",     "type": "int"},
+            {"name": "fecha_carga",       "type": "datetime",      "not_null": True, "default": "CURRENT_TIMESTAMP"},
+            {"name": "fecha_procesado",   "type": "datetime"},
+            {"name": "updated_at",        "type": "datetime",      "not_null": True, "default": "CURRENT_TIMESTAMP_ON_UPDATE"},
+        ],
+        "indexes": [
+            {"columns": ["tenant_codigo"], "name": "idx_int_ped_tenant"},
+            {"columns": ["estado"],        "name": "idx_int_ped_estado"},
+            {"columns": ["nro_pedido"],    "name": "idx_int_ped_nro"},
+        ],
+    },
+    {
+        "name": "intercambio_log",
+        "comment": "Historial de ejecuciones del proceso de intercambio",
+        "columns": [
+            {"name": "id",                   "type": "int",          "pk": True, "autoincrement": True},
+            {"name": "modulo",               "type": "varchar(50)",  "not_null": True},
+            {"name": "resultado",            "type": "varchar(20)",  "not_null": True, "default": "'ok'"},
+            {"name": "registros_procesados", "type": "int",          "not_null": True, "default": 0},
+            {"name": "registros_error",      "type": "int",          "not_null": True, "default": 0},
+            {"name": "detalle",              "type": "text"},
+            {"name": "usuario",              "type": "varchar(100)"},
+            {"name": "fecha",                "type": "datetime",     "not_null": True, "default": "CURRENT_TIMESTAMP"},
+        ],
+        "indexes": [
+            {"columns": ["modulo"], "name": "idx_int_log_modulo"},
+            {"columns": ["fecha"],  "name": "idx_int_log_fecha"},
+        ],
+    },
+]
+
+
+# ============================================================================
 # SEED DATA
 # ============================================================================
+
+# Rutas de la aplicacion asignables a roles. El sufijo "/*" cubre todas las
+# subrutas de un modulo (ej: /inventario/* cubre /inventario y /inventario/crear).
+# El valor "*" otorga acceso total al rol.
+ROUTE_CATALOG = [
+    {"grupo": "Materiales", "rutas": [
+        "/materiales", "/materiales/guardar", "/materiales/importar",
+        "/materiales/exportar/*", "/materiales/plantilla/*", "/materiales/eliminar/*",
+    ]},
+    {"grupo": "Ubicaciones", "rutas": [
+        "/ubicaciones", "/ubicaciones/guardar", "/ubicaciones/importar",
+        "/ubicaciones/exportar/*", "/ubicaciones/plantilla/*",
+    ]},
+    {"grupo": "Tipos de ubicacion", "rutas": [
+        "/tipoubicacion", "/tipoubicacion/guardar", "/tipoubicacion/eliminar/*",
+        "/tipoubicacion/importar", "/tipoubicacion/exportar/*", "/tipoubicacion/plantilla/*",
+    ]},
+    {"grupo": "Proveedores", "rutas": [
+        "/proveedores", "/proveedores/guardar", "/proveedores/eliminar/*",
+        "/proveedores/importar", "/proveedores/exportar/*", "/proveedores/plantilla/*",
+    ]},
+    {"grupo": "Clientes", "rutas": [
+        "/clientes", "/clientes/guardar", "/clientes/importar",
+        "/clientes/exportar/*", "/clientes/plantilla/*",
+    ]},
+    {"grupo": "Categorias", "rutas": [
+        "/categorias", "/categorias/guardar", "/categorias/eliminar/*",
+        "/categorias/importar", "/categorias/exportar/*", "/categorias/plantilla/*",
+    ]},
+    {"grupo": "Unidades", "rutas": [
+        "/unidades", "/unidades/guardar", "/unidades/eliminar/*",
+        "/unidades/importar", "/unidades/exportar/*", "/unidades/plantilla/*",
+    ]},
+    {"grupo": "Transportes", "rutas": [
+        "/transportes", "/transportes/guardar", "/transportes/importar",
+        "/transportes/exportar/*", "/transportes/plantilla/*",
+    ]},
+    {"grupo": "Rutas de reparto", "rutas": [
+        "/rutas", "/rutas/guardar", "/rutas/eliminar/*",
+        "/rutas/importar", "/rutas/exportar/*", "/rutas/plantilla/*",
+    ]},
+    {"grupo": "Zonas", "rutas": [
+        "/zonas", "/zonas/guardar", "/zonas/eliminar/*",
+        "/zonas/importar", "/zonas/exportar/*", "/zonas/plantilla/*",
+    ]},
+    {"grupo": "Clases de pedido", "rutas": [
+        "/clases-pedido", "/clases-pedido/guardar", "/clases-pedido/eliminar/*",
+        "/clases-pedido/importar", "/clases-pedido/exportar/*", "/clases-pedido/plantilla/*",
+    ]},
+    {"grupo": "Pedidos", "rutas": [
+        "/pedidos", "/pedidos/nuevo", "/pedidos/ver/*", "/pedidos/editar/*",
+        "/pedidos/guardar", "/pedidos/eliminar/*", "/pedidos/importar",
+        "/pedidos/plantilla/*", "/pedidos/picking_json",
+        "/pedidos/verificar_stock_masivo", "/pedidos/preparar_masivo",
+        "/pedidos/resumen_preparar", "/pedidos/cambiar_ruta_transporte",
+        "/pedidos/buscar_contenedores", "/pedidos/filtros/*", "/pedidos/contenedor_stock",
+    ]},
+    {"grupo": "Recepciones", "rutas": [
+        "/recepciones", "/recepciones/nueva", "/recepciones/guardar",
+        "/recepciones/ver/*", "/recepciones/buscar_*", "/recepciones/guardar_item",
+        "/recepciones/eliminar_item/*", "/recepciones/cerrar/*",
+        "/recepciones/eliminar/*", "/recepciones/confirmar_stock/*",
+        "/recepciones/anular/*", "/recepciones/importar", "/recepciones/plantilla/*",
+    ]},
+    {"grupo": "OMC", "rutas": [
+        "/omc", "/omc/nueva", "/omc/guardar", "/omc/ver/*", "/omc/confirmar/*",
+        "/omc/modificar/*", "/omc/anular/*", "/omc/buscar_*", "/omc/tipos_ubicacion",
+    ]},
+    {"grupo": "Despacho", "rutas": [
+        "/despacho", "/despacho/despachar/*", "/despacho/despachar_masivo",
+    ]},
+    {"grupo": "Stock contable", "rutas": [
+        "/stockcontable", "/stockcontable/editar/*", "/stockcontable/importar",
+        "/stockcontable/exportar/*", "/stockcontable/plantilla/*",
+    ]},
+    {"grupo": "Inventario", "rutas": [
+        "/inventario", "/inventario/crear", "/inventario/*",
+    ]},
+    {"grupo": "Parametros", "rutas": [
+        "/parametros", "/actualizar_parametros",
+    ]},
+    {"grupo": "Sistema", "rutas": [
+        "/dashboard", "/stock", "/entradas", "/salidas", "/movimientos",
+        "/reportes", "/rentradas", "/rsalidas", "/configuracion-db",
+        "/test_db_connection", "/sidebar-preferences",
+    ]},
+    {"grupo": "Intercambio", "rutas": [
+        "/intercambio", "/intercambio/procesar", "/intercambio/reintentar",
+        "/intercambio/reintentar/*",
+    ]},
+]
+
+# Rutas operativas por defecto para cada rol
+ROUTES_OPERADOR = [
+    "/materiales", "/materiales/guardar", "/materiales/importar",
+    "/materiales/exportar/*", "/materiales/plantilla/*", "/materiales/eliminar/*",
+    "/ubicaciones", "/ubicaciones/guardar", "/ubicaciones/importar",
+    "/ubicaciones/exportar/*", "/ubicaciones/plantilla/*",
+    "/tipoubicacion", "/tipoubicacion/guardar", "/tipoubicacion/eliminar/*",
+    "/tipoubicacion/importar", "/tipoubicacion/exportar/*", "/tipoubicacion/plantilla/*",
+    "/proveedores", "/proveedores/guardar", "/proveedores/eliminar/*",
+    "/proveedores/importar", "/proveedores/exportar/*", "/proveedores/plantilla/*",
+    "/clientes", "/clientes/guardar", "/clientes/importar",
+    "/clientes/exportar/*", "/clientes/plantilla/*",
+    "/categorias", "/categorias/guardar", "/categorias/eliminar/*",
+    "/unidades", "/unidades/guardar", "/unidades/eliminar/*",
+    "/unidades/importar", "/unidades/exportar/*", "/unidades/plantilla/*",
+    "/transportes", "/transportes/guardar",
+    "/transportes/importar", "/transportes/exportar/*", "/transportes/plantilla/*",
+    "/rutas", "/rutas/guardar", "/rutas/eliminar/*",
+    "/rutas/importar", "/rutas/exportar/*", "/rutas/plantilla/*",
+    "/pedidos", "/pedidos/nuevo", "/pedidos/ver/*", "/pedidos/editar/*",
+    "/pedidos/guardar", "/pedidos/eliminar/*", "/pedidos/importar",
+    "/pedidos/plantilla/*", "/pedidos/picking_json",
+    "/pedidos/preparar_masivo", "/pedidos/resumen_preparar",
+    "/pedidos/cambiar_ruta_transporte", "/pedidos/filtros/*", "/pedidos/contenedor_stock",
+    "/recepciones", "/recepciones/nueva", "/recepciones/guardar",
+    "/recepciones/ver/*", "/recepciones/buscar_*", "/recepciones/guardar_item",
+    "/recepciones/eliminar_item/*", "/recepciones/cerrar/*",
+    "/recepciones/eliminar/*", "/recepciones/confirmar_stock/*",
+    "/recepciones/anular/*", "/recepciones/importar", "/recepciones/plantilla/*",
+    "/omc", "/omc/nueva", "/omc/guardar", "/omc/ver/*",
+    "/omc/confirmar/*", "/omc/modificar/*", "/omc/anular/*", "/omc/buscar_*",
+    "/omc/tipos_ubicacion",
+    "/despacho", "/despacho/despachar/*", "/despacho/despachar_masivo",
+    "/stockcontable", "/stockcontable/editar/*",
+    "/stockcontable/importar", "/stockcontable/exportar/*", "/stockcontable/plantilla/*",
+    "/inventario", "/inventario/crear", "/inventario/*",
+    "/parametros", "/actualizar_parametros",
+    "/sidebar-preferences",
+]
+
+ROUTES_CONSULTA = [
+    "/materiales", "/ubicaciones", "/tipoubicacion", "/proveedores",
+    "/clientes", "/categorias", "/unidades", "/transportes", "/rutas",
+    "/zonas", "/clases-pedido",
+    "/pedidos", "/pedidos/ver/*", "/pedidos/filtros/*",
+    "/pedidos/buscar_contenedores", "/pedidos/contenedor_stock",
+    "/recepciones", "/recepciones/ver/*", "/recepciones/buscar_*",
+    "/omc", "/omc/ver/*", "/omc/buscar_*",
+    "/despacho", "/stockcontable", "/stockcontable/exportar/*",
+    "/stockcontable/plantilla/*",
+    "/inventario", "/inventario/*",
+    "/parametros",
+    "/stock", "/entradas", "/salidas", "/movimientos", "/reportes",
+    "/rentradas", "/rsalidas", "/dashboard",
+    "/sidebar-preferences",
+]
 
 ADMIN_SEEDS = [
     {
@@ -724,6 +1097,15 @@ ADMIN_SEEDS = [
              "razon_social": "Empresa Principal S.A.", "activo": True,
              "nombredelalmacen": "Almacen Principal", "metodosdepicking": '"fifo"',
              "bajostock": 0, "dias_filtro_fechas": 30},
+        ],
+    },
+    {
+        "table": "roles",
+        "comment": "Roles por defecto del sistema",
+        "rows": [
+            {"nombre": "ADMIN",     "descripcion": "Acceso total a todas las rutas",      "activo": True},
+            {"nombre": "OPERADOR",  "descripcion": "Rutas operativas del WMS",            "activo": True},
+            {"nombre": "CONSULTA",  "descripcion": "Acceso de solo lectura",              "activo": True},
         ],
     },
     {
@@ -756,6 +1138,13 @@ ADMIN_SEEDS = [
             {"clave": "DB_PASSWORD",  "valor": "Taurus_2001", "descripcion": "Contrasena de la base de datos"},
             {"clave": "DB_CHAR_SET",  "valor": "utf8mb4",     "descripcion": "Charset de la base de datos"},
             {"clave": "DB_ENGINE",    "valor": "mysql",       "descripcion": "Motor de BD: mysql, postgresql, sqlite"},
+            {"clave": "INTERCAMBIO_ENGINE",   "valor": "mysql",        "descripcion": "Motor de BD de intercambio (mysql, postgresql, sqlite, sqlserver)"},
+            {"clave": "INTERCAMBIO_HOST",     "valor": "localhost",    "descripcion": "Host de la base de intercambio"},
+            {"clave": "INTERCAMBIO_PORT",     "valor": "3306",         "descripcion": "Puerto de la base de intercambio"},
+            {"clave": "INTERCAMBIO_NAME",     "valor": "taurus_intercambio", "descripcion": "Nombre de la base de intercambio"},
+            {"clave": "INTERCAMBIO_USER",     "valor": "taurus",       "descripcion": "Usuario de la base de intercambio"},
+            {"clave": "INTERCAMBIO_PASSWORD", "valor": "Taurus_2001",  "descripcion": "Contrasena de la base de intercambio"},
+            {"clave": "INTERCAMBIO_CHAR_SET", "valor": "utf8mb4",      "descripcion": "Charset de la base de intercambio"},
         ],
     },
     {
@@ -765,46 +1154,9 @@ ADMIN_SEEDS = [
             # ADMIN: acceso total
             {"rol": "ADMIN", "ruta": "*"},
             # OPERADOR: rutas operativas
-            *[{  "rol": "OPERADOR", "ruta": r} for r in [
-                "/materiales", "/materiales/guardar", "/materiales/eliminar",
-                "/materiales/importar", "/materiales/exportar", "/materiales/plantilla",
-                "/ubicaciones", "/ubicaciones/guardar", "/ubicaciones/importar",
-                "/ubicaciones/exportar", "/ubicaciones/plantilla",
-                "/tipoubicacion", "/tipoubicacion/guardar", "/tipoubicacion/eliminar",
-                "/tipoubicacion/importar", "/tipoubicacion/exportar", "/tipoubicacion/plantilla",
-                "/proveedores", "/proveedores/guardar", "/proveedores/eliminar",
-                "/proveedores/importar", "/proveedores/exportar", "/proveedores/plantilla",
-                "/clientes", "/clientes/guardar", "/clientes/importar",
-                "/clientes/exportar", "/clientes/plantilla",
-                "/categorias", "/categorias/guardar", "/categorias/eliminar",
-                "/unidades", "/unidades/guardar", "/unidades/eliminar",
-                "/unidades/importar", "/unidades/exportar", "/unidades/plantilla",
-                "/transportes", "/transportes/guardar",
-                "/transportes/importar", "/transportes/exportar", "/transportes/plantilla",
-                "/rutas", "/rutas/guardar", "/rutas/eliminar",
-                "/rutas/importar", "/rutas/exportar", "/rutas/plantilla",
-                "/pedidos", "/pedidos/nuevo", "/pedidos/editar", "/pedidos/guardar",
-                "/pedidos/eliminar", "/pedidos/importar", "/pedidos/plantilla",
-                "/pedidos/picking_json",
-                "/recepciones", "/recepciones/nueva", "/recepciones/guardar",
-                "/recepciones/ver", "/recepciones/cerrar", "/recepciones/eliminar",
-                "/recepciones/importar", "/recepciones/plantilla",
-                "/recepciones/guardar_item", "/recepciones/eliminar_item",
-                "/recepciones/confirmar_stock", "/recepciones/anular",
-                "/omc", "/omc/nueva", "/omc/guardar", "/omc/ver",
-                "/despacho", "/despacho/despachar", "/despacho/despachar_masivo",
-                "/stockcontable", "/stockcontable/editar",
-                "/stockcontable/importar", "/stockcontable/exportar", "/stockcontable/plantilla",
-                "/inventario", "/inventario/crear", "/inventario/*",
-                "/parametros", "/actualizar_parametros",
-            ]],
+            *[{"rol": "OPERADOR", "ruta": r} for r in ROUTES_OPERADOR],
             # CONSULTA: solo lectura
-            *[{  "rol": "CONSULTA", "ruta": r} for r in [
-                "/materiales", "/ubicaciones", "/tipoubicacion", "/proveedores",
-                "/clientes", "/categorias", "/unidades", "/transportes", "/rutas",
-                "/pedidos", "/recepciones", "/omc", "/despacho",
-                "/stockcontable", "/inventario", "/parametros",
-            ]],
+            *[{"rol": "CONSULTA", "ruta": r} for r in ROUTES_CONSULTA],
         ],
     },
 ]
@@ -867,6 +1219,7 @@ class DDLEngine:
         parts.append(self.translate_type(col["type"]))
         if col.get("pk") and col.get("autoincrement"):
             parts.append(self.autoincrement_clause())
+            parts.append("PRIMARY KEY")
         elif col.get("pk"):
             parts.append("PRIMARY KEY")
         if col.get("not_null") and not (col.get("pk") and col.get("autoincrement")):
@@ -932,7 +1285,7 @@ class DDLEngine:
                 continue  # already handled in CREATE TABLE
             idx_cols = ", ".join(self.quote_identifier(c) for c in idx["columns"])
             self.add(
-                f"CREATE UNIQUE INDEX {self.quote_identifier(idx['name'])} "
+                f"CREATE INDEX {self.quote_identifier(idx['name'])} "
                 f"ON {self.quote_identifier(table_def['name'])} ({idx_cols})"
             )
 
@@ -1090,7 +1443,8 @@ class PostgreSQLEngine(DDLEngine):
 
         is_serial = col.get("pk") and col.get("autoincrement") and col["type"] in ("int", "bigint")
         if is_serial:
-            pass  # SERIAL already implies PK + autoincrement
+            # Replace type with SERIAL/BIGSERIAL (implies PK + autoincrement)
+            parts[-1] = "BIGSERIAL" if col["type"] == "bigint" else "SERIAL"
         elif col.get("pk") and col.get("autoincrement"):
             parts.append(self.autoincrement_clause())
         elif col.get("pk"):
@@ -1469,60 +1823,32 @@ ENGINE_MAP = {
 }
 
 
-def generate_schema(engine_name, output_file=None):
-    """Generate DDL for the specified engine. Returns the SQL as a string."""
+def generate_database(engine_name, db_name, tables, seeds, title, output_file=None):
+    """Generate DDL for a single database. Returns the SQL as a string."""
     if engine_name not in ENGINE_MAP:
         raise ValueError(f"Unknown engine: {engine_name}. Supported: {', '.join(ENGINE_MAP.keys())}")
 
     engine = ENGINE_MAP[engine_name]()
 
-    # --- ADMIN DATABASE ---
-    engine.header("taurus_admin")
-    engine.comment_sql("TAURUS WMS - Schema para taurus_admin")
+    engine.header(db_name)
+    engine.comment_sql(title)
     engine.comment_sql(f"Engine: {engine_name}")
     engine.comment_sql("Generado por modules/schema_generator.py")
     engine.add_blank()
 
-    engine.drop_database_sql("taurus_admin")
-    engine.create_database("taurus_admin")
-    engine.use_database("taurus_admin")
+    engine.drop_database_sql(db_name)
+    engine.create_database(db_name)
+    engine.use_database(db_name)
     engine.add_blank()
 
-    for table_def in ADMIN_TABLES:
+    for table_def in tables:
         engine.table_separator(table_def["name"])
         engine.create_table(table_def)
         engine.create_indexes(table_def)
 
     engine.add_blank()
     engine.comment_sql("--- Datos iniciales ---")
-    for seed in ADMIN_SEEDS:
-        engine.add_blank()
-        if "comment" in seed:
-            engine.comment_sql(seed["comment"])
-        engine.insert_seed(seed["table"], seed["rows"])
-
-    # --- WMS DATABASE ---
-    engine.add_blank()
-    engine.add_blank()
-    engine.header("taurus_wms")
-    engine.comment_sql("TAURUS WMS - Schema para taurus_wms (datos operativos)")
-    engine.comment_sql(f"Engine: {engine_name}")
-    engine.comment_sql("Generado por modules/schema_generator.py")
-    engine.add_blank()
-
-    engine.drop_database_sql("taurus_wms")
-    engine.create_database("taurus_wms")
-    engine.use_database("taurus_wms")
-    engine.add_blank()
-
-    for table_def in WMS_TABLES:
-        engine.table_separator(table_def["name"])
-        engine.create_table(table_def)
-        engine.create_indexes(table_def)
-
-    engine.add_blank()
-    engine.comment_sql("--- Datos iniciales ---")
-    for seed in WMS_SEEDS:
+    for seed in seeds:
         engine.add_blank()
         if "comment" in seed:
             engine.comment_sql(seed["comment"])
@@ -1547,6 +1873,53 @@ def generate_schema(engine_name, output_file=None):
     return sql
 
 
+def generate_schema(engine_name, output_file=None):
+    """Generate the combined schema (taurus_admin + taurus_wms + taurus_intercambio) for the specified engine."""
+    if engine_name not in ENGINE_MAP:
+        raise ValueError(f"Unknown engine: {engine_name}. Supported: {', '.join(ENGINE_MAP.keys())}")
+
+    admin_sql = generate_database(
+        engine_name, "taurus_admin", ADMIN_TABLES, ADMIN_SEEDS,
+        "TAURUS WMS - Schema para taurus_admin",
+    )
+    wms_sql = generate_database(
+        engine_name, "taurus_wms", WMS_TABLES, WMS_SEEDS,
+        "TAURUS WMS - Schema para taurus_wms (datos operativos)",
+    )
+    intercambio_sql = generate_database(
+        engine_name, "taurus_intercambio", INTERCAMBIO_TABLES, [],
+        "TAURUS WMS - Schema para taurus_intercambio (interfaces con sistemas externos)",
+    )
+
+    sql = admin_sql + "\n" + wms_sql + "\n" + intercambio_sql
+
+    if output_file:
+        os.makedirs(os.path.dirname(output_file) or ".", exist_ok=True)
+        with open(output_file, "w", encoding="utf-8") as f:
+            f.write(sql)
+
+    return sql
+
+
+def generate_migrations(engine_name, migrations_dir="migrations"):
+    """Generate create_admin_<engine>.sql, create_wms_<engine>.sql and create_intercambio_<engine>.sql."""
+    generate_database(
+        engine_name, "taurus_admin", ADMIN_TABLES, ADMIN_SEEDS,
+        "TAURUS WMS - Schema para taurus_admin",
+        os.path.join(migrations_dir, f"create_admin_{engine_name}.sql"),
+    )
+    generate_database(
+        engine_name, "taurus_wms", WMS_TABLES, WMS_SEEDS,
+        "TAURUS WMS - Schema para taurus_wms (datos operativos)",
+        os.path.join(migrations_dir, f"create_wms_{engine_name}.sql"),
+    )
+    generate_database(
+        engine_name, "taurus_intercambio", INTERCAMBIO_TABLES, [],
+        "TAURUS WMS - Schema para taurus_intercambio (interfaces con sistemas externos)",
+        os.path.join(migrations_dir, f"create_intercambio_{engine_name}.sql"),
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(description="Generador de schema multi-engine para Taurus WMS")
     parser.add_argument("--engine", choices=["mysql", "postgresql", "sqlite", "sqlserver"],
@@ -1564,6 +1937,8 @@ def main():
             out_path = os.path.join(args.output_dir, f"schema_{eng}.sql")
             print(f"Generando {out_path} ...")
             generate_schema(eng, out_path)
+            print(f"Generando migrations/create_admin_{eng}.sql y create_wms_{eng}.sql ...")
+            generate_migrations(eng)
         print("Listo.")
     elif args.engine:
         if args.output:

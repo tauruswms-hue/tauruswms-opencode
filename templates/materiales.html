@@ -53,6 +53,7 @@
                     <th>Prov. Habitual</th>
                     <th>Stock Min/Max</th>
                     <th style="text-align:center;">Lote / Serie</th>
+                    <th style="text-align:center;">Picking</th>
                     <th>Acciones</th>
                 </tr>
             </thead>
@@ -86,6 +87,14 @@
                             <span style="color:#ccc;">—</span>
                         {% endif %}
                     </td>
+                    <td style="text-align:center;">
+                        {% set mp = m.metodo_picking or 'libre' %}
+                        {% if mp == 'libre' %}
+                            <span title="{{ picking_labels.get(mp, mp) }}" style="background:#3498db; color:white; padding:2px 8px; border-radius:10px; font-size:0.8rem;">Libre</span>
+                        {% else %}
+                            <span title="{{ picking_labels.get(mp, mp) }}" style="background:#8e44ad; color:white; padding:2px 8px; border-radius:10px; font-size:0.8rem;">{{ mp|upper }}</span>
+                        {% endif %}
+                    </td>
                     <td class="actions-cell" style="text-align: center;">
                         <button class="btn-icon edit" onclick='editMaterial({{ m | tojson }})' style="color: #3498db; border:none; background:none; cursor:pointer;">
                             <i class="fas fa-edit"></i>
@@ -111,6 +120,7 @@
     const listaProveedoresDB = {{ proveedores | tojson }};
     const relacionesExistentes = {{ relaciones | tojson }};
     const presentacionesExistentes = {{ presentaciones | tojson }};
+    const metodoPickingDefault = {{ picking_metodo_default | tojson }};
 </script>
 <script src="{{ url_for('static', filename='js/materiales.js') }}"></script>
 <script src="{{ url_for('static', filename='js/batch_ui.js') }}"></script>

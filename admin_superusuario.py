@@ -73,10 +73,14 @@ def pedir_input(prompt, obligatorio=True):
 
 
 def pedir_password(prompt="  Contraseña: "):
+    import sys
+    import getpass
     try:
-        import getpass
-        pw = getpass.getpass(prompt)
-    except (KeyboardInterrupt, getpass.GetPassWarning):
+        if sys.stdin.isatty():
+            pw = getpass.getpass(prompt)
+        else:
+            pw = input(prompt)
+    except (KeyboardInterrupt, getpass.GetPassWarning, OSError):
         print()
         return None
     if not pw:
@@ -130,7 +134,7 @@ while True:
             if username is None:
                 continue
 
-            cursor.execute("SELECT id, nombre, email, rol, activo FROM admin_usuarios WHERE username = %s", (username,))
+            cursor.execute("SELECT id, username, nombre, email, rol, activo FROM admin_usuarios WHERE username = %s", (username,))
             usuario = cursor.fetchone()
 
             if usuario:
@@ -246,7 +250,7 @@ while True:
             if username is None:
                 continue
 
-            cursor.execute("SELECT id, nombre, email, rol, activo FROM admin_usuarios WHERE username = %s", (username,))
+            cursor.execute("SELECT id, username, nombre, email, rol, activo FROM admin_usuarios WHERE username = %s", (username,))
             usuario = cursor.fetchone()
 
             if not usuario:
@@ -275,7 +279,7 @@ while True:
             if username is None:
                 continue
 
-            cursor.execute("SELECT id, nombre, email, rol, activo FROM admin_usuarios WHERE username = %s", (username,))
+            cursor.execute("SELECT id, username, nombre, email, rol, activo FROM admin_usuarios WHERE username = %s", (username,))
             usuario = cursor.fetchone()
 
             if not usuario:

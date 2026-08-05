@@ -2,10 +2,16 @@
 
 {% block content %}
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/fixedheader/3.4.0/css/fixedHeader.dataTables.min.css">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/tipoubicacion.css') }}">
+<style>
+#tablaClasesPedido_wrapper .dataTables_scrollHead thead th { background: #f8f9fa; }
+        #tablaClasesPedido_wrapper .dataTables_scrollBody td,
+        #tablaClasesPedido_wrapper .dataTables_scrollHead th { font-size: 0.9rem; padding: 3px 5px; }
+</style>
 
-<div class="materiales-container">
-    <div class="header-actions">
+<div class="materiales-container" style="padding: 0 20px 20px 20px; height: calc(100vh - 50px); display: flex; flex-direction: column;">
+    <div class="header-actions" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-shrink: 0; position: sticky; top: 0; z-index: 10; background: #f8f9fa; margin: -20px -20px 20px -20px; padding: 10px 20px 8px 20px;">
         <h1><i class="fas fa-layer-group"></i> Clases de Pedido</h1>
         <div style="display:flex; gap:10px; align-items:center;">
             <div class="mat-dropdown" style="position:relative;">
@@ -18,17 +24,17 @@
                     <a href="{{ url_for('clases_pedido.exportar', formato='json') }}" style="display:flex; align-items:center; gap:8px; padding:10px 16px; color:#333; text-decoration:none; font-size:0.9rem;" onmouseenter="this.style.background='#f5f5f5'" onmouseleave="this.style.background=''"><i class="fas fa-file-code" style="color:#e67e22; width:16px;"></i> JSON</a>
                 </div>
             </div>
-            <button onclick="openModalImportar()" style="background:#3498db; color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer; font-weight:bold;">
+            <button class="btn-add" onclick="openModalImportar()" style="background:#3498db; color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer; font-weight:bold;">
                 <i class="fas fa-file-import"></i> Importar
             </button>
-            <button class="btn-add" onclick="openModalClase()">
+            <button class="btn-add" onclick="openModalClase()" style="background:#27ae60; color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer; font-weight:bold;">
                 <i class="fas fa-plus"></i> Nueva Clase
             </button>
         </div>
     </div>
 
-    <div class="table-card">
-        <table id="tablaClasesPedido" class="display cell-border hover stripe" style="width:100%">
+    <div class="table-card" style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); flex: 1; min-height: 0; overflow: auto;">
+        <table id="tablaClasesPedido" class="display cell-border hover stripe" style="width:100%; min-width: 500px;">
             <thead>
                 <tr>
                     <th>Nombre</th>
@@ -39,12 +45,12 @@
                 {% for c in clases %}
                 <tr>
                     <td><strong>{{ c.nombre }}</strong></td>
-                    <td class="actions-cell">
-                        <button class="btn-icon edit" onclick='editClase({{ c | tojson }})'>
+                    <td class="actions-cell" style="text-align: center;">
+                        <button class="btn-icon edit" onclick='editClase({{ c | tojson }})' style="color: #3498db; background: none; border: none; cursor: pointer; font-size: 1.1rem;">
                             <i class="fas fa-edit"></i>
                         </button>
                         <form method="POST" action="{{ url_for('clases_pedido.eliminar', id_clase=c.id_clase) }}" style="display:inline;" onsubmit="return confirm('¿Inactivar esta clase de pedido?')">
-                            <button type="submit" class="btn-icon delete"><i class="fas fa-trash"></i></button>
+                            <button type="submit" class="btn-icon delete" style="color: #e74c3c; background: none; border: none; cursor: pointer; font-size: 1.1rem;"><i class="fas fa-trash"></i></button>
                         </form>
                     </td>
                 </tr>
@@ -59,6 +65,34 @@
 
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/fixedheader/3.4.0/js/dataTables.fixedHeader.min.js"></script>
+<script>
+    $(document).ready(function() {
+        $('#tablaClasesPedido').DataTable({
+            "paging": false,                    // todas las filas en el cuerpo; el scroll lo maneja la grilla
+            "scrollY": "calc(100vh - 300px)",
+            "scrollX": true,
+            "scrollCollapse": true,
+            "language": {
+                sProcessing:   "Procesando...",
+                sLengthMenu:   "Mostrar _MENU_ registros",
+                sZeroRecords:  "No se encontraron resultados",
+                sEmptyTable:   "Ningún dato disponible",
+                sInfo:         "Mostrando _START_ a _END_ de _TOTAL_ registros",
+                sInfoEmpty:    "Mostrando 0 a 0 de 0 registros",
+                sInfoFiltered: "(filtrado de _MAX_ registros totales)",
+                sSearch:       "Buscar:",
+                sLoadingRecords: "Cargando...",
+                oPaginate: {
+                    sFirst:    "« Primero",
+                    sLast:     "Último »",
+                    sNext:     "Siguiente »",
+                    sPrevious: "« Anterior"
+                }
+            }
+        });
+    });
+</script>
 <script src="{{ url_for('static', filename='js/clases_pedido.js') }}"></script>
 <script src="{{ url_for('static', filename='js/batch_ui.js') }}"></script>
 {% endblock %}

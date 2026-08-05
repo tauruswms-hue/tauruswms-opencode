@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session
+﻿from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session
 import re
 from modules.db_config import get_db_connection
 from modules.batch_utils import (parse_file, export_csv, export_json, export_xlsx,
@@ -53,7 +53,7 @@ def guardar():
     email = d.get('email')
 
     if cuit and not validar_cuit(cuit):
-        flash("Error: El CUIT debe contener 11 dígitos numéricos.", "danger")
+        flash("Error: El CUIT debe contener 11 dÃ­gitos numÃ©ricos.", "danger")
         return redirect(url_for('transportes.listar'))
 
     rutas_ids = request.form.getlist('rutas_ids[]')
@@ -99,7 +99,7 @@ def guardar():
     return redirect(url_for('transportes.listar'))
 
 
-# ── Batch ─────────────────────────────────────────────────────────────────────
+# â”€â”€ Batch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 _CAMPOS_EXPORT = ['codigo', 'razonsocial', 'cuit', 'telefono', 'email', 'activo']
 _CAMPOS_IMPORT = ['codigo', 'razonsocial', 'cuit', 'telefono', 'email', 'activo']
 _EJEMPLO_IMPORT = ['TRA001', 'Transporte Ejemplo S.A.', '30-12345678-9',
@@ -111,9 +111,9 @@ def importar():
     tenant_id = get_tenant_filter()
     file = request.files.get('archivo')
     if not file or not file.filename:
-        return jsonify({'error': 'No se proporcionó archivo'}), 400
+        return jsonify({'error': 'No se proporcionÃ³ archivo'}), 400
     try:
-        rows = parse_file(file)
+        rows = parse_file(file, request.form.get('hoja'))
     except Exception as e:
         return jsonify({'error': f'Error al leer el archivo: {str(e)}'}), 400
 
@@ -124,8 +124,8 @@ def importar():
             codigo = str(row.get('codigo', '') or '').strip()
             razon = str(row.get('razonsocial', '') or '').strip()
             if not codigo or not razon:
-                errores.append({'fila': i, 'codigo': codigo or '(vacío)',
-                                'razon': 'Código y Razón Social son obligatorios'})
+                errores.append({'fila': i, 'codigo': codigo or '(vacÃ­o)',
+                                'razon': 'CÃ³digo y RazÃ³n Social son obligatorios'})
                 continue
             try:
                 with conn.cursor() as cursor:
@@ -180,7 +180,7 @@ def exportar(formato):
         return export_json(rows, _CAMPOS_EXPORT, 'transportes.json')
     elif formato == 'xlsx':
         return export_xlsx(rows, _CAMPOS_EXPORT, 'transportes.xlsx')
-    return 'Formato no válido', 400
+    return 'Formato no vÃ¡lido', 400
 
 
 @transportes_bp.route('/transportes/plantilla/<formato>')
@@ -191,4 +191,4 @@ def plantilla(formato):
         return plantilla_json(_CAMPOS_IMPORT, _EJEMPLO_IMPORT, 'plantilla_transportes.json')
     elif formato == 'xlsx':
         return plantilla_xlsx(_CAMPOS_IMPORT, _EJEMPLO_IMPORT, 'plantilla_transportes.xlsx')
-    return 'Formato no válido', 400
+    return 'Formato no vÃ¡lido', 400

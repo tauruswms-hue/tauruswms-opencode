@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Taurus Suite - Rutas del rol {{ role.nombre }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root { --primary-color: #1a365d; }
+        body { background: #f8f9fa; }
+        .admin-header {
+            background: var(--primary-color);
+            color: white;
+            padding: 15px 0;
+        }
+        .ruta-caja { border: 1px solid #dee2e6; border-radius: .375rem; padding: .5rem .75rem; }
+        .ruta-caja:hover { background: #f8f9fa; }
+    </style>
+</head>
+<body>
+    <div class="admin-header">
+        <div class="container">
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-2">
+                    <img src="{{ url_for('static', filename='logo/Taurussuite.jpg') }}" alt="Taurus Suite" style="height: 40px;">
+                    <h4 class="mb-0">Taurus Suite</h4>
+                </div>
+                <div class="d-flex align-items-center gap-3">
+                    <span><i class="fas fa-user me-1"></i>{{ session.admin_nombre }} ({{ session.admin_rol }})</span>
+                    <a href="{{ url_for('admin.logout') }}" class="btn btn-outline-light btn-sm">
+                        <i class="fas fa-sign-out-alt"></i> Salir
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="container py-4">
+        <nav aria-label="breadcrumb" class="mb-3">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('admin.roles') }}">Roles y Rutas</a></li>
+                <li class="breadcrumb-item active">Rutas del rol {{ role.nombre }}</li>
+            </ol>
+        </nav>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    {% if category == 'error' %}
+                    <div class="alert alert-danger alert-dismissible fade show">
+                    {% else %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show">
+                    {% endif %}
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <form method="POST" id="formRutas">
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-route me-2"></i>Permisos del rol <strong>{{ role.nombre }}</strong></h5>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Guardar
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="form-check form-switch mb-3 p-3 bg-warning-subtle rounded">
+                        <input class="form-check-input" type="checkbox" value="*" id="chkAccesoTotal" name="rutas"
+                               {% if '*' in asignadas %}checked{% endif %}>
+                        <label class="form-check-label" for="chkAccesoTotal">
+                            <strong>Acceso total a todas las rutas (*)</strong>
+                        </label>
+                        <div class="form-text">Al activar esta opción, el rol puede acceder a cualquier ruta de la aplicación, incluidas las futuras.</div>
+                    </div>
+
+                    {% for grupo in catalogo %}
+                    <div class="row g-2 mb-3">
+                        <div class="col-12">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h6 class="mb-1 text-primary">{{ grupo.grupo }}</h6>
+                                <div class="btn-group btn-group-sm">
+                                    <button type="button" class="btn btn-outline-primary" onclick="marcarGrupo({{ loop.index0 }}, true)">Marcar</button>
+                                    <button type="button" class="btn btn-outline-secondary" onclick="marcarGrupo({{ loop.index0 }}, false)">Desmarcar</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="row g-2">
+                                {% for ruta in grupo.rutas %}
+                                <div class="col-md-4 col-lg-3">
+                                    <div class="ruta-caja">
+                                        <div class="form-check">
+                                            <input class="form-check-input ruta-check" type="checkbox" value="{{ ruta }}" name="rutas"
+                                                   id="chk-{{ loop.index0 }}-{{ loop.index }}" data-grupo="{{ loop.index0 }}"
+                                                   {% if ruta in asignadas %}checked{% endif %}>
+                                            <label class="form-check-label small" for="chk-{{ loop.index0 }}-{{ loop.index }}">
+                                                <code>{{ ruta }}</code>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="card-footer d-flex justify-content-between">
+                    <a href="{{ url_for('admin.roles') }}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Volver
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Guardar
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function marcarGrupo(idx, estado) {
+            document.querySelectorAll('.ruta-check[data-grupo="' + idx + '"]').forEach(function(cb) {
+                cb.checked = estado;
+            });
+        }
+    </script>
+</body>
+</html>

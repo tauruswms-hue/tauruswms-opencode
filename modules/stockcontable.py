@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, jsonify, session
+﻿from flask import Blueprint, render_template, request, jsonify, session
 import datetime
 from modules.batch_utils import (parse_file, export_csv, export_json, export_xlsx,
                                   plantilla_csv, plantilla_json, plantilla_xlsx,
@@ -61,7 +61,7 @@ def listar():
 
 # -------------------------------------------------------------------
 # Las siguientes funciones son de uso interno, llamadas desde los
-# módulos de Ingresos, Pedidos, Ajustes y Movimientos internos.
+# mÃ³dulos de Ingresos, Pedidos, Ajustes y Movimientos internos.
 # No exponen rutas HTTP propias.
 # -------------------------------------------------------------------
 
@@ -73,8 +73,8 @@ def upsert_posicion(conn, ubicacion_id, material_id, contenedor,
                     ultimo_movimiento=None, fecha_vencimiento=None,
                     usuario_ultimo_mov=None, tenant_id=None):
     """
-    Inserta o actualiza una posición de stock contable.
-    Clave única: (Ubicacion, Material, IDContenedor).
+    Inserta o actualiza una posiciÃ³n de stock contable.
+    Clave Ãºnica: (Ubicacion, Material, IDContenedor).
     Los deltas se suman al stock existente.
     """
     cols = ['Ubicacion', 'Material', 'IDContenedor', 'Lote', 'TipoStock',
@@ -107,16 +107,16 @@ def editar(stock_id):
 
     tipos_validos = {'Libre Venta', 'Calidad', 'Bloqueado', 'Mal Estado'}
     if tipo_stock not in tipos_validos:
-        return jsonify({'ok': False, 'error': 'Tipo de stock inválido'}), 400
+        return jsonify({'ok': False, 'error': 'Tipo de stock invÃ¡lido'}), 400
     if not lote:
-        return jsonify({'ok': False, 'error': 'El lote no puede estar vacío'}), 400
+        return jsonify({'ok': False, 'error': 'El lote no puede estar vacÃ­o'}), 400
 
     fecha_venc = None
     if fecha_venc_str:
         try:
             fecha_venc = datetime.datetime.strptime(fecha_venc_str, '%Y-%m-%d').date()
         except ValueError:
-            return jsonify({'ok': False, 'error': 'Fecha de vencimiento inválida'}), 400
+            return jsonify({'ok': False, 'error': 'Fecha de vencimiento invÃ¡lida'}), 400
 
     usuario = session.get('username', 'sistema')
     ahora   = datetime.datetime.now()
@@ -148,7 +148,7 @@ def editar(stock_id):
     finally:
         conn.close()
 
-# ── Batch ─────────────────────────────────────────────────────────────────────
+# â”€â”€ Batch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 _CAMPOS_EXPORT = ['ubicacion_codigo', 'ubicacion_descripcion', 'material_codigo', 'material_nombre',
                   'IDContenedor', 'Lote', 'TipoStock', 'FechaVencimiento',
                   'StockTotal', 'StockDisponible', 'StockEntrando', 'StockSaliendo',
@@ -187,7 +187,7 @@ def exportar(formato):
         return export_json(rows, _CAMPOS_EXPORT, 'stock.json')
     elif formato == 'xlsx':
         return export_xlsx(rows, _CAMPOS_EXPORT, 'stock.xlsx')
-    return 'Formato no válido', 400
+    return 'Formato no vÃ¡lido', 400
 
 
 @stockcontable_bp.route('/stockcontable/importar', methods=['POST'])
@@ -195,9 +195,9 @@ def importar():
     """Carga inicial de stock. Inserta posiciones nuevas; omite duplicados (Ubicacion, Material, IDContenedor)."""
     file = request.files.get('archivo')
     if not file or not file.filename:
-        return jsonify({'error': 'No se proporcionó archivo'}), 400
+        return jsonify({'error': 'No se proporcionÃ³ archivo'}), 400
     try:
-        rows = parse_file(file)
+        rows = parse_file(file, request.form.get('hoja'))
     except Exception as e:
         return jsonify({'error': f'Error al leer el archivo: {str(e)}'}), 400
 
@@ -222,7 +222,7 @@ def importar():
                     cursor.execute("SELECT id FROM ubicaciones WHERE codigo = %s AND (%s IS NULL OR tenant_id = %s)", (ub_cod, tenant_id, tenant_id))
                     ub_row = cursor.fetchone()
                     if not ub_row:
-                        errores.append({'fila': i, 'codigo': ub_cod, 'razon': f'Ubicación "{ub_cod}" no encontrada'})
+                        errores.append({'fila': i, 'codigo': ub_cod, 'razon': f'UbicaciÃ³n "{ub_cod}" no encontrada'})
                         continue
                     cursor.execute("SELECT id FROM materiales WHERE codigo = %s AND (%s IS NULL OR tenant_id = %s)", (mat_cod, tenant_id, tenant_id))
                     mat_row = cursor.fetchone()
@@ -284,4 +284,4 @@ def plantilla(formato):
         return plantilla_json(_CAMPOS_IMPORT, _EJEMPLO_IMPORT, 'plantilla_stock.json')
     elif formato == 'xlsx':
         return plantilla_xlsx(_CAMPOS_IMPORT, _EJEMPLO_IMPORT, 'plantilla_stock.xlsx')
-    return 'Formato no válido', 400
+    return 'Formato no vÃ¡lido', 400

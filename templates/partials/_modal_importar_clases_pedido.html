@@ -27,6 +27,10 @@
                     <a href="{{ url_for('clases_pedido.plantilla', formato='xlsx') }}" style="background:#217346; color:white; text-decoration:none; padding:6px 12px; border-radius:4px; font-size:0.82rem;"><i class="fas fa-file-excel"></i> XLSX</a>
                     <a href="{{ url_for('clases_pedido.plantilla', formato='json') }}" style="background:#e67e22; color:white; text-decoration:none; padding:6px 12px; border-radius:4px; font-size:0.82rem;"><i class="fas fa-file-code"></i> JSON</a>
                 </div>
+                <p style="margin:10px 0 0; font-size:0.85rem;">
+                    <i class="fas fa-database" style="color:#8e44ad;"></i>
+                    <a href="{{ url_for('clases_pedido.plantilla_datos', formato='xlsx') }}" style="color:#8e44ad; font-weight:bold;">Descargar XLSX con las clases de pedido actuales</a> (datos reales, listo para importar/editar).
+                </p>
             </div>
             <div style="margin-bottom:16px;">
                 <label style="font-size:0.88rem; font-weight:bold; color:#555; display:block; margin-bottom:8px;"><i class="fas fa-folder-open"></i> Seleccionar archivo</label>

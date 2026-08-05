@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+
+{% block title %}Intercambio{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+<style>
+    .int-container { padding: 0 20px 20px 20px; }
+    .int-header {
+        display: flex; justify-content: space-between; align-items: center;
+        margin: -20px -20px 20px -20px; padding: 10px 20px 8px 20px;
+        background: #f8f9fa; position: sticky; top: 0; z-index: 10;
+    }
+    .int-card { background: white; padding: 20px; border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-bottom: 20px; }
+    .stat-card { border-radius: 8px; padding: 16px; color: white; }
+    .stat-card h2 { margin: 0; font-size: 2rem; }
+    .stat-card .label { opacity: 0.9; font-size: 0.85rem; text-transform: uppercase; }
+    .badge-error { background: #e74c3c; color: white; }
+    .badge-pendiente { background: #f39c12; color: white; }
+    .badge-procesado { background: #27ae60; color: white; }
+    table.dataTable tbody td { font-size: 0.88rem; padding: 4px 6px; }
+</style>
+
+<div class="int-container">
+    <div class="int-header">
+        <h1><i class="fas fa-exchange-alt"></i> Intercambio con Sistemas Externos</h1>
+        <div style="display:flex; gap:10px;">
+            <form method="POST" action="{{ url_for('intercambio.reintentar_todos') }}" style="display:inline;"
+                  onsubmit="return confirm('¿Devolver TODOS los registros en error a pendiente?');">
+                <button class="btn-add" style="background:#e67e22; color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer; font-weight:bold;">
+                    <i class="fas fa-undo"></i> Reintentar Errores
+                </button>
+            </form>
+            <form method="POST" action="{{ url_for('intercambio.procesar') }}" style="display:inline;">
+                <button class="btn-add" style="background:#27ae60; color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer; font-weight:bold;">
+                    <i class="fas fa-sync"></i> Procesar Pendientes
+                </button>
+            </form>
+        </div>
+    </div>
+
+    {% if tenant_id is none %}
+    <div class="alert alert-warning" style="background:#fef3cd; color:#856404; padding:10px 16px; border-radius:6px; margin-bottom:16px;">
+        <i class="fas fa-info-circle"></i> Vista sin filtro de tenant (superadmin). Se muestran registros de todos los tenants.
+    </div>
+    {% endif %}
+
+    <div class="row" style="display:flex; gap:20px; margin-bottom:20px;">
+        <div class="stat-card" style="background:#3498db; flex:1;">
+            <div class="label">Pendientes</div>
+            <h2>{{ conteo.get('pendiente', 0) }}</h2>
+        </div>
+        <div class="stat-card" style="background:#e74c3c; flex:1;">
+            <div class="label">Errores</div>
+            <h2>{{ conteo.get('error', 0) }}</h2>
+        </div>
+        <div class="stat-card" style="background:#27ae60; flex:1;">
+            <div class="label">Procesados</div>
+            <h2>{{ conteo.get('procesado', 0) }}</h2>
+        </div>
+    </div>
+
+    <div class="int-card">
+        <div class="d-flex justify-content-between align-items-center" style="display:flex; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+            <h5 style="margin:0;"><i class="fas fa-list me-1"></i> Registros (últimos 300)</h5>
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                <a href="{{ url_for('intercambio.listar', estado=filtro or '', modulo='') }}" class="btn btn-sm {{ 'btn-primary' if not modulo else 'btn-outline-secondary' }}" style="text-decoration:none;">Todos los módulos</a>
+                {% for m, conf in modulos.items() %}
+                <a href="{{ url_for('intercambio.listar', estado=filtro or '', modulo=m) }}" class="btn btn-sm {{ 'btn-primary' if modulo==m else 'btn-outline-secondary' }}" style="text-decoration:none;">{{ conf.nombre }}</a>
+                {% endfor %}
+            </div>
+            <div style="display:flex; gap:6px;">
+                <a href="{{ url_for('intercambio.listar', estado='', modulo=modulo) }}" class="btn btn-sm {{ 'btn-primary' if not filtro else 'btn-outline-secondary' }}" style="text-decoration:none;">Todos</a>
+                <a href="{{ url_for('intercambio.listar', estado='pendiente', modulo=modulo) }}" class="btn btn-sm {{ 'btn-warning' if filtro=='pendiente' else 'btn-outline-secondary' }}" style="text-decoration:none;">Pendientes</a>
+                <a href="{{ url_for('intercambio.listar', estado='error', modulo=modulo) }}" class="btn btn-sm {{ 'btn-danger' if filtro=='error' else 'btn-outline-secondary' }}" style="text-decoration:none;">Errores</a>
+                <a href="{{ url_for('intercambio.listar', estado='procesado', modulo=modulo) }}" class="btn btn-sm {{ 'btn-success' if filtro=='procesado' else 'btn-outline-secondary' }}" style="text-decoration:none;">Procesados</a>
+            </div>
+        </div>
+        <div class="table-responsive" style="overflow-x:auto;">
+            <table class="display cell-border hover stripe" style="width:100%;">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Módulo</th>
+                        <th>Tenant</th>
+                        <th>Referencia</th>
+                        <th>Detalle</th>
+                        <th>Acción</th>
+                        <th>Estado</th>
+                        <th>Intentos</th>
+                        <th>Error / Detalle</th>
+                        <th>Carga</th>
+                        <th>Procesado</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in registros %}
+                    <tr>
+                        <td>{{ r.id }}</td>
+                        <td><span class="badge bg-secondary">{{ r.modulo_nombre }}</span></td>
+                        <td><code>{{ r.tenant_codigo }}</code></td>
+                        <td><code>{{ r.referencia }}</code></td>
+                        <td>{{ r.nombre }}</td>
+                        <td><span class="badge bg-secondary">{{ r.accion or 'alta' }}</span></td>
+                        <td>
+                            {% if r.estado == 'procesado' %}
+                                <span class="badge badge-procesado">Procesado</span>
+                            {% elif r.estado == 'error' %}
+                                <span class="badge badge-error">Error</span>
+                            {% else %}
+                                <span class="badge badge-pendiente">Pendiente</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ r.intentos }}</td>
+                        <td style="max-width:300px;">
+                            {% if r.error_mensaje %}
+                                <span style="color:#c0392b;" title="{{ r.error_mensaje }}">{{ r.error_mensaje[:120] }}</span>
+                            {% else %}
+                                <span style="color:#aaa;">—</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ r.fecha_carga.strftime('%d/%m/%Y %H:%M') if r.fecha_carga else '-' }}</td>
+                        <td>{{ r.fecha_procesado.strftime('%d/%m/%Y %H:%M') if r.fecha_procesado else '-' }}</td>
+                        <td>
+                            {% if r.estado == 'error' %}
+                            <form method="POST" action="{{ url_for('intercambio.reintentar_uno', modulo=r.modulo, rid=r.id) }}" style="display:inline;">
+                                <button class="btn btn-warning btn-sm" title="Reintentar">
+                                    <i class="fas fa-undo"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="12" style="text-align:center; color:#999;">No hay registros para mostrar.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="int-card">
+        <h5 style="margin:0 0 12px 0;"><i class="fas fa-history"></i> Historial de ejecuciones</h5>
+        <div class="table-responsive">
+            <table class="table table-sm table-hover" style="width:100%;">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Módulo</th>
+                        <th>Resultado</th>
+                        <th>Procesados</th>
+                        <th>Errores</th>
+                        <th>Usuario</th>
+                        <th>Detalle</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for l in logs %}
+                    <tr>
+                        <td>{{ l.fecha.strftime('%d/%m/%Y %H:%M') if l.fecha else '-' }}</td>
+                        <td>{{ l.modulo }}</td>
+                        <td>
+                            {% if l.resultado == 'ok' %}
+                                <span class="badge badge-procesado">OK</span>
+                            {% else %}
+                                <span class="badge badge-error">Error</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ l.registros_procesados }}</td>
+                        <td>{{ l.registros_error }}</td>
+                        <td>{{ l.usuario or '-' }}</td>
+                        <td style="max-width:350px;"><small>{{ l.detalle or '-' }}</small></td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="7" style="text-align:center; color:#999;">Sin ejecuciones aún.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script>
+$(document).ready(function() {
+    $('.table-responsive table').DataTable({
+        pageLength: 15,
+        order: [[0, 'desc']],
+        language: {
+            url: 'https://cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json'
+        }
+    });
+});
+</script>
+{% endblock %}

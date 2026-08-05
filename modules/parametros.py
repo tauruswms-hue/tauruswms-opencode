@@ -16,6 +16,7 @@ def parametros():
             'nombredelalmacen': '',
             'razonsocial': '',
             'metodosdepicking': 'fifo',
+            'metodo_picking_default': 'libre',
             'bajostock': 0,
             'dias_filtro_fechas': 30,
         }
@@ -25,7 +26,8 @@ def parametros():
     try:
         with conn.cursor() as cursor:
             cursor.execute("""
-                SELECT nombredelalmacen, metodosdepicking, bajostock, dias_filtro_fechas
+                SELECT nombredelalmacen, metodosdepicking, metodo_picking_default,
+                       bajostock, dias_filtro_fechas
                 FROM tenants WHERE id = %s
             """, (tenant_id,))
             row = cursor.fetchone()
@@ -35,6 +37,7 @@ def parametros():
                     'nombredelalmacen': '',
                     'razonsocial': '',
                     'metodosdepicking': 'fifo',
+                    'metodo_picking_default': 'libre',
                     'bajostock': 0,
                     'dias_filtro_fechas': 30,
                 }
@@ -51,6 +54,7 @@ def parametros():
                 config = {
                     'nombredelalmacen': row.get('nombredelalmacen') or '',
                     'metodosdepicking': metodos,
+                    'metodo_picking_default': row.get('metodo_picking_default') or 'libre',
                     'bajostock': row.get('bajostock') or 0,
                     'dias_filtro_fechas': row.get('dias_filtro_fechas') or 30,
                 }
@@ -74,18 +78,27 @@ def actualizar():
 
     try:
         with conn.cursor() as cursor:
-            picking_json = json.dumps(d.get('metodosdepicking', 'fifo'))
+            metodos = d.getlist('metodosdepicking')
+            if not metodos:
+                metodos = ['fifo']
+            picking_json = json.dumps(metodos)
+
+            metodo_default = (d.get('metodo_picking_default') or '').strip().lower()
+            if metodo_default not in metodos:
+                metodo_default = metodos[0]
 
             cursor.execute("""
                 UPDATE tenants SET
                     nombredelalmacen = %s,
                     metodosdepicking = %s,
+                    metodo_picking_default = %s,
                     bajostock = %s,
                     dias_filtro_fechas = %s
                 WHERE id = %s
             """, (
                 d.get('nombredelalmacen', ''),
                 picking_json,
+                metodo_default,
                 float(d.get('bajostock') or 0),
                 int(d.get('dias_filtro_fechas') or 30),
                 tenant_id
