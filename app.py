@@ -29,7 +29,7 @@ from modules.rutas import rutas_bp
 from modules.pedidos import pedidos_bp
 from modules.clases_pedido import clases_pedido_bp
 from modules.stockcontable import stockcontable_bp
-from modules.recepciones import recepciones_bp
+from modules.recepciones import recepciones_bpope
 from modules.zonas import zonas_bp
 from modules.omc import omc_bp
 from modules.inventario import inventario_bp
