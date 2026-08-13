@@ -127,13 +127,19 @@
                                         <i class="fas fa-sliders-h"></i>
                                     </a>
                                     {% if tenant.activo %}
-                                    <button class="btn btn-outline-danger btn-sm" onclick="eliminarTenant('{{ url_for('admin.tenants_eliminar', encoded_id=tenant.id|encode_id) }}')" title="Desactivar">
-                                        <i class="fas fa-ban"></i>
-                                    </button>
+                                    <form method="POST" action="{{ url_for('admin.tenants_eliminar', encoded_id=tenant.id|encode_id) }}" style="display:inline;" onsubmit="return confirm('¿Desactivar este tenant? Esto también desactivará sus usuarios.');">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-outline-danger btn-sm" title="Desactivar">
+                                            <i class="fas fa-ban"></i>
+                                        </button>
+                                    </form>
                                     {% else %}
-                                    <button class="btn btn-outline-success btn-sm" onclick="activarTenant('{{ url_for('admin.tenants_activar', encoded_id=tenant.id|encode_id) }}')" title="Activar">
-                                        <i class="fas fa-check"></i>
-                                    </button>
+                                    <form method="POST" action="{{ url_for('admin.tenants_activar', encoded_id=tenant.id|encode_id) }}" style="display:inline;" onsubmit="return confirm('¿Activar este tenant?');">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-outline-success btn-sm" title="Activar">
+                                            <i class="fas fa-check"></i>
+                                        </button>
+                                    </form>
                                     {% endif %}
                                 </td>
                             </tr>
@@ -153,6 +159,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <form method="POST" action="{{ url_for('admin.tenants_guardar') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="modal-body">
                         <input type="hidden" name="id" id="tenantId">
                         <div class="mb-2">
@@ -206,18 +213,6 @@
             document.querySelector('#modalTenant form').reset();
             document.getElementById('tenantActivo').checked = true;
             modal.show();
-        }
-        
-        function eliminarTenant(url) {
-            if (confirm('¿Desactivar este tenant? Esto también desactivará sus usuarios.')) {
-                window.location.href = url;
-            }
-        }
-        
-        function activarTenant(url) {
-            if (confirm('¿Activar este tenant?')) {
-                window.location.href = url;
-            }
         }
     </script>
 </body>

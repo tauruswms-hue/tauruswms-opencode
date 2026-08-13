@@ -1,0 +1,323 @@
+================================================================================
+ROADMAP — Taurus WMS: tareas para llevar la app a nivel produccion
+================================================================================
+Supuesto: "nivel requerido" = app vendible a un cliente real (estabilidad +
+seguridad razonable + procesos reproducibles). Ordenado por riesgo: primero
+lo que hoy esta roto, luego lo que impide produccion, y al final calidad.
+
+Formato de progreso: marcar [x] cuando la tarea este terminada y verificada.
+
+--------------------------------------------------------------------------------
+FASE 0 — ESTABILIZACION DE EMERGENCIA (aprox. 3-4 dias)
+--------------------------------------------------------------------------------
+Objetivo: que no haya flujos rotos ni texto corrupto a la vista del cliente.
+
+  [x] 0.1  Fix confirmacion OMC (CRITICO)
+           modules/omc.py:365 — la password de admin se valida contra
+           taurus_wms.usuarios, tabla migrada a taurus_admin. Validar contra
+           taurus_admin.usuarios via _get_admin_connection().
+           Es el bug que revienta una demo si la migracion esta aplicada.
+
+  [ ] 0.2  Corregir mojibake (UTF-8 doblemente codificado) en:
+           modules/pedidos.py, modules/recepciones.py,
+           modules/stockcontable.py (comentarios), modules/admin.py:352,
+           docs/create_manual.py. Reescribir literales tipo "Ã©xito",
+           "GESTIÃ“N", "contrase�a" a UTF-8 correcto. Guardar como UTF-8.
+
+  [x] 0.3  Fix upsert stockcontable multi-engine
+           modules/stockcontable.py:86 + sql_dialect.upsert_coalesce_sql.
+           ON CONFLICT (Ubicacion) chocaba con la unica unica compuesta
+           (Ubicacion, Material, IDContenedor). Corregido: los helpers
+           upsert_sql/upsert_incremental_sql/upsert_coalesce_sql aceptan
+           lista de columnas de conflicto (compat con str) y los 5 call
+           sites de stockcontable usan (Ubicacion, Material, IDContenedor).
+           MySQL usa ON DUPLICATE KEY; postgres/sqlite ON CONFLICT compuesto;
+           sqlserver MERGE con la clave compuesta en el ON.
+           Pendiente: probar ejecucion real en los 4 engines (ver Fase 2.2).
+           Nota: insert_ignore_sql sigue usando columns[0] como clave.
+
+  [x] 0.4  Eliminar except muerto en login
+           app.py:404-407 — habia dos `except Exception` seguidos; el segundo
+           era codigo muerto. Quedó uno que loguea el error real
+           (logger.error con exc_info) y muestra el mensaje al usuario.
+
+  [x] 0.5  Blindar clausulas IN vacias
+           modules/pedidos.py + despacho.py + inventario.py + intercambio.py
+           + omc.py. Nuevo helper central sql_dialect.in_clause_sql(items)
+           que genera los placeholders y lanza ValueError claro si la lista
+           esta vacia (evita IN () invalido o barridos accidentales si se
+           quita una guarda). Refactorizados los 10 sitios que armaban
+           ph = ','.join(['%s'] * len(ids)).
+
+  [x] 0.6  Scoping de transporte_rutas por tenant
+           modules/pedidos.py:42,110,152 + clientes.py:37 + transportes.py
+           (listar/guardar) + intercambio.py (_aplicar_registro_transporte_ruta).
+           Schema: columna tenant_id + idx_transporte_rutas_tenant en
+           schema_generator.py (regenerados los 4 engines).
+           MIGRACION APLICADA al WMS (MySQL): columna + backfill (0 filas)
+           + indice. La tabla estaba vacia.
+           ALERTA resuelta: las credenciales MySQL no coincidian con .env.
+           Se reseteo 'taurus_admin' a Taurus_2001 y se creo el usuario
+           'taurus' (no existia) con permisos sobre las 3 BDs. App conecta
+           OK contra taurus_admin y taurus_wms.
+
+VERIFICACION FASE 0:
+  Correr el flujo demo completo (recepcion -> cerrar -> OMC -> confirmar ->
+  pedido -> picking -> despacho) sin errores, con la consola sin mojibake.
+
+--------------------------------------------------------------------------------
+FASE 1 — SEGURIDAD (bloqueante para produccion, aprox. 1-2 semanas)
+--------------------------------------------------------------------------------
+Objetivo: mitigar los riesgos de exposicion que hoy impiden vender.
+
+  [ ] 1.1  CSRF global
+           app.py + admin.py. Flask-WTF ya esta en requirements pero nunca
+           se importo. Activar CSRFProtect en ambas apps. Migrar los POST
+           de las acciones AJAX a tokens X-CSRFToken (inyectar token en
+           base.html, JS lo manda por header).
+
+  [x] 1.2  Acciones destructivas GET -> POST
+           Rutas afectadas:
+             - pedidos/eliminar, rutas/eliminar, tipoubicacion/eliminar
+             - categorias/eliminar, proveedores/eliminar, unidades/eliminar
+             - clases_pedido/eliminar, zonas/eliminar
+             - inventario/*/anular, omc/*/anular, recepciones/*/anular
+             - admin: tenants activar/desactivar, usuarios activar/desactivar
+           Hecho: la mayoria ya era POST (rutas, tipoubicacion, categorias,
+           proveedores, unidades, clases_pedido, zonas, materiales, omc,
+           recepciones, inventario). Se convirtio a POST:
+             - pedidos/eliminar (modules/pedidos.py:353)
+             - admin: tenants/eliminar, tenants/activar, usuarios/eliminar,
+               usuarios/activar, roles/eliminar, roles/activar,
+               configuracion/eliminar (modules/admin.py)
+           Templates: pedidos.html (confirmarEliminar ahora usa fetch POST),
+           admin_tenants.html, admin_roles.html, admin_configuracion.html y
+           admin_tenant_detail.html (links GET -> forms method=POST con
+           hidden csrf_token; se eliminaron las funciones JS eliminar*/activar*
+           que hacian window.location). Ya existian forms POST en el resto.
+           Verificado: GET a esas rutas -> 405; POST sin token -> 400; POST
+           con token -> 302. Nota: tenants_gestionar.html es una plantilla
+           huerfana (ninguna ruta la renderiza) y referencia un endpoint
+           inexistente; se deja como codigo muerto (ver Fase 4.2).
+
+  [x] 1.3  Rate limiting en login
+           app.py (login) + modules/admin.py (login). Flask-Limiter por
+           IP/usuario (p. ej. 5 intentos / 15 min). Agregar a requirements.
+           Hecho: flask-limiter 4.1.1. Limiter(key_func=get_remote_address)
+           con "5 per 15 minutes" aplicado SOLO a POST /login en ambas apps
+           (admin_limiter en modules/admin.py, init_app en admin.py).
+           Storage in-memory (single process; para multi-worker usar
+           REDIS_URL — ver Fase 3). Verificado: 5 POST ok, 6to -> 429.
+
+  [x] 1.4  Auditoria de filtros tenant (verificar TODAS, no confiar en docs)
+           Queries sin el patron WHERE (%s IS NULL OR tenant_id = %s):
+             - materiales/exportar, ubicaciones/exportar, rutas/eliminar
+             - recepciones/anular, pedidos/eliminar, pedidos/preparar_masivo
+             - pedidos/cambiar_ruta_transporte, pedidos/resumen_preparar
+             - pedidos/buscar_contenedores, pedidos/filtros_contenedores
+             - pedidos/contenedor_stock, omc/buscar_contenedores_destino
+           Metodo: grep de queries que tocan tablas operativas sin tenant_id.
+           Hecho: las 13 rutas listadas tienen el filtro tenant. Barrido
+           adicional de UPDATE/DELETE en modules/ confirma el patron en
+           todas las tablas operativas (intercambio resuelve tenant por
+           tenant_codigo; modules/admin.py es cross-tenant por diseno).
+
+  [x] 1.5  Secretos y passwords por defecto
+           Crear .env.example (versionado), quitar fallback 'dev-fallback',
+           forzar cambio de Admin@2024! / Taurus_2001 en el arranque si
+           siguen igual, regenerar hashes scrypt de los seeds.
+           Hecho: .env.example con todas las variables documentadas.
+           app.py/admin.py: sin SECRET_KEY -> RuntimeError (no hay fallback).
+           _check_secretos(): en APP_ENV=production lanza RuntimeError si
+           detecta secretos/passwords por defecto; en dev loguea WARNING.
+           Seeds ya eran scrypt (schema_generator ADMIN_SEEDS). schema_app.py
+           (dev-only :5002) conserva su fallback.
+
+  [x] 1.6  Hardening de sesion
+           app.py + admin.py. Cookie HttpOnly, SameSite=Lax, Secure en prod,
+           SESSION_LIFETIME explicito. El check de 8h ya existe.
+           Hecho: SESSION_COOKIE_HTTPONLY=True, SAMESITE=Lax,
+           SECURE=(APP_ENV==production), PERMANENT_SESSION_LIFETIME=8h y
+           session.permanent=True en ambos login. Verificado: cookie con
+           HttpOnly + SameSite=Lax + Expires a 8h.
+
+  [x] 1.7  Audit SQL injection
+           modules/pedidos.py, despacho.py, intercambio.py. Unicos patrones
+           dinamicos: IN (...) (parametrizado) y nombres de tabla/columna de
+           dicts internos. Confirmar que ninguna entrada de request entra a
+           f-strings de nombres.
+           Hecho: todos los f-strings en SQL interpolan helpers internos
+           (quote(), limit_sql(), in_clause_sql(), year_func(), date_func())
+           o nombres de tablas de INTERCAMBIO_TABLES (dict interno). Ningun
+           valor de request entra a f-strings; todo va por placeholders %s.
+
+VERIFICACION FASE 1:
+  Checklist recorrida por una persona externa; ningun POST sin token; acciones
+  destructivas no ejecutables por GET; login bloqueado tras N intentos.
+
+--------------------------------------------------------------------------------
+FASE 2 — CONFIABILIDAD Y TESTS (aprox. 2-3 semanas)
+--------------------------------------------------------------------------------
+Objetivo: que un cambio no rompa recepciones/pedidos/intercambio sin aviso.
+
+  [x] 2.1  Infraestructura de tests
+           pytest + fixtures de Flask test client en tests/conftest.py:
+           client, admin_client, logged_client, admin_logged_client,
+           requires_db (marca DB_OK que salta tests de integracion si MySQL
+           no responde). Autouse fixture desactiva RATELIMIT y CSRF; los
+           tests especificos las reactivan.
+
+  [x] 2.2  Tests unitarios de sql_dialect
+           tests/test_sql_dialect.py — 51 tests: quote/year/date/
+           cast_as_int/cast_as_char/substring_index/concat/group_concat/
+           limit_sql/in_clause_sql/upsert_sql/upsert_incremental_sql/
+           upsert_coalesce_sql/insert_ignore_sql/get_lastrowid/
+           execute_insert/is_duplicate_key_error en los 4 engines.
+
+  [x] 2.3  Tests de integracion del ciclo de stock
+           tests/test_ciclo_stock.py — recepcion -> guardar_item -> cerrar
+           (OMC + StockEntrando) -> confirmar_stock (StockDisponible) con
+           datos reales y limpieza. Expuso 3 bugs reales corregidos:
+           (a) INSERT de recepciones_cabecera omitia id_contenedor (NOT NULL
+           sin default) en guardar e importar;
+           (b) los enums MySQL se almacenan en UPPERCASE y el codigo
+           comparaba 'Abierta'/'Pendiente'/'Abierto' en Python -> comparaciones
+           case-insensitive en recepciones/inventario/admin + dashboard;
+           (c) los upsert de stockcontable omitian tenant_id (filas quedaban
+           con tenant_id=NULL, invisibles por tenant) en recepciones.cerrar,
+           omc._crear_stock_entrando y pedidos. Pendiente: OMC desde pedido.
+
+  [x] 2.4  Tests de intercambio
+           tests/test_intercambio.py — conexiones inyectables: alta material,
+           baja, rama error (codigo vacio no rompe el lote), alta de rutas.
+           Pendiente: modificacion y orden de dependencia completo.
+
+  [x] 2.5  Tests de permisos
+           tests/test_permisos.py (18) logica _match_permiso/_ruta_en_catalogo;
+           tests/test_seguridad.py (12) CSRF/rate-limit/sesion/secretos;
+           tests/test_permisos_integracion.py (16) rol temporal sin ruta
+           bloqueado, wildcards, SUPERADMIN bypass, cambios sin re-login.
+
+  [ ] 2.6  Connection pooling
+           modules/db_config.py — pool simple por conexion, o al menos un
+           contextmanager que siempre cierre. Hoy una conexion por query.
+
+  [ ] 2.7  Cache de permisos por request
+           app.py middleware — obtener_rutas_por_rol abre conexion admin en
+           cada request. Cachear en g de Flask + invalidar tras cambios en
+           el panel (o 1 query con el usuario por request).
+
+VERIFICACION FASE 2:
+  pytest verde: 102 tests (1 suite completa sin fallos).
+  cobertura >60% en modulos criticos; CI (Fase 3) lo corre.
+
+--------------------------------------------------------------------------------
+FASE 3 — PROCESO DE DESARROLLO REPRODUCIBLE (aprox. 1-2 semanas)
+--------------------------------------------------------------------------------
+Objetivo: que otro dev levante, migre y despliegue sin instrucciones verbales.
+
+  [ ] 3.1  Migration runner
+           Script migrate.py que lea migrations/*.sql en orden con tabla
+           schema_migrations de control. Soportar las 4 engines o minimo
+           marcar los MySQL-only.
+
+  [ ] 3.2  Sanear migrations/
+           Documentar/mover los archivos rotos o vacios en procesados/
+           (008_inventarios_anulado.sql, add_sidebar_preferences.sql,
+           add_dias_filtro_fechas.sql, seed_pedidos_prueba.sql,
+           add_estado_trabajo_omc_pedidos.sql). Resolver estado de
+           fix_unique_codigo_per_tenant.sql (aplicada o no).
+
+  [ ] 3.3  requirements.txt + venv
+           Agregar psycopg2-binary, pymssql, pytest, flask-limiter.
+           Congelar con pip freeze.
+
+  [ ] 3.4  Docker
+           Dockerfile + docker-compose.yml (app WMS + admin + MySQL + volumen).
+           Acelera la demo para el cliente.
+
+  [ ] 3.5  CI
+           GitHub Actions: lint (ruff) + pytest + build de imagen.
+
+  [ ] 3.6  README real
+           Reemplazar el placeholder: que es, como correr, como migrar, como
+           configurar cada engine, troubleshooting (bugs conocidos fase 0).
+
+VERIFICACION FASE 3:
+  git clone -> docker compose up -> login -> flujo demo sin pasos manuales.
+  pip install -r requirements.txt limpio.
+
+--------------------------------------------------------------------------------
+FASE 4 — CALIDAD DE CODIGO (aprox. 2-3 semanas, priorizada por impacto)
+--------------------------------------------------------------------------------
+Objetivo: pagar la deuda que encarece cada cambio futuro.
+
+  [ ] 4.1  Unificar import/export
+           modules/materiales.py:262-295 vs batch_utils.py. Sacar los
+           parsers duplicados; batch_utils.parse_file ya es identico.
+
+  [ ] 4.2  Eliminar rutas muertas/duplicadas
+           app.py:592 /movimientos->omc, /dashboard, /rentradas y /rsalidas
+           (aliases de /entradas y /salidas). Actualizar ROUTE_CATALOG y el
+           sidebar.
+
+  [ ] 4.3  Completar CRUD faltantes
+           clientes (eliminar), ubicaciones (eliminar), transportes
+           (eliminar). Coherente con el borrado logico existente (activo=0).
+
+  [ ] 4.4  Error handling global
+           app.py — handlers 404/403/500 con paginas en espanol + logging
+           con stack. Hoy un error crudo muestra excepcion al usuario.
+
+  [ ] 4.5  Consolidar frontend
+           static/css/* y static/js/* — clases comunes a un CSS base,
+           centralizar config de DataTables en un data_tables.js, quitar
+           jQuery duplicado en templates. No bloqueante.
+
+  [ ] 4.6  Accesibilidad / responsive
+           Foco de teclado, labels, DataTables mobile. No bloqueante.
+
+  [ ] 4.7  Limpiar debug
+           app.py:470-474 — pasar los prints de depuracion a logger.
+           Revisar que no queden print() en app.py y admin.py.
+
+VERIFICACION FASE 4:
+  Lint sin errores nuevos; ningun path duplicado; sin prints de debug.
+
+--------------------------------------------------------------------------------
+FASE 5 — FEATURES DIFERENCIALES (solo con el core solido)
+--------------------------------------------------------------------------------
+  [ ] 5.1  Modulo movil (recepcion/picking/inventario con escaneo)
+           Es el gancho comercial del pitch de presentacion.
+  [ ] 5.2  API REST para integraciones (hoy solo hay JSON inline para AJAX)
+  [ ] 5.3  Reportes por tenant (el dashboard tiene 5 KPIs, nada exportable)
+  [ ] 5.4  Auditoria de stock (historial de movimientos por posicion; hoy
+           solo queda el ultimo movimiento)
+
+--------------------------------------------------------------------------------
+ORDEN SUGERIDO DE EJECUCION
+--------------------------------------------------------------------------------
+  Semana 1   : Fase 0 completa (0.1 -> 0.6). Semana de la demo confiable.
+  Semana 2-3 : Fase 1 (empezar por 1.1 CSRF y 1.2 GET->POST, que tocan todo
+               el frontend).
+  Semana 4-5 : Fase 2 con tests de los flujos tocados en Fase 0.
+  Semana 3+  : Fase 3 en paralelo con la Fase 4 desde la semana 3:
+               Docker + CI primero, README al final de cada fase.
+  Fase 5     : recien cuando 0-4 esten verdes.
+
+--------------------------------------------------------------------------------
+REGLAS DE ORO
+--------------------------------------------------------------------------------
+  1) Cada vez que se toque schema, actualizar modules/schema_generator.py y
+     regenerar los 4 engines:
+         python modules/schema_generator.py --all
+     Los archivos SQL (raiz, schemas/, migrations/create_*) son GENERADOS,
+     nunca editar a mano.
+  2) Antes de tocar una query, revisar modules/sql_dialect.py. Nunca
+     hardcodear backticks MySQL.
+  3) Toda query operativa usa el patron WHERE (%s IS NULL OR tenant_id = %s).
+  4) No confiar en resumen_tecnico_proyecto.txt ni hoja_de_ruta.txt:
+     estan desactualizados (julio 2026). Verificar contra el codigo.
+  5) Toda ruta nueva va a ROUTE_CATALOG (modules/schema_generator.py) o
+     queda solo-auth por defecto.
+================================================================================

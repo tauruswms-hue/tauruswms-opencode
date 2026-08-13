@@ -58,18 +58,18 @@ def eliminar(id):
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            # Nota: Si la ruta estÃ¡ asignada a un transporte, fallarÃ¡ por FK (lo cual es correcto)
+            # Nota: Si la ruta está asignada a un transporte, fallará por FK (lo cual es correcto)
             cursor.execute("DELETE FROM rutas WHERE id_ruta = %s AND (%s IS NULL OR tenant_id = %s)", (id, tenant_id, tenant_id))
             conn.commit()
             flash("Ruta eliminada", "success")
     except Exception:
-        flash("No se puede eliminar la ruta porque estÃ¡ asignada a uno o mÃ¡s transportes.", "danger")
+        flash("No se puede eliminar la ruta porque está asignada a uno o más transportes.", "danger")
     finally:
         conn.close()
     return redirect(url_for('rutas.listar'))
 
 
-# â”€â”€ Batch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Batch ─────────────────────────────────────────────────────────────────────
 _CAMPOS = ['nombre_ruta', 'descripcion']
 _EJEMPLO = ['Zona Norte', 'Ruta de reparto zona norte']
 
@@ -79,7 +79,7 @@ def importar():
     tenant_id = get_tenant_filter()
     file = request.files.get('archivo')
     if not file or not file.filename:
-        return jsonify({'error': 'No se proporcionÃ³ archivo'}), 400
+        return jsonify({'error': 'No se proporcionó archivo'}), 400
     try:
         rows = parse_file(file, request.form.get('hoja'))
     except Exception as e:
@@ -91,7 +91,7 @@ def importar():
         for i, row in enumerate(rows, 1):
             nombre = str(row.get('nombre_ruta', '') or '').strip()
             if not nombre:
-                errores.append({'fila': i, 'codigo': '(vacÃ­o)', 'razon': 'El campo nombre_ruta es obligatorio'})
+                errores.append({'fila': i, 'codigo': '(vacío)', 'razon': 'El campo nombre_ruta es obligatorio'})
                 continue
             try:
                 with conn.cursor() as cursor:
@@ -135,7 +135,7 @@ def exportar(formato):
         return export_json(rows, _CAMPOS, 'rutas.json')
     elif formato == 'xlsx':
         return export_xlsx(rows, _CAMPOS, 'rutas.xlsx')
-    return 'Formato no vÃ¡lido', 400
+    return 'Formato no válido', 400
 
 
 @rutas_bp.route('/rutas/plantilla/<formato>')
@@ -146,4 +146,4 @@ def plantilla(formato):
         return plantilla_json(_CAMPOS, _EJEMPLO, 'plantilla_rutas.json')
     elif formato == 'xlsx':
         return plantilla_xlsx(_CAMPOS, _EJEMPLO, 'plantilla_rutas.xlsx')
-    return 'Formato no vÃ¡lido', 400
+    return 'Formato no válido', 400

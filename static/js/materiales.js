@@ -18,6 +18,14 @@ function validarEAN(barcode) {
 }
 
 $(document).ready(function() {
+    $('.mat-tab-btn').on('click', function() {
+        var idTab = $(this).data('tab');
+        $('.mat-tab-btn').removeClass('active');
+        $('.mat-tab-panel').removeClass('active');
+        $(this).addClass('active');
+        $('#' + idTab).addClass('active');
+    });
+
     $('#tablaMateriales').DataTable({
         "paging": false,                    // todas las filas en el cuerpo; el scroll lo maneja la grilla
         "scrollY": "calc(100vh - 300px)",

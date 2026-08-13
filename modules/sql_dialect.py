@@ -126,9 +126,32 @@ def limit_sql(n, offset=0):
     return f'LIMIT {n}'
 
 
-def upsert_sql(table, columns, conflict_col, update_cols):
+def in_clause_sql(items):
+    """Genera los placeholders %s de una cláusula IN.
+
+    Falla con un mensaje claro si la lista está vacía para evitar SQL inválido
+    del tipo IN () (o un escaneo completo accidental si se quita una guarda).
+    """
+    n = len(items)
+    if n == 0:
+        raise ValueError('in_clause_sql: lista vacía, cláusula IN inválida')
+    return ','.join(['%s'] * n)
+
+
+def _conflict_list(conflict_cols):
+    if isinstance(conflict_cols, (list, tuple)):
+        return list(conflict_cols)
+    return [conflict_cols]
+
+
+def _merge_on(conflict_cols):
+    return ' AND '.join([f'target.{c} = source.{c}' for c in conflict_cols])
+
+
+def upsert_sql(table, columns, conflict_cols, update_cols):
     placeholders = ', '.join(['%s'] * len(columns))
     cols = ', '.join(columns)
+    conflict_cols = _conflict_list(conflict_cols)
 
     if _engine == 'mysql':
         updates = ', '.join([f'{c} = VALUES({c})' for c in update_cols])
@@ -141,18 +164,17 @@ def upsert_sql(table, columns, conflict_col, update_cols):
         updates = ', '.join([f'{c} = EXCLUDED.{c}' for c in update_cols])
         return (
             f'INSERT INTO {table} ({cols}) VALUES ({placeholders}) '
-            f'ON CONFLICT ({conflict_col}) DO UPDATE SET {updates}'
+            f'ON CONFLICT ({", ".join(conflict_cols)}) DO UPDATE SET {updates}'
         )
 
     if _engine == 'sqlserver':
-        source_cols = ', '.join([f's.{c}' for c in update_cols])
         target_updates = ', '.join([f'target.{c} = source.{c}' for c in update_cols])
         src_values = ', '.join([f'@p{i}' for i in range(len(columns))])
         src_alias = ', '.join(columns)
         return (
             f'MERGE INTO {table} AS target '
             f'USING (VALUES ({src_values})) AS source ({src_alias}) '
-            f'ON target.{conflict_col} = source.{conflict_col} '
+            f'ON {_merge_on(conflict_cols)} '
             f'WHEN MATCHED THEN UPDATE SET {target_updates} '
             f'WHEN NOT MATCHED THEN INSERT ({cols}) VALUES ({", ".join([f"source.{c}" for c in columns])});'
         )
@@ -160,13 +182,14 @@ def upsert_sql(table, columns, conflict_col, update_cols):
     updates = ', '.join([f'{c} = excluded.{c}' for c in update_cols])
     return (
         f'INSERT INTO {table} ({cols}) VALUES ({placeholders}) '
-        f'ON CONFLICT ({conflict_col}) DO UPDATE SET {updates}'
+        f'ON CONFLICT ({", ".join(conflict_cols)}) DO UPDATE SET {updates}'
     )
 
 
-def upsert_incremental_sql(table, columns, conflict_col, increment_cols, passthrough_cols=None):
+def upsert_incremental_sql(table, columns, conflict_cols, increment_cols, passthrough_cols=None):
     placeholders = ', '.join(['%s'] * len(columns))
     cols = ', '.join(columns)
+    conflict_cols = _conflict_list(conflict_cols)
 
     if _engine == 'mysql':
         updates = []
@@ -189,7 +212,7 @@ def upsert_incremental_sql(table, columns, conflict_col, increment_cols, passthr
                 updates.append(f'{c} = EXCLUDED.{c}')
         return (
             f'INSERT INTO {table} ({cols}) VALUES ({placeholders}) '
-            f'ON CONFLICT ({conflict_col}) DO UPDATE SET {", ".join(updates)}'
+            f'ON CONFLICT ({", ".join(conflict_cols)}) DO UPDATE SET {", ".join(updates)}'
         )
 
     if _engine == 'sqlserver':
@@ -204,7 +227,7 @@ def upsert_incremental_sql(table, columns, conflict_col, increment_cols, passthr
         return (
             f'MERGE INTO {table} AS target '
             f'USING (VALUES ({src_values})) AS source ({src_alias}) '
-            f'ON target.{conflict_col} = source.{conflict_col} '
+            f'ON {_merge_on(conflict_cols)} '
             f'WHEN MATCHED THEN UPDATE SET {", ".join(updates)} '
             f'WHEN NOT MATCHED THEN INSERT ({cols}) VALUES ({", ".join([f"source.{c}" for c in columns])});'
         )
@@ -217,13 +240,14 @@ def upsert_incremental_sql(table, columns, conflict_col, increment_cols, passthr
             updates.append(f'{c} = excluded.{c}')
     return (
         f'INSERT INTO {table} ({cols}) VALUES ({placeholders}) '
-        f'ON CONFLICT ({conflict_col}) DO UPDATE SET {", ".join(updates)}'
+        f'ON CONFLICT ({", ".join(conflict_cols)}) DO UPDATE SET {", ".join(updates)}'
     )
 
 
-def upsert_coalesce_sql(table, columns, conflict_col, increment_cols, coalesce_cols):
+def upsert_coalesce_sql(table, columns, conflict_cols, increment_cols, coalesce_cols):
     placeholders = ', '.join(['%s'] * len(columns))
     cols = ', '.join(columns)
+    conflict_cols = _conflict_list(conflict_cols)
 
     if _engine == 'mysql':
         updates = []
@@ -244,7 +268,7 @@ def upsert_coalesce_sql(table, columns, conflict_col, increment_cols, coalesce_c
             updates.append(f'{c} = COALESCE(EXCLUDED.{c}, {table}.{c})')
         return (
             f'INSERT INTO {table} ({cols}) VALUES ({placeholders}) '
-            f'ON CONFLICT ({conflict_col}) DO UPDATE SET {", ".join(updates)}'
+            f'ON CONFLICT ({", ".join(conflict_cols)}) DO UPDATE SET {", ".join(updates)}'
         )
 
     if _engine == 'sqlserver':
@@ -258,7 +282,7 @@ def upsert_coalesce_sql(table, columns, conflict_col, increment_cols, coalesce_c
         return (
             f'MERGE INTO {table} AS target '
             f'USING (VALUES ({src_values})) AS source ({src_alias}) '
-            f'ON target.{conflict_col} = source.{conflict_col} '
+            f'ON {_merge_on(conflict_cols)} '
             f'WHEN MATCHED THEN UPDATE SET {", ".join(updates)} '
             f'WHEN NOT MATCHED THEN INSERT ({cols}) VALUES ({", ".join([f"source.{c}" for c in columns])});'
         )
@@ -270,7 +294,7 @@ def upsert_coalesce_sql(table, columns, conflict_col, increment_cols, coalesce_c
         updates.append(f'{c} = COALESCE(excluded.{c}, {c})')
     return (
         f'INSERT INTO {table} ({cols}) VALUES ({placeholders}) '
-        f'ON CONFLICT ({conflict_col}) DO UPDATE SET {", ".join(updates)}'
+        f'ON CONFLICT ({", ".join(conflict_cols)}) DO UPDATE SET {", ".join(updates)}'
     )
 
 

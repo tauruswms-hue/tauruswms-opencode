@@ -47,7 +47,7 @@ def guardar():
                 cursor.execute(sql, (descripcion, soporte_picking, tenant_id))
 
             conn.commit()
-            flash("Tipo de ubicaciÃ³n guardado", "success")
+            flash("Tipo de ubicación guardado", "success")
     except Exception as e:
         conn.rollback()
         flash(f"Error: {str(e)}", "danger")
@@ -69,12 +69,12 @@ def eliminar(id):
             result = cursor.fetchone()
 
             if result['total'] > 0:
-                flash("No se puede eliminar porque estÃ¡ en uso por ubicaciones.", "danger")
+                flash("No se puede eliminar porque está en uso por ubicaciones.", "danger")
             else:
                 cursor.execute("DELETE FROM tipoubicacion WHERE id = %s AND (%s IS NULL OR tenant_id = %s)", 
                                (id, tenant_id, tenant_id))
                 conn.commit()
-                flash("Tipo de ubicaciÃ³n eliminado", "success")
+                flash("Tipo de ubicación eliminado", "success")
     except Exception as e:
         flash(f"Error: {str(e)}", "danger")
     finally:
@@ -82,10 +82,10 @@ def eliminar(id):
     return redirect(url_for('tipoubicacion.listar'))
 
 
-# â”€â”€ Batch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Batch ─────────────────────────────────────────────────────────────────────
 _CAMPOS_EXPORT = ['descripcion', 'soporte_picking']
 _CAMPOS_IMPORT = ['descripcion', 'soporte_picking']
-_EJEMPLO = ['EstanterÃ­a', '1']
+_EJEMPLO = ['Estantería', '1']
 
 
 @tipoubicacion_bp.route('/tipoubicacion/importar', methods=['POST'])
@@ -93,7 +93,7 @@ def importar():
     tenant_id = get_tenant_filter()
     file = request.files.get('archivo')
     if not file or not file.filename:
-        return jsonify({'error': 'No se proporcionÃ³ archivo'}), 400
+        return jsonify({'error': 'No se proporcionó archivo'}), 400
     try:
         rows = parse_file(file, request.form.get('hoja'))
     except Exception as e:
@@ -105,7 +105,7 @@ def importar():
         for i, row in enumerate(rows, 1):
             descripcion = str(row.get('descripcion', '') or '').strip()
             if not descripcion:
-                errores.append({'fila': i, 'codigo': '(vacÃ­o)',
+                errores.append({'fila': i, 'codigo': '(vacío)',
                                 'razon': 'El campo descripcion es obligatorio'})
                 continue
             try:
@@ -153,7 +153,7 @@ def exportar(formato):
         return export_json(rows, _CAMPOS_EXPORT, 'tipos_ubicacion.json')
     elif formato == 'xlsx':
         return export_xlsx(rows, _CAMPOS_EXPORT, 'tipos_ubicacion.xlsx')
-    return 'Formato no vÃ¡lido', 400
+    return 'Formato no válido', 400
 
 
 @tipoubicacion_bp.route('/tipoubicacion/plantilla/<formato>')
@@ -164,4 +164,4 @@ def plantilla(formato):
         return plantilla_json(_CAMPOS_IMPORT, _EJEMPLO, 'plantilla_tipos_ubicacion.json')
     elif formato == 'xlsx':
         return plantilla_xlsx(_CAMPOS_IMPORT, _EJEMPLO, 'plantilla_tipos_ubicacion.xlsx')
-    return 'Formato no vÃ¡lido', 400
+    return 'Formato no válido', 400

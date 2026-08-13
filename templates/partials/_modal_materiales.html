@@ -7,8 +7,17 @@
         <form action="{{ url_for('materiales.guardar') }}" method="POST" id="formMateriales" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
             <input type="hidden" name="id" id="form_id_material">
 
+            <div class="mat-tabs">
+                <button type="button" class="mat-tab-btn active" data-tab="tab-mat-ident"><i class="fas fa-tag"></i> Identificación</button>
+                <button type="button" class="mat-tab-btn" data-tab="tab-mat-stock"><i class="fas fa-balance-scale"></i> Stock y Pesos</button>
+                <button type="button" class="mat-tab-btn" data-tab="tab-mat-control"><i class="fas fa-cogs"></i> Trazabilidad y Picking</button>
+                <button type="button" class="mat-tab-btn" data-tab="tab-mat-prov"><i class="fas fa-truck-loading"></i> Proveedores</button>
+                <button type="button" class="mat-tab-btn" data-tab="tab-mat-pres"><i class="fas fa-cubes"></i> Presentaciones</button>
+            </div>
+
             <div style="overflow-y: auto; flex: 1; padding: 20px 25px;">
-            <div class="form-section" style="margin-bottom: 20px;">
+
+            <div class="mat-tab-panel active" id="tab-mat-ident">
                 <div class="form-row" style="display: flex; gap: 15px; margin-bottom: 15px; flex-wrap: wrap;">
                     <div class="form-group" style="flex: 1; min-width: 150px;">
                         <label style="font-size:0.8rem; font-weight:bold; color:#666;">Código *</label>
@@ -53,6 +62,13 @@
                     </div>
                 </div>
 
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label style="font-size:0.8rem; font-weight:bold; color:#666;">Descripción</label>
+                    <textarea name="descripcion" id="form_desc" style="width:100%; padding: 10px; border: 1px solid #ddd; border-radius:4px; box-sizing:border-box;" rows="2"></textarea>
+                </div>
+            </div>
+
+            <div class="mat-tab-panel" id="tab-mat-stock">
                 <div class="form-row" style="display: flex; gap: 15px; margin-bottom: 15px; flex-wrap: wrap;">
                     <div class="form-group" style="flex: 1;">
                         <label style="font-size:0.8rem; font-weight:bold; color:#666;">Stock Mínimo</label>
@@ -74,13 +90,10 @@
                         <input type="number" step="0.001" name="peso_neto" id="form_peso_neto" placeholder="0.000" style="width:100%; padding: 10px; border: 1px solid #ddd; border-radius:4px; box-sizing:border-box;">
                     </div>
                 </div>
+            </div>
 
-                <div class="form-group" style="margin-bottom: 15px;">
-                    <label style="font-size:0.8rem; font-weight:bold; color:#666;">Descripción</label>
-                    <textarea name="descripcion" id="form_desc" style="width:100%; padding: 10px; border: 1px solid #ddd; border-radius:4px; box-sizing:border-box;" rows="2"></textarea>
-                </div>
-
-                <div class="form-group" style="margin-bottom: 10px;">
+            <div class="mat-tab-panel" id="tab-mat-control">
+                <div class="form-group" style="margin-bottom: 20px;">
                     <label style="font-size:0.8rem; font-weight:bold; color:#666; display:block; margin-bottom:8px;">Trazabilidad</label>
                     <div style="display:flex; gap:25px; flex-wrap:wrap;">
                         <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:0.9rem;">
@@ -109,8 +122,9 @@
                 </div>
             </div>
 
-            <div class="form-section" style="margin-bottom: 20px; border-top: 1px solid #eee; padding-top: 15px;">
-                <h4><i class="fas fa-truck-loading"></i> Proveedores Autorizados</h4>
+            <div class="mat-tab-panel" id="tab-mat-prov">
+                <div class="form-section" style="margin-bottom: 20px;">
+                    <h4><i class="fas fa-truck-loading"></i> Proveedores Autorizados</h4>
                 <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
                     <thead>
                         <tr style="border-bottom: 2px solid #eee;">
@@ -126,29 +140,32 @@
                 <button type="button" class="btn-sec" onclick="agregarFilaProveedor()" style="margin-top:10px; background: #95a5a6; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">
                     <i class="fas fa-plus"></i> Agregar Proveedor
                 </button>
+                </div>
             </div>
 
-            <div class="form-section" style="margin-bottom: 20px; border-top: 1px solid #eee; padding-top: 15px;">
-                <h4><i class="fas fa-cubes"></i> Presentaciones / Embalajes</h4>
-                <small style="color:#888; display:block; margin-bottom:10px;">
-                    Defina los embalajes (caja, pallet, display…) con su GTIN-14 (14 dígitos, único) y la cantidad de unidades base que contienen.
-                </small>
-                <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
-                    <thead>
-                        <tr style="border-bottom: 2px solid #eee;">
-                            <th style="text-align:left; padding: 8px;">Nombre</th>
-                            <th style="text-align:left; padding: 8px;">GTIN-14 (indicador + código + dígito verificador)</th>
-                            <th style="text-align:center; padding: 8px; width: 70px;">Unidades</th>
-                            <th style="text-align:center; padding: 8px; width: 90px;">P. Bruto (kg)</th>
-                            <th style="text-align:center; padding: 8px; width: 90px;">P. Neto (kg)</th>
-                            <th style="width: 40px; padding: 8px;"></th>
-                        </tr>
-                    </thead>
-                    <tbody id="listaPresentacionesCuerpo"></tbody>
-                </table>
-                <button type="button" onclick="agregarFilaPresentacion()" style="margin-top:10px; background:#16a085; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer; font-size:0.8rem;">
-                    <i class="fas fa-plus"></i> Agregar Presentación
-                </button>
+            <div class="mat-tab-panel" id="tab-mat-pres">
+                <div class="form-section" style="margin-bottom: 20px;">
+                    <h4><i class="fas fa-cubes"></i> Presentaciones / Embalajes</h4>
+                    <small style="color:#888; display:block; margin-bottom:10px;">
+                        Defina los embalajes (caja, pallet, display…) con su GTIN-14 (14 dígitos, único) y la cantidad de unidades base que contienen.
+                    </small>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                        <thead>
+                            <tr style="border-bottom: 2px solid #eee;">
+                                <th style="text-align:left; padding: 8px;">Nombre</th>
+                                <th style="text-align:left; padding: 8px;">GTIN-14 (indicador + código + dígito verificador)</th>
+                                <th style="text-align:center; padding: 8px; width: 70px;">Unidades</th>
+                                <th style="text-align:center; padding: 8px; width: 90px;">P. Bruto (kg)</th>
+                                <th style="text-align:center; padding: 8px; width: 90px;">P. Neto (kg)</th>
+                                <th style="width: 40px; padding: 8px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="listaPresentacionesCuerpo"></tbody>
+                    </table>
+                    <button type="button" onclick="agregarFilaPresentacion()" style="margin-top:10px; background:#16a085; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer; font-size:0.8rem;">
+                        <i class="fas fa-plus"></i> Agregar Presentación
+                    </button>
+                </div>
             </div>
 
             </div><!-- /scroll-body -->

@@ -630,7 +630,9 @@
 
     function confirmarEliminar(id) {
         if (confirm('¿Seguro que desea anular este pedido? El pedido pasará al estado Anulado.')) {
-            window.location.href = "{{ url_for('pedidos.eliminar', id_pedido=0) }}".replace('0', id);
+            fetch("{{ url_for('pedidos.eliminar', id_pedido=0) }}".replace('0', id), { method: 'POST' })
+                .then(function() { location.reload(); })
+                .catch(function(err) { alert('Error de conexión: ' + err); });
         }
     }
 </script>

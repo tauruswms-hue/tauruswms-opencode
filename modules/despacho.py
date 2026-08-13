@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session
 from datetime import datetime
 from modules.db_config import get_db_connection
+from modules.sql_dialect import in_clause_sql
 
 despacho_bp = Blueprint('despacho', __name__)
 
@@ -69,7 +70,7 @@ def despachar_masivo():
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            ph = ','.join(['%s'] * len(ids))
+            ph = in_clause_sql(ids)
             cursor.execute(
                 f"UPDATE pedidos_cabecera SET estado = 'Despachado', fecha_despacho = %s "
                 f"WHERE id_pedido IN ({ph}) AND estado = 'Preparado' AND (%s IS NULL OR tenant_id = %s)",

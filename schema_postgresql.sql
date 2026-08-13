@@ -437,10 +437,12 @@ CREATE TABLE "transporte_rutas" (
     "id_transporte" INTEGER NOT NULL,
     "id_ruta" INTEGER NOT NULL,
     "observaciones" text,
+    "tenant_id" INTEGER,
     PRIMARY KEY ("id_transporte", "id_ruta"),
     CONSTRAINT "fk_transporte_rutas_id_transporte" FOREIGN KEY ("id_transporte") REFERENCES "transportes" ("id_transporte") ON DELETE CASCADE,
     CONSTRAINT "fk_transporte_rutas_id_ruta" FOREIGN KEY ("id_ruta") REFERENCES "rutas" ("id_ruta") ON DELETE CASCADE
 );
+CREATE INDEX "idx_transporte_rutas_tenant" ON "transporte_rutas" ("tenant_id");
 
 -- --- clientes ---;
 CREATE TABLE "clientes" (

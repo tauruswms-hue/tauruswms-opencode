@@ -53,7 +53,7 @@ def listar():
 
 
 # ============================================================================
-# NUEVA RECEPCIÃ“N â€” formulario de cabecera
+# NUEVA RECEPCIÓN — formulario de cabecera
 # ============================================================================
 @recepciones_bp.route('/recepciones/nueva')
 def nueva():
@@ -96,7 +96,7 @@ def guardar():
     tenant_id = get_tenant_filter()
     
     if not d.get('id_ubicacion_recep'):
-        flash("Debe seleccionar una ubicaciÃ³n de recepciÃ³n.", "danger")
+        flash("Debe seleccionar una ubicación de recepción.", "danger")
         return redirect(url_for('recepciones.nueva'))
     
     conn = get_db_connection()
@@ -116,13 +116,14 @@ def guardar():
             id_recepcion = execute_insert(cursor, """
                 INSERT INTO recepciones_cabecera
                     (numero, id_proveedor, id_ubicacion_recep, id_ubicacion_destino,
-                     observaciones, usuario_creacion, tenant_id)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                     id_contenedor, observaciones, usuario_creacion, tenant_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 numero,
                 d.get('id_proveedor'),
                 d.get('id_ubicacion_recep'),
                 d.get('id_ubicacion_destino') or None,
+                '',
                 d.get('observaciones') or None,
                 usuario,
                 tenant_id
@@ -137,21 +138,21 @@ def guardar():
             conn.commit()
             session['ultima_ubicacion_recepcion'] = d.get('id_ubicacion_recep')
             if d.get('redirect_to') == 'listar':
-                flash(f"RecepciÃ³n {numero} creada â€” contenedor {contenedor}.", "success")
+                flash(f"Recepción {numero} creada — contenedor {contenedor}.", "success")
                 return redirect(url_for('recepciones.listar'))
-            flash(f"RecepciÃ³n {numero} creada â€” contenedor {contenedor}. Agregue los materiales.", "success")
+            flash(f"Recepción {numero} creada — contenedor {contenedor}. Agregue los materiales.", "success")
             return redirect(url_for('recepciones.ver', id_recepcion=id_recepcion))
 
     except Exception as e:
         conn.rollback()
-        flash(f"Error al crear la recepciÃ³n: {str(e)}", "danger")
+        flash(f"Error al crear la recepción: {str(e)}", "danger")
         return redirect(url_for('recepciones.nueva'))
     finally:
         conn.close()
 
 
 # ============================================================================
-# VER / GESTIONAR RECEPCIÃ“N
+# VER / GESTIONAR RECEPCIÓN
 # ============================================================================
 @recepciones_bp.route('/recepciones/ver/<int:id_recepcion>')
 def ver(id_recepcion):
@@ -173,7 +174,7 @@ def ver(id_recepcion):
             recepcion = cursor.fetchone()
 
             if not recepcion:
-                flash("RecepciÃ³n no encontrada.", "danger")
+                flash("Recepción no encontrada.", "danger")
                 return redirect(url_for('recepciones.listar'))
 
             cursor.execute("""
@@ -235,7 +236,7 @@ def ver(id_recepcion):
 
 
 # ============================================================================
-# BÃšSQUEDA DE MATERIALES (AJAX)
+# BÚSQUEDA DE MATERIALES (AJAX)
 # ============================================================================
 @recepciones_bp.route('/recepciones/buscar_materiales/<int:id_proveedor>')
 def buscar_materiales(id_proveedor):
@@ -266,7 +267,7 @@ def buscar_materiales(id_proveedor):
 
 @recepciones_bp.route('/recepciones/buscar_barcode/<int:id_proveedor>')
 def buscar_barcode(id_proveedor):
-    """BÃºsqueda exacta por cÃ³digo de barras (usado por lector)."""
+    """Búsqueda exacta por código de barras (usado por lector)."""
     barcode = request.args.get('barcode', '').strip()
     if not barcode:
         return jsonify({})
@@ -294,7 +295,7 @@ def buscar_barcode(id_proveedor):
 
 
 # ============================================================================
-# BÃšSQUEDA DE UBICACIONES (AJAX)
+# BÚSQUEDA DE UBICACIONES (AJAX)
 # ============================================================================
 @recepciones_bp.route('/recepciones/buscar_ubicaciones')
 def buscar_ubicaciones():
@@ -332,7 +333,7 @@ def buscar_ubicaciones():
 
 
 # ============================================================================
-# GUARDAR ÃTEM (AJAX)
+# GUARDAR ÍTEM (AJAX)
 # ============================================================================
 @recepciones_bp.route('/recepciones/guardar_item', methods=['POST'])
 def guardar_item():
@@ -356,8 +357,8 @@ def guardar_item():
                 (id_recepcion, tenant_id, tenant_id)
             )
             rec = cursor.fetchone()
-            if not rec or rec['estado'] != 'Abierta':
-                return jsonify({"ok": False, "msg": "La recepciÃ³n no estÃ¡ Abierta."})
+            if not rec or rec['estado'].upper() != 'ABIERTA':
+                return jsonify({"ok": False, "msg": "La recepción no está Abierta."})
 
             if id_detalle:
                 cursor.execute("""
@@ -389,7 +390,7 @@ def guardar_item():
 
 
 # ============================================================================
-# ELIMINAR ÃTEM (AJAX)
+# ELIMINAR ÍTEM (AJAX)
 # ============================================================================
 @recepciones_bp.route('/recepciones/eliminar_item/<int:id_detalle>', methods=['POST'])
 def eliminar_item(id_detalle):
@@ -403,7 +404,7 @@ def eliminar_item(id_detalle):
                 WHERE d.id_detalle = %s AND (%s IS NULL OR r.tenant_id = %s)
             """, (id_detalle, tenant_id, tenant_id))
             row = cursor.fetchone()
-            if not row or row['estado'] != 'Abierta':
+            if not row or row['estado'].upper() != 'ABIERTA':
                 return jsonify({"ok": False, "msg": "No se puede eliminar."})
 
             cursor.execute("DELETE FROM recepciones_detalle WHERE id_detalle = %s AND (%s IS NULL OR tenant_id = %s)", (id_detalle, tenant_id, tenant_id))
@@ -417,13 +418,13 @@ def eliminar_item(id_detalle):
 
 
 # ============================================================================
-# CERRAR RECEPCIÃ“N â€” impacta stockcontable
+# CERRAR RECEPCIÓN — impacta stockcontable
 # ============================================================================
 @recepciones_bp.route('/recepciones/cerrar/<int:id_recepcion>', methods=['POST'])
 def cerrar(id_recepcion):
     id_ubicacion_destino = request.form.get('id_ubicacion_destino')
     if not id_ubicacion_destino:
-        flash("Debe seleccionar la ubicaciÃ³n destino.", "warning")
+        flash("Debe seleccionar la ubicación destino.", "warning")
         return redirect(url_for('recepciones.ver', id_recepcion=id_recepcion))
 
     tenant_id = get_tenant_filter()
@@ -436,7 +437,7 @@ def cerrar(id_recepcion):
             )
             recepcion = cursor.fetchone()
             if not recepcion:
-                flash("La recepciÃ³n no existe o ya no estÃ¡ Abierta.", "danger")
+                flash("La recepción no existe o ya no está Abierta.", "danger")
                 return redirect(url_for('recepciones.listar'))
 
             cursor.execute("""
@@ -447,7 +448,7 @@ def cerrar(id_recepcion):
             items = cursor.fetchall()
 
             if not items:
-                flash("No hay Ã­tems con cantidad recibida para cerrar la recepciÃ³n.", "warning")
+                flash("No hay ítems con cantidad recibida para cerrar la recepción.", "warning")
                 return redirect(url_for('recepciones.ver', id_recepcion=id_recepcion))
 
             contenedor = recepcion['id_contenedor']
@@ -455,30 +456,30 @@ def cerrar(id_recepcion):
             usuario = session.get('nombre', 'sistema')
 
             for item in items:
-                # El stock queda en la ubicaciÃ³n de recepciÃ³n como StockSaliendo
+                # El stock queda en la ubicación de recepción como StockSaliendo
                 cols_stock = ['Ubicacion', 'Material', 'Lote', 'TipoStock', 'IDContenedor',
                               'StockTotal', 'StockDisponible', 'StockEntrando', 'StockSaliendo',
-                              'UltimaEntrada', 'UltimoMovimiento', 'FechaVencimiento', 'UsuarioUltimoMov']
-                sql_saliendo = upsert_incremental_sql('stockcontable', cols_stock, 'Ubicacion',
+                              'UltimaEntrada', 'UltimoMovimiento', 'FechaVencimiento', 'UsuarioUltimoMov', 'tenant_id']
+                sql_saliendo = upsert_incremental_sql('stockcontable', cols_stock, ['Ubicacion', 'Material', 'IDContenedor'],
                                                       ['StockSaliendo'], ['UltimoMovimiento', 'UsuarioUltimoMov'])
                 cursor.execute(sql_saliendo, (
                     recepcion['id_ubicacion_recep'], item['id_material'], item['lote'],
                     item['tipo_stock'], contenedor,
                     0, 0, 0, item['cantidad_recibida'],
-                    None, ahora, item['fecha_vencimiento'], usuario
+                    None, ahora, item['fecha_vencimiento'], usuario, tenant_id
                 ))
 
-                # Crear StockEntrando en la ubicaciÃ³n destino
-                sql_entrando = upsert_incremental_sql('stockcontable', cols_stock, 'Ubicacion',
+                # Crear StockEntrando en la ubicación destino
+                sql_entrando = upsert_incremental_sql('stockcontable', cols_stock, ['Ubicacion', 'Material', 'IDContenedor'],
                                                       ['StockEntrando'], ['UltimoMovimiento', 'UsuarioUltimoMov'])
                 cursor.execute(sql_entrando, (
                     id_ubicacion_destino, item['id_material'], item['lote'],
                     item['tipo_stock'], contenedor,
                     0, 0, item['cantidad_recibida'], 0,
-                    None, ahora, item['fecha_vencimiento'], usuario
+                    None, ahora, item['fecha_vencimiento'], usuario, tenant_id
                 ))
 
-            # Generar nÃºmero de OMC
+            # Generar número de OMC
             anio_omc = ahora.year
             expr_omc = cast_as_int(substring_index("numero", "-", -1))
             cursor.execute(
@@ -498,7 +499,7 @@ def cerrar(id_recepcion):
                 numero_omc, contenedor,
                 recepcion['id_ubicacion_recep'], id_ubicacion_destino,
                 id_recepcion,
-                f"Generada al cerrar recepciÃ³n {recepcion['numero']}",
+                f"Generada al cerrar recepción {recepcion['numero']}",
                 usuario, ahora, tenant_id
             ))
             cursor.execute("""
@@ -517,8 +518,8 @@ def cerrar(id_recepcion):
 
             conn.commit()
             flash(
-                f"RecepciÃ³n {recepcion['numero']} cerrada. "
-                f"{len(items)} Ã­tem(s) registrado(s). "
+                f"Recepción {recepcion['numero']} cerrada. "
+                f"{len(items)} ítem(s) registrado(s). "
                 f"OMC {numero_omc} generada para confirmar el traslado.",
                 "success"
             )
@@ -526,14 +527,14 @@ def cerrar(id_recepcion):
 
     except Exception as e:
         conn.rollback()
-        flash(f"Error al cerrar la recepciÃ³n (sin cambios guardados): {str(e)}", "danger")
+        flash(f"Error al cerrar la recepción (sin cambios guardados): {str(e)}", "danger")
         return redirect(url_for('recepciones.ver', id_recepcion=id_recepcion))
     finally:
         conn.close()
 
 
 # ============================================================================
-# ELIMINAR RECEPCIÃ“N (solo Abierta sin materiales)
+# ELIMINAR RECEPCIÓN (solo Abierta sin materiales)
 # ============================================================================
 @recepciones_bp.route('/recepciones/eliminar/<int:id_recepcion>', methods=['POST'])
 def eliminar(id_recepcion):
@@ -546,7 +547,7 @@ def eliminar(id_recepcion):
                 (id_recepcion, tenant_id, tenant_id)
             )
             rec = cursor.fetchone()
-            if not rec or rec['estado'] != 'Abierta':
+            if not rec or rec['estado'].upper() != 'ABIERTA':
                 flash("Solo se pueden eliminar recepciones Abiertas.", "warning")
                 return redirect(url_for('recepciones.listar'))
 
@@ -555,7 +556,7 @@ def eliminar(id_recepcion):
                 (id_recepcion, tenant_id, tenant_id)
             )
             if cursor.fetchone()['total'] > 0:
-                flash("No se puede eliminar: la recepciÃ³n tiene materiales asignados.", "danger")
+                flash("No se puede eliminar: la recepción tiene materiales asignados.", "danger")
                 return redirect(url_for('recepciones.ver', id_recepcion=id_recepcion))
 
             cursor.execute(
@@ -563,7 +564,7 @@ def eliminar(id_recepcion):
                 (id_recepcion, tenant_id, tenant_id)
             )
             conn.commit()
-            flash(f"RecepciÃ³n {rec['numero']} eliminada.", "success")
+            flash(f"Recepción {rec['numero']} eliminada.", "success")
     except Exception as e:
         conn.rollback()
         flash(f"Error: {str(e)}", "danger")
@@ -584,7 +585,7 @@ def confirmar_stock(id_recepcion):
             )
             recepcion = cursor.fetchone()
             if not recepcion:
-                flash("La recepciÃ³n no existe o no estÃ¡ en estado Cerrada.", "danger")
+                flash("La recepción no existe o no está en estado Cerrada.", "danger")
                 return redirect(url_for('recepciones.ver', id_recepcion=id_recepcion))
 
             ahora = datetime.now()
@@ -621,7 +622,7 @@ def confirmar_stock(id_recepcion):
 
 
 # ============================================================================
-# ANULAR RECEPCIÃ“N
+# ANULAR RECEPCIÓN
 # ============================================================================
 @recepciones_bp.route('/recepciones/anular/<int:id_recepcion>', methods=['POST'])
 def anular(id_recepcion):
@@ -634,7 +635,7 @@ def anular(id_recepcion):
                 (id_recepcion, tenant_id, tenant_id)
             )
             rec = cursor.fetchone()
-            if not rec or rec['estado'] != 'Abierta':
+            if not rec or rec['estado'].upper() != 'ABIERTA':
                 flash("Solo se pueden anular recepciones Abiertas.", "warning")
                 return redirect(url_for('recepciones.listar'))
 
@@ -645,7 +646,7 @@ def anular(id_recepcion):
                 WHERE id_recepcion = %s AND (%s IS NULL OR tenant_id = %s)
             """, (datetime.now(), usuario, id_recepcion, tenant_id, tenant_id))
             conn.commit()
-            flash(f"RecepciÃ³n {rec['numero']} anulada.", "success")
+            flash(f"Recepción {rec['numero']} anulada.", "success")
     except Exception as e:
         conn.rollback()
         flash(f"Error: {str(e)}", "danger")
@@ -663,7 +664,7 @@ _CAMPOS_IMPORT_REC = [
 ]
 _EJEMPLO_IMPORT_REC = [
     'LOTE-2024-001', 'PROV001', 'UB-RECEP', 'UB-DEPOSITO',
-    'ImportaciÃ³n masiva', 'MAT001', 'UNICO', '', '100', 'Libre Venta'
+    'Importación masiva', 'MAT001', 'UNICO', '', '100', 'Libre Venta'
 ]
 
 
@@ -671,7 +672,7 @@ _EJEMPLO_IMPORT_REC = [
 def importar():
     file = request.files.get('archivo')
     if not file or not file.filename:
-        return jsonify({'error': 'No se proporcionÃ³ archivo'}), 400
+        return jsonify({'error': 'No se proporcionó archivo'}), 400
     try:
         rows = parse_file(file, request.form.get('hoja'))
     except Exception as e:
@@ -714,7 +715,7 @@ def importar():
                     cursor.execute("SELECT id FROM ubicaciones WHERE codigo = %s AND (%s IS NULL OR tenant_id = %s)", (ubic_recep_cod, tenant_id, tenant_id))
                     ubic_recep = cursor.fetchone()
                     if not ubic_recep:
-                        errores.append({'fila': filas[0][0], 'codigo': agrupador, 'razon': f'UbicaciÃ³n recep "{ubic_recep_cod}" no encontrada'})
+                        errores.append({'fila': filas[0][0], 'codigo': agrupador, 'razon': f'Ubicación recep "{ubic_recep_cod}" no encontrada'})
                         continue
 
                     id_dest = None
@@ -735,9 +736,10 @@ def importar():
                     id_recepcion = execute_insert(cursor, """
                         INSERT INTO recepciones_cabecera
                             (numero, id_proveedor, id_ubicacion_recep, id_ubicacion_destino,
-                             observaciones, usuario_creacion, tenant_id)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    """, (numero, prov['id'], ubic_recep['id'], id_dest, observaciones, usuario, tenant_id))
+                             id_contenedor, observaciones, usuario_creacion, tenant_id)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    """, (numero, prov['id'], ubic_recep['id'], id_dest, '',
+                          observaciones, usuario, tenant_id))
 
                     cursor.execute(
                         "UPDATE recepciones_cabecera SET id_contenedor = %s WHERE id_recepcion = %s AND (%s IS NULL OR tenant_id = %s)",
@@ -770,7 +772,7 @@ def importar():
                         lineas_ok += 1
 
                     if lineas_ok == 0:
-                        errores.append({'fila': filas[0][0], 'codigo': agrupador, 'razon': 'Ninguna lÃ­nea de material vÃ¡lida'})
+                        errores.append({'fila': filas[0][0], 'codigo': agrupador, 'razon': 'Ninguna línea de material válida'})
                     else:
                         insertados += 1
 
@@ -795,4 +797,4 @@ def plantilla(formato):
         return plantilla_json(_CAMPOS_IMPORT_REC, _EJEMPLO_IMPORT_REC, 'plantilla_recepciones.json')
     elif formato == 'xlsx':
         return plantilla_xlsx(_CAMPOS_IMPORT_REC, _EJEMPLO_IMPORT_REC, 'plantilla_recepciones.xlsx')
-    return 'Formato no vÃ¡lido', 400
+    return 'Formato no válido', 400

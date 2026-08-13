@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for, flash
 import datetime
 from modules.db_config import get_db_connection
-from modules.sql_dialect import execute_insert, limit_sql
+from modules.sql_dialect import execute_insert, limit_sql, in_clause_sql
 
 inventario_bp = Blueprint('inventario', __name__)
 
@@ -98,7 +98,7 @@ def crear():
                 params.append(int(id_material))
 
             elif modo == 'ubicaciones' and id_ubicaciones:
-                placeholders = ','.join(['%s'] * len(id_ubicaciones))
+                placeholders = in_clause_sql(id_ubicaciones)
                 where_extra += f" AND sc.Ubicacion IN ({placeholders})"
                 params.extend([int(x) for x in id_ubicaciones])
 
@@ -211,7 +211,7 @@ def guardar_conteo(id_linea):
             row = cursor.fetchone()
             if not row:
                 return jsonify({'ok': False, 'error': 'Línea no encontrada'}), 404
-            if row['estado'] != 'Abierto':
+            if row['estado'].upper() != 'ABIERTO':
                 return jsonify({'ok': False, 'error': 'El inventario está cerrado'}), 400
 
             stock_sistema = float(row['stock_sistema'])
@@ -254,7 +254,7 @@ def anular(id_inventario):
                 (id_inventario, tenant_id, tenant_id)
             )
             row = cursor.fetchone()
-            if not row or row['estado'] != 'Abierto':
+            if not row or row['estado'].upper() != 'ABIERTO':
                 flash('Solo se pueden anular inventarios en estado Abierto.', 'warning')
                 return redirect(url_for('inventario.detalle', id_inventario=id_inventario))
 
@@ -287,7 +287,7 @@ def cerrar(id_inventario):
                 (id_inventario, tenant_id, tenant_id)
             )
             row = cursor.fetchone()
-            if not row or row['estado'] != 'Abierto':
+            if not row or row['estado'].upper() != 'ABIERTO':
                 flash('El inventario no existe o ya está cerrado.', 'warning')
                 return redirect(url_for('inventario.detalle', id_inventario=id_inventario))
 

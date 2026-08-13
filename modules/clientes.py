@@ -34,7 +34,7 @@ def listar():
             cursor.execute("SELECT id_transporte, razonsocial FROM transportes WHERE activo = 1 AND (%s IS NULL OR tenant_id = %s)", (tenant_id, tenant_id))
             transportes_all = cursor.fetchall()
 
-            cursor.execute("SELECT id_transporte, id_ruta FROM transporte_rutas")
+            cursor.execute("SELECT id_transporte, id_ruta FROM transporte_rutas WHERE (%s IS NULL OR tenant_id = %s)", (tenant_id, tenant_id))
             rel_transp_rutas = cursor.fetchall()
 
         return render_template('clientes.html',
@@ -93,7 +93,7 @@ def guardar():
     finally:
         conn.close()
     return redirect(url_for('clientes.listar'))
-# â”€â”€ Batch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Batch ─────────────────────────────────────────────────────────────────────
 _CAMPOS_EXPORT = ['codigo', 'razonsocial', 'cuit', 'direccion', 'localidad', 'provincia',
                   'telefono', 'email', 'contacto_nombre',
                   'id_ruta', 'nombre_ruta', 'id_transporte_predeterminado', 'nombre_transporte',
@@ -103,7 +103,7 @@ _CAMPOS_IMPORT = ['codigo', 'razonsocial', 'cuit', 'direccion', 'localidad', 'pr
                   'id_ruta', 'id_transporte_predeterminado', 'activo']
 _EJEMPLO_IMPORT = ['CLI001', 'Cliente de Ejemplo S.A.', '20-87654321-0',
                    'Av. Corrientes 1234', 'Buenos Aires', 'Buenos Aires',
-                   '011-5555-6666', 'cliente@ejemplo.com', 'Juan PÃ©rez',
+                   '011-5555-6666', 'cliente@ejemplo.com', 'Juan Pérez',
                    'Zona Centro', 'TRA005', '1']
 
 
@@ -138,7 +138,7 @@ def importar():
     tenant_id = get_tenant_filter()
     file = request.files.get('archivo')
     if not file or not file.filename:
-        return jsonify({'error': 'No se proporcionÃ³ archivo'}), 400
+        return jsonify({'error': 'No se proporcionó archivo'}), 400
     try:
         rows = parse_file(file, request.form.get('hoja'))
     except Exception as e:
@@ -151,8 +151,8 @@ def importar():
             codigo = str(row.get('codigo', '') or '').strip()
             razon = str(row.get('razonsocial', '') or '').strip()
             if not codigo or not razon:
-                errores.append({'fila': i, 'codigo': codigo or '(vacÃ­o)',
-                                'razon': 'CÃ³digo y RazÃ³n Social son obligatorios'})
+                errores.append({'fila': i, 'codigo': codigo or '(vacío)',
+                                'razon': 'Código y Razón Social son obligatorios'})
                 continue
             try:
                 with conn.cursor() as cursor:
@@ -229,7 +229,7 @@ def exportar(formato):
         return export_json(rows, _CAMPOS_EXPORT, 'clientes.json')
     elif formato == 'xlsx':
         return export_xlsx(rows, _CAMPOS_EXPORT, 'clientes.xlsx')
-    return 'Formato no vÃ¡lido', 400
+    return 'Formato no válido', 400
 
 
 @clientes_bp.route('/clientes/plantilla/<formato>')
@@ -240,4 +240,4 @@ def plantilla(formato):
         return plantilla_json(_CAMPOS_IMPORT, _EJEMPLO_IMPORT, 'plantilla_clientes.json')
     elif formato == 'xlsx':
         return plantilla_xlsx(_CAMPOS_IMPORT, _EJEMPLO_IMPORT, 'plantilla_clientes.xlsx')
-    return 'Formato no vÃ¡lido', 400
+    return 'Formato no válido', 400

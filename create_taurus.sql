@@ -1,13 +1,54 @@
+-- =============================================================================
+-- TAURUS WMS - Script de creacion de bases de datos para INSTALACION NUEVA
+-- Motor: MySQL (InnoDB, utf8mb4 / utf8mb4_unicode_ci)
+-- =============================================================================
+--
+-- QUE CREA ESTE SCRIPT
+-- --------------------
+--   taurus_admin       Usuarios, tenants (empresas), roles y permisos,
+--                      parametros de configuracion y auditoria.
+--   taurus_wms         Datos operativos del WMS (materiales, ubicaciones,
+--                      stock, recepciones, pedidos, OMC, despacho, inventario).
+--   taurus_intercambio Interfase con sistemas externos (materiales, rutas,
+--                      transportes, clientes, pedidos) + historial (intercambio_log).
+--
+-- REQUISITOS
+-- ----------
+--   * MySQL 5.7 o superior (recomendado 8.x).
+--   * Ejecutar con un usuario con privilegios de creacion de bases de datos
+--     y tablas (p. ej. root).
+--
+-- COMO EJECUTAR
+-- -------------
+--   mysql -u root -p < create_taurus.sql
+--
+--   (o pegar el contenido en un cliente como MySQL Workbench y ejecutarlo).
+--
+-- IMPORTANTE
+-- ----------
+--   * Este script BORRA y RECREA las tres bases de datos (DROP DATABASE IF
+--     EXISTS). NO lo ejecute sobre una instalacion existente con datos.
+--   * Al terminar, el panel admin queda en http://localhost:5001/admin con el
+--     usuario admin y la aplicacion principal en http://localhost:5000.
+--   * Contrasenas iniciales (cambiarlas apenas se ingrese):
+--         SuperAdmin: admin    / Admin@2024!
+--         Operador:   operador / Admin@2024!
+--   * Los datos de conexion WMS/Intercambio que usa la aplicacion se guardan
+--     en la tabla taurus_admin.configuracion (claves DB_* e INTERCAMBIO_*).
+--     Ajustar DB_PASSWORD / INTERCAMBIO_PASSWORD segun el servidor real.
+--   * Tambien puede generarse este schema con:
+--         python modules/schema_generator.py --engine mysql
+-- =============================================================================
+
 SET NAMES utf8mb4;
+SET FOREIGN_KEY_CHECKS = 0;
 
--- TAURUS WMS - Schema para taurus_admin;
--- Engine: mysql;
--- Generado por modules/schema_generator.py;
-
+-- -----------------------------------------------------------------------------
+-- BASE 1/3: taurus_admin
+-- -----------------------------------------------------------------------------
 DROP DATABASE IF EXISTS taurus_admin;
 CREATE DATABASE IF NOT EXISTS taurus_admin CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE taurus_admin;
-
 
 -- --- admin_usuarios ---;
 CREATE TABLE `admin_usuarios` (
@@ -298,14 +339,13 @@ INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('CONSULTA', '/sidebar-p
 
 SET NAMES utf8mb4;
 
--- TAURUS WMS - Schema para taurus_wms (datos operativos);
--- Engine: mysql;
--- Generado por modules/schema_generator.py;
 
+-- -----------------------------------------------------------------------------
+-- BASE 2/3: taurus_wms
+-- -----------------------------------------------------------------------------
 DROP DATABASE IF EXISTS taurus_wms;
 CREATE DATABASE IF NOT EXISTS taurus_wms CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE taurus_wms;
-
 
 -- --- zonas ---;
 CREATE TABLE `zonas` (
@@ -437,12 +477,10 @@ CREATE TABLE `transporte_rutas` (
     `id_transporte` int NOT NULL,
     `id_ruta` int NOT NULL,
     `observaciones` text,
-    `tenant_id` int,
     PRIMARY KEY (`id_transporte`, `id_ruta`),
     CONSTRAINT `fk_transporte_rutas_id_transporte` FOREIGN KEY (`id_transporte`) REFERENCES `transportes` (`id_transporte`) ON DELETE CASCADE,
     CONSTRAINT `fk_transporte_rutas_id_ruta` FOREIGN KEY (`id_ruta`) REFERENCES `rutas` (`id_ruta`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-CREATE INDEX `idx_transporte_rutas_tenant` ON `transporte_rutas` (`tenant_id`);
 
 -- --- clientes ---;
 CREATE TABLE `clientes` (
@@ -759,14 +797,13 @@ INSERT IGNORE INTO `clases_pedido` (`nombre`, `activo`) VALUES ('Devolucion', TR
 
 SET NAMES utf8mb4;
 
--- TAURUS WMS - Schema para taurus_intercambio (interfaces con sistemas externos);
--- Engine: mysql;
--- Generado por modules/schema_generator.py;
 
+-- -----------------------------------------------------------------------------
+-- BASE 3/3: taurus_intercambio
+-- -----------------------------------------------------------------------------
 DROP DATABASE IF EXISTS taurus_intercambio;
 CREATE DATABASE IF NOT EXISTS taurus_intercambio CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE taurus_intercambio;
-
 
 -- --- intercambio_materiales ---;
 CREATE TABLE `intercambio_materiales` (
@@ -941,3 +978,17 @@ CREATE INDEX `idx_int_log_fecha` ON `intercambio_log` (`fecha`);
 -- Usuarios por defecto:;
 --   SuperAdmin: admin / Admin@2024!;
 --   Operador:   operador / Admin@2024!;
+-- -----------------------------------------------------------------------------
+-- FIN DEL SCRIPT
+-- -----------------------------------------------------------------------------
+SET FOREIGN_KEY_CHECKS = 1;
+
+-- El schema quedo creado. Proximos pasos:
+--   1. Crear el usuario de MySQL que usara la aplicacion (opcional, si no usa root):
+--        CREATE USER 'taurus'@'%' IDENTIFIED BY 'Taurus_2001';
+--        GRANT ALL PRIVILEGES ON taurus_admin.*       TO 'taurus'@'%';
+--        GRANT ALL PRIVILEGES ON taurus_wms.*         TO 'taurus'@'%';
+--        GRANT ALL PRIVILEGES ON taurus_intercambio.* TO 'taurus'@'%';
+--        FLUSH PRIVILEGES;
+--   2. Configurar `.env` (DB_ADMIN_*, DB_*, INTERCAMBIO_*) con las mismas credenciales.
+--   3. Iniciar la aplicacion:  python app.py  y  python admin.py

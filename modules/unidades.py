@@ -75,7 +75,7 @@ def eliminar(id):
     return redirect(url_for('unidades.unidades'))
 
 
-# â”€â”€ Batch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Batch ─────────────────────────────────────────────────────────────────────
 _CAMPOS = ['codigo', 'nombre', 'simbolo', 'tipo_magnitud', 'conversion_a_base', 'unidad_base_referencia', 'decimales_permitidos', 'activo']
 _EJEMPLO = ['UND', 'Unidad', 'U', 'CANTIDAD', '1', 'U', '0', '1']
 
@@ -85,7 +85,7 @@ def importar():
     tenant_id = get_tenant_filter()
     file = request.files.get('archivo')
     if not file or not file.filename:
-        return jsonify({'error': 'No se proporcionÃ³ archivo'}), 400
+        return jsonify({'error': 'No se proporcionó archivo'}), 400
     try:
         rows = parse_file(file, request.form.get('hoja'))
     except Exception as e:
@@ -98,7 +98,7 @@ def importar():
             codigo = str(row.get('codigo', '') or '').strip()
             nombre = str(row.get('nombre', '') or '').strip()
             if not codigo or not nombre:
-                errores.append({'fila': i, 'codigo': codigo or '(vacÃ­o)', 'razon': 'CÃ³digo y Nombre son obligatorios'})
+                errores.append({'fila': i, 'codigo': codigo or '(vacío)', 'razon': 'Código y Nombre son obligatorios'})
                 continue
             try:
                 with conn.cursor() as cursor:
@@ -106,7 +106,7 @@ def importar():
                     if cursor.fetchone():
                         omitidos.append(codigo)
                         continue
-                    activo = 1 if str(row.get('activo', '1')).strip().lower() in ('1', 'true', 'si', 'sÃ­', 'yes') else 0
+                    activo = 1 if str(row.get('activo', '1')).strip().lower() in ('1', 'true', 'si', 'sí', 'yes') else 0
                     cursor.execute("""
                         INSERT INTO unidades_medida 
                             (codigo, nombre, simbolo, tipo_magnitud, conversion_a_base, 
@@ -158,7 +158,7 @@ def exportar(formato):
         return export_json(rows, _CAMPOS, 'unidades_medida.json')
     elif formato == 'xlsx':
         return export_xlsx(rows, _CAMPOS, 'unidades_medida.xlsx')
-    return 'Formato no vÃ¡lido', 400
+    return 'Formato no válido', 400
 
 
 @ unidades_bp.route('/unidades/plantilla/<formato>')
@@ -169,4 +169,4 @@ def plantilla(formato):
         return plantilla_json(_CAMPOS, _EJEMPLO, 'plantilla_unidades.json')
     elif formato == 'xlsx':
         return plantilla_xlsx(_CAMPOS, _EJEMPLO, 'plantilla_unidades.xlsx')
-    return 'Formato no vÃ¡lido', 400
+    return 'Formato no válido', 400

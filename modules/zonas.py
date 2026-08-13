@@ -87,9 +87,9 @@ def eliminar(id):
     return redirect(url_for('zonas.listar'))
 
 
-# â”€â”€ Batch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Batch ─────────────────────────────────────────────────────────────────────
 _CAMPOS = ['codigo', 'nombre', 'descripcion', 'activo']
-_EJEMPLO = ['ZN-NORTE', 'Zona Norte', 'Sector norte del depÃ³sito', '1']
+_EJEMPLO = ['ZN-NORTE', 'Zona Norte', 'Sector norte del depósito', '1']
 
 
 @zonas_bp.route('/zonas/importar', methods=['POST'])
@@ -97,7 +97,7 @@ def importar():
     tenant_id = get_tenant_filter()
     file = request.files.get('archivo')
     if not file or not file.filename:
-        return jsonify({'error': 'No se proporcionÃ³ archivo'}), 400
+        return jsonify({'error': 'No se proporcionó archivo'}), 400
     try:
         rows = parse_file(file, request.form.get('hoja'))
     except Exception as e:
@@ -110,8 +110,8 @@ def importar():
             codigo = str(row.get('codigo', '') or '').strip().upper()
             nombre = str(row.get('nombre', '') or '').strip()
             if not codigo or not nombre:
-                errores.append({'fila': i, 'codigo': codigo or '(vacÃ­o)',
-                                'razon': 'CÃ³digo y Nombre son obligatorios'})
+                errores.append({'fila': i, 'codigo': codigo or '(vacío)',
+                                'razon': 'Código y Nombre son obligatorios'})
                 continue
             try:
                 with conn.cursor() as cursor:
@@ -161,7 +161,7 @@ def exportar(formato):
         return export_json(rows, _CAMPOS, 'zonas.json')
     elif formato == 'xlsx':
         return export_xlsx(rows, _CAMPOS, 'zonas.xlsx')
-    return 'Formato no vÃ¡lido', 400
+    return 'Formato no válido', 400
 
 
 @zonas_bp.route('/zonas/plantilla/<formato>')
@@ -172,4 +172,4 @@ def plantilla(formato):
         return plantilla_json(_CAMPOS, _EJEMPLO, 'plantilla_zonas.json')
     elif formato == 'xlsx':
         return plantilla_xlsx(_CAMPOS, _EJEMPLO, 'plantilla_zonas.xlsx')
-    return 'Formato no vÃ¡lido', 400
+    return 'Formato no válido', 400

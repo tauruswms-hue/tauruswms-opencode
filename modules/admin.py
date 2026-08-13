@@ -1,4 +1,6 @@
 from flask import Blueprint, render_template, session, redirect, url_for, request, flash
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash, generate_password_hash
 import os
 import datetime
@@ -17,6 +19,8 @@ from modules.intercambio import (
 )
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
+
+admin_limiter = Limiter(key_func=get_remote_address, storage_uri="memory://")
 
 env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
 load_dotenv(dotenv_path=env_path)
@@ -98,6 +102,7 @@ def admin_required(f):
 
 
 @admin_bp.route('/login', methods=['GET', 'POST'])
+@admin_limiter.limit("5 per 15 minutes", methods=['POST'])
 def login():
     if 'admin_user_id' in session:
         return redirect(url_for('admin.tenants'))
@@ -134,6 +139,7 @@ def login():
                 session['admin_username'] = usuario['username']
                 session['admin_nombre'] = usuario['nombre']
                 session['admin_rol'] = usuario['rol']
+                session.permanent = True
                 
                 log_audit('LOGIN', 'auth', {'username': username})
                 flash(f'Bienvenido, {usuario["nombre"]}', 'success')
@@ -269,7 +275,7 @@ def tenants_guardar():
     return redirect(url_for('admin.tenants'))
 
 
-@admin_bp.route('/tenants/eliminar/<encoded_id>')
+@admin_bp.route('/tenants/eliminar/<encoded_id>', methods=['POST'])
 @admin_required
 def tenants_eliminar(encoded_id):
     tenant_id = decode_id(encoded_id)
@@ -291,7 +297,7 @@ def tenants_eliminar(encoded_id):
     return redirect(url_for('admin.tenants'))
 
 
-@admin_bp.route('/tenants/activar/<encoded_id>')
+@admin_bp.route('/tenants/activar/<encoded_id>', methods=['POST'])
 @admin_required
 def tenants_activar(encoded_id):
     tenant_id = decode_id(encoded_id)
@@ -382,7 +388,7 @@ def usuarios_guardar():
     return redirect(url_for('admin.tenants_ver', encoded_id=encode_id(tenant_id)))
 
 
-@admin_bp.route('/usuarios/eliminar/<int:usuario_id>/<encoded_tenant_id>')
+@admin_bp.route('/usuarios/eliminar/<int:usuario_id>/<encoded_tenant_id>', methods=['POST'])
 @admin_required
 def usuarios_eliminar(usuario_id, encoded_tenant_id):
     tenant_id = decode_id(encoded_tenant_id)
@@ -413,7 +419,7 @@ def usuarios_eliminar(usuario_id, encoded_tenant_id):
     return redirect(url_for('admin.tenants_ver', encoded_id=encode_id(tenant_id)))
 
 
-@admin_bp.route('/usuarios/activar/<int:usuario_id>/<encoded_tenant_id>')
+@admin_bp.route('/usuarios/activar/<int:usuario_id>/<encoded_tenant_id>', methods=['POST'])
 @admin_required
 def usuarios_activar(usuario_id, encoded_tenant_id):
     tenant_id = decode_id(encoded_tenant_id)
@@ -565,7 +571,7 @@ def roles_guardar():
     return redirect(url_for('admin.roles'))
 
 
-@admin_bp.route('/roles/eliminar/<int:rol_id>')
+@admin_bp.route('/roles/eliminar/<int:rol_id>', methods=['POST'])
 @admin_required
 def roles_eliminar(rol_id):
     if session.get('admin_rol') != 'SUPERADMIN':
@@ -599,7 +605,7 @@ def roles_eliminar(rol_id):
     return redirect(url_for('admin.roles'))
 
 
-@admin_bp.route('/roles/activar/<int:rol_id>')
+@admin_bp.route('/roles/activar/<int:rol_id>', methods=['POST'])
 @admin_required
 def roles_activar(rol_id):
     if session.get('admin_rol') != 'SUPERADMIN':
@@ -834,7 +840,7 @@ def configuracion_guardar():
     return redirect(url_for('admin.configuracion'))
 
 
-@admin_bp.route('/configuracion/eliminar/<int:config_id>')
+@admin_bp.route('/configuracion/eliminar/<int:config_id>', methods=['POST'])
 @admin_required
 def configuracion_eliminar(config_id):
     if session.get('admin_rol') != 'SUPERADMIN':
@@ -890,7 +896,8 @@ def intercambio():
             cursor_int.execute(
                 f"SELECT estado, COUNT(*) AS total FROM {conf['tabla']} GROUP BY estado")
             for r in cursor_int.fetchall():
-                conteo[r['estado']] = conteo.get(r['estado'], 0) + r['total']
+                clave = str(r['estado']).lower()
+                conteo[clave] = conteo.get(clave, 0) + r['total']
 
             cursor_int.execute(
                 f"SELECT * FROM {conf['tabla']} WHERE estado = 'error' "

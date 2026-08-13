@@ -1,0 +1,86 @@
+# -*- coding: utf-8 -*-
+"""Fixtures compartidos para los tests de Taurus WMS.
+
+Se importan las apps reales (app.py / admin.py). Para tests que no tocan la
+BD se desactiva CSRF y rate limiting; los tests de integración que requieren
+MySQL se marcan con `requires_db` (salto automático si no hay conexión).
+"""
+
+import os
+import sys
+
+import pytest
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+
+os.environ.setdefault('APP_ENV', 'development')
+
+import app as wms_app_module            # noqa: E402
+import admin as admin_app_module        # noqa: E402
+
+
+# --------------------------------------------------------------------------
+# Disponibilidad de la BD (para tests de integración)
+# --------------------------------------------------------------------------
+def _mysql_disponible():
+    try:
+        from modules.db_config import _get_admin_connection
+        conn = _get_admin_connection()
+        conn.close()
+        return True
+    except Exception:
+        return False
+
+
+DB_OK = _mysql_disponible()
+
+requires_db = pytest.mark.skipif(
+    not DB_OK,
+    reason='MySQL no disponible: se omiten tests de integración',
+)
+
+
+@pytest.fixture(autouse=True)
+def _desactivar_limiter_y_csrf():
+    """Por defecto: sin rate limiting y sin CSRF para poder testear flujos."""
+    wms_app_module.app.config['RATELIMIT_ENABLED'] = False
+    wms_app_module.app.config['WTF_CSRF_ENABLED'] = False
+    admin_app_module.app.config['RATELIMIT_ENABLED'] = False
+    admin_app_module.app.config['WTF_CSRF_ENABLED'] = False
+    yield
+
+
+@pytest.fixture
+def client():
+    wms_app_module.app.config.update(TESTING=True)
+    with wms_app_module.app.test_client() as c:
+        yield c
+
+
+@pytest.fixture
+def admin_client():
+    admin_app_module.app.config.update(TESTING=True)
+    with admin_app_module.app.test_client() as c:
+        yield c
+
+
+@pytest.fixture
+def logged_client(client):
+    """Cliente WMS autenticado como operador (credenciales seed reales)."""
+    resp = client.post('/login', data={
+        'username': 'operador', 'password': 'Admin@2024!',
+    })
+    assert resp.status_code in (302, 200)
+    return client
+
+
+@pytest.fixture
+def admin_logged_client(admin_client):
+    """Cliente admin autenticado (admin/Admin@2024!)."""
+    resp = admin_client.post('/admin/login', data={
+        'username': 'admin', 'password': 'Admin@2024!',
+    })
+    assert resp.status_code in (302, 200)
+    return admin_client

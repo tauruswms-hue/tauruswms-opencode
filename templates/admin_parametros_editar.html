@@ -63,6 +63,7 @@
             </div>
             <div class="card-body">
                 <form method="POST" action="{{ url_for('admin.parametros_editar', tenant_id=tenant_id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     
                     <ul class="nav nav-tabs" role="tablist">
                         <li class="nav-item" role="presentation">

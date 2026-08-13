@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from datetime import datetime
 from werkzeug.security import check_password_hash
 from modules.db_config import get_db_connection, _get_admin_connection
-from modules.sql_dialect import upsert_incremental_sql, cast_as_int, substring_index, year as year_func, concat, group_concat, quote, execute_insert, limit_sql
+from modules.sql_dialect import upsert_incremental_sql, cast_as_int, substring_index, year as year_func, concat, group_concat, quote, execute_insert, limit_sql, in_clause_sql
 
 omc_bp = Blueprint('omc', __name__)
 
@@ -50,13 +50,13 @@ def _crear_stock_entrando(cursor, contenedor_origen, id_origen, id_destino,
     for rec in registros:
         cols = ['Ubicacion', 'Material', 'Lote', 'TipoStock', 'IDContenedor',
                 'StockTotal', 'StockDisponible', 'StockEntrando', 'StockSaliendo',
-                'UltimaEntrada', 'UltimoMovimiento', 'FechaVencimiento', 'UsuarioUltimoMov']
+                'UltimaEntrada', 'UltimoMovimiento', 'FechaVencimiento', 'UsuarioUltimoMov', 'tenant_id']
         increment = ['StockEntrando']
         passthrough = ['UltimoMovimiento', 'UsuarioUltimoMov']
-        sql = upsert_incremental_sql('stockcontable', cols, 'Ubicacion', increment, passthrough)
+        sql = upsert_incremental_sql('stockcontable', cols, ['Ubicacion', 'Material', 'IDContenedor'], increment, passthrough)
         cursor.execute(sql, (
             id_destino, rec['Material'], rec['Lote'], rec['TipoStock'], contenedor_dest,
-            0, 0, rec['StockSaliendo'], 0, None, ahora, rec['FechaVencimiento'], usuario
+            0, 0, rec['StockSaliendo'], 0, None, ahora, rec['FechaVencimiento'], usuario, tenant_id
         ))
     return len(registros)
 
@@ -315,7 +315,7 @@ def ver(id_omc):
             cont_dests = list({c.get('id_contenedor_destino') or c['id_contenedor'] for c in contenedores})
             stock_destino = []
             if cont_dests:
-                ph = ','.join(['%s'] * len(cont_dests))
+                ph = in_clause_sql(cont_dests)
                 cursor.execute(f"""
                     SELECT sc.*, m.codigo AS mat_codigo, m.nombre AS mat_nombre,
                            u.codigo AS ubi_codigo
@@ -358,18 +358,24 @@ def confirmar(id_omc):
         flash("Debe ingresar la contraseña de administrador.", "warning")
         return redirect(url_for('omc.ver', id_omc=id_omc))
 
-    conn = get_db_connection()
+    conn_admin = _get_admin_connection()
     try:
-        with conn.cursor() as cursor:
-            cursor.execute(
+        with conn_admin.cursor() as cursor_admin:
+            cursor_admin.execute(
                 "SELECT password_hash FROM usuarios WHERE id = %s AND activo = 1",
                 (session.get('user_id'),)
             )
-            user = cursor.fetchone()
-            if not user or not check_password_hash(user['password_hash'], password):
-                flash("Contraseña incorrecta.", "danger")
-                return redirect(url_for('omc.ver', id_omc=id_omc))
+            user = cursor_admin.fetchone()
+    finally:
+        conn_admin.close()
 
+    if not user or not check_password_hash(user['password_hash'], password):
+        flash("Contraseña incorrecta.", "danger")
+        return redirect(url_for('omc.ver', id_omc=id_omc))
+
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
             cursor.execute(
                 "SELECT * FROM omc WHERE id_omc = %s AND estado = 'Pendiente' AND (%s IS NULL OR tenant_id = %s)",
                 (id_omc, tenant_id, tenant_id)

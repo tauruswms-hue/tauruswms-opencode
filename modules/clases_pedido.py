@@ -40,7 +40,7 @@ def guardar():
                 sql = "INSERT INTO clases_pedido (nombre, activo, tenant_id) VALUES (%s, %s, %s)"
                 cursor.execute(sql, (d.get('nombre'), 1 if d.get('activo') else 0, tenant_id))
             conn.commit()
-            flash("Clase de pedido guardada con Ã©xito", "success")
+            flash("Clase de pedido guardada con éxito", "success")
     except Exception as e:
         conn.rollback()
         flash(f"Error: {str(e)}", "danger")
@@ -67,7 +67,7 @@ def eliminar(id_clase):
     return redirect(url_for('clases_pedido.listar'))
 
 
-# â”€â”€ Batch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Batch ─────────────────────────────────────────────────────────────────────
 _CAMPOS = ['nombre', 'activo']
 _EJEMPLO = ['Urgente', '1']
 
@@ -77,7 +77,7 @@ def importar():
     tenant_id = get_tenant_filter()
     file = request.files.get('archivo')
     if not file or not file.filename:
-        return jsonify({'error': 'No se proporcionÃ³ archivo'}), 400
+        return jsonify({'error': 'No se proporcionó archivo'}), 400
     try:
         rows = parse_file(file, request.form.get('hoja'))
     except Exception as e:
@@ -89,7 +89,7 @@ def importar():
         for i, row in enumerate(rows, 1):
             nombre = str(row.get('nombre', '') or '').strip()
             if not nombre:
-                errores.append({'fila': i, 'codigo': '(vacÃ­o)', 'razon': 'El campo nombre es obligatorio'})
+                errores.append({'fila': i, 'codigo': '(vacío)', 'razon': 'El campo nombre es obligatorio'})
                 continue
             try:
                 with conn.cursor() as cursor:
@@ -133,7 +133,7 @@ def exportar(formato):
         return export_json(rows, _CAMPOS, 'clases_pedido.json')
     elif formato == 'xlsx':
         return export_xlsx(rows, _CAMPOS, 'clases_pedido.xlsx')
-    return 'Formato no vÃ¡lido', 400
+    return 'Formato no válido', 400
 
 
 @clases_pedido_bp.route('/clases-pedido/plantilla/<formato>')
@@ -144,7 +144,7 @@ def plantilla(formato):
         return plantilla_json(_CAMPOS, _EJEMPLO, 'plantilla_clases_pedido.json')
     elif formato == 'xlsx':
         return plantilla_xlsx(_CAMPOS, _EJEMPLO, 'plantilla_clases_pedido.xlsx')
-    return 'Formato no vÃ¡lido', 400
+    return 'Formato no válido', 400
 
 
 @clases_pedido_bp.route('/clases-pedido/plantilla-datos/<formato>')
@@ -168,4 +168,4 @@ def plantilla_datos(formato):
         return export_csv(rows, _CAMPOS, 'clases_pedido_importar.csv')
     elif formato == 'json':
         return export_json(rows, _CAMPOS, 'clases_pedido_importar.json')
-    return 'Formato no vÃ¡lido', 400
+    return 'Formato no válido', 400

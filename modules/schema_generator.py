@@ -336,8 +336,12 @@ WMS_TABLES = [
             {"name": "id_transporte", "type": "int",  "not_null": True},
             {"name": "id_ruta",       "type": "int",  "not_null": True},
             {"name": "observaciones", "type": "text"},
+            {"name": "tenant_id",     "type": "int"},
         ],
         "primary_key": ["id_transporte", "id_ruta"],
+        "indexes": [
+            {"columns": ["tenant_id"], "name": "idx_transporte_rutas_tenant"},
+        ],
         "foreign_keys": [
             {"columns": ["id_transporte"], "ref_table": "transportes", "ref_columns": ["id_transporte"], "on_delete": "CASCADE"},
             {"columns": ["id_ruta"],       "ref_table": "rutas",       "ref_columns": ["id_ruta"],       "on_delete": "CASCADE"},

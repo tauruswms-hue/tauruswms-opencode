@@ -135,12 +135,18 @@
                                             <button class="btn btn-outline-primary btn-sm" onclick="editarUsuario({{ usuario.id }}, '{{ usuario.username }}', '{{ usuario.nombre }}', '{{ usuario.email or '' }}', '{{ usuario.rol }}', {{ usuario.activo|int }})">
                                                 <i class="fas fa-edit"></i>
                                             </button>{% if usuario.activo %}
-                                            <a href="{{ url_for('admin.usuarios_eliminar', usuario_id=usuario.id, encoded_tenant_id=tenant.id|encode_id) }}" class="btn btn-outline-danger btn-sm" onclick="return confirm('¿Desactivar este usuario?')">
-                                                <i class="fas fa-ban"></i>
-                                            </a>{% else %}
-                                            <a href="{{ url_for('admin.usuarios_activar', usuario_id=usuario.id, encoded_tenant_id=tenant.id|encode_id) }}" class="btn btn-outline-success btn-sm" onclick="return confirm('¿Activar este usuario?')">
-                                                <i class="fas fa-check"></i>
-                                            </a>{% endif %}
+                                            <form method="POST" action="{{ url_for('admin.usuarios_eliminar', usuario_id=usuario.id, encoded_tenant_id=tenant.id|encode_id) }}" style="display:inline;" onsubmit="return confirm('¿Desactivar este usuario?');">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <button type="submit" class="btn btn-outline-danger btn-sm" title="Desactivar">
+                                                    <i class="fas fa-ban"></i>
+                                                </button>
+                                            </form>{% else %}
+                                            <form method="POST" action="{{ url_for('admin.usuarios_activar', usuario_id=usuario.id, encoded_tenant_id=tenant.id|encode_id) }}" style="display:inline;" onsubmit="return confirm('¿Activar este usuario?');">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <button type="submit" class="btn btn-outline-success btn-sm" title="Activar">
+                                                    <i class="fas fa-check"></i>
+                                                </button>
+                                            </form>{% endif %}
                                         </td>
                                     </tr>
                                     {% endfor %}
@@ -164,6 +170,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <form method="POST" action="{{ url_for('admin.tenants_guardar') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="modal-body">
                         <input type="hidden" name="id" id="tenantId" value="{{ tenant.id }}">
                         <div class="mb-2">
@@ -212,6 +219,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <form method="POST" action="{{ url_for('admin.usuarios_guardar') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="modal-body">
                         <input type="hidden" name="id" id="usuarioId">
                         <input type="hidden" name="tenant_id" value="{{ tenant.id }}">

@@ -5,6 +5,58 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Taurus WMS - {% block title %}Inicio{% endblock %}</title>
     <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <script>
+    // CSRF global: cabecera en AJAX (jQuery y fetch) y campo oculto en formularios.
+    (function() {
+        var meta = document.querySelector('meta[name="csrf-token"]');
+        if (!meta) return;
+        var token = meta.content;
+        window.csrfToken = token;
+
+        // jQuery
+        if (window.jQuery) {
+            window.jQuery.ajaxSetup({
+                beforeSend: function(xhr) { xhr.setRequestHeader('X-CSRFToken', token); }
+            });
+        }
+
+        // fetch: inyecta cabecera en métodos no seguros
+        var origFetch = window.fetch;
+        if (origFetch) {
+            window.fetch = function(url, options) {
+                options = options || {};
+                var method = (options.method || 'GET').toUpperCase();
+                if (['POST', 'PUT', 'PATCH', 'DELETE'].indexOf(method) !== -1) {
+                    var headers = new Headers(options.headers || {});
+                    if (!headers.has('X-CSRFToken')) headers.set('X-CSRFToken', token);
+                    options.headers = headers;
+                }
+                return origFetch(url, options);
+            };
+        }
+
+        // Formularios clásicos: campo oculto al cargar y al enviar (cubre formularios dinámicos)
+        function addToken(form) {
+            if (!form.querySelector('input[name="csrf_token"]')) {
+                var input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'csrf_token';
+                input.value = token;
+                form.appendChild(input);
+            }
+        }
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('form').forEach(addToken);
+        });
+        document.addEventListener('submit', function(e) {
+            var form = e.target && e.target.tagName === 'FORM'
+                ? e.target
+                : (e.target && e.target.closest ? e.target.closest('form') : null);
+            if (form) addToken(form);
+        }, true);
+    })();
+    </script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     {% if session.user_id and session.login_timestamp %}

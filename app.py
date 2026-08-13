@@ -1,4 +1,7 @@
 from flask import Flask, render_template, session, redirect, url_for, request, flash, jsonify, abort
+from flask_wtf.csrf import CSRFProtect
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash
 import os
 import time
@@ -29,7 +32,7 @@ from modules.rutas import rutas_bp
 from modules.pedidos import pedidos_bp
 from modules.clases_pedido import clases_pedido_bp
 from modules.stockcontable import stockcontable_bp
-from modules.recepciones import recepciones_bpope
+from modules.recepciones import recepciones_bp
 from modules.zonas import zonas_bp
 from modules.omc import omc_bp
 from modules.inventario import inventario_bp
@@ -64,7 +67,49 @@ app.register_blueprint(intercambio_bp)
 env_path = Path('.') / '.env'
 load_dotenv(dotenv_path=env_path)
 
-app.secret_key = os.getenv('SECRET_KEY', 'dev-fallback')
+APP_ENV = os.getenv('APP_ENV', 'development').strip().lower()
+
+_SECRET_KEY = os.getenv('SECRET_KEY')
+if not _SECRET_KEY:
+    raise RuntimeError("Falta SECRET_KEY en .env (ver .env.example)")
+app.secret_key = _SECRET_KEY
+
+_DEFAULT_SECRETOS = (
+    'taurus-wms-secret-2024-dev', 'taurus-admin-secret-2024-dev',
+    'taurus-wms-salt-2024', 'Admin@2024!', 'Taurus_2001', 'dev-fallback',
+)
+
+
+def _check_secretos():
+    """Fuerza el cambio de secretos/passwords por defecto en production."""
+    valores = [
+        ('SECRET_KEY', os.getenv('SECRET_KEY')),
+        ('ADMIN_SECRET_KEY', os.getenv('ADMIN_SECRET_KEY')),
+        ('SECRET_SALT', os.getenv('SECRET_SALT')),
+        ('DB_ADMIN_PASSWORD', os.getenv('DB_ADMIN_PASSWORD')),
+        ('DB_PASSWORD', os.getenv('DB_PASSWORD')),
+        ('DB_INTERCAMBIO_PASSWORD', os.getenv('DB_INTERCAMBIO_PASSWORD')),
+    ]
+    encontrados = [f"{k}={v}" for k, v in valores if v and v in _DEFAULT_SECRETOS]
+    if encontrados:
+        mensaje = ("Se detectaron credenciales/secretos por defecto. Cambiarlos "
+                   "antes de producción: " + ", ".join(encontrados))
+        if APP_ENV == 'production':
+            raise RuntimeError(mensaje)
+        logger.warning("[SEGURIDAD] %s", mensaje)
+
+
+_check_secretos()
+
+# Hardening de sesión
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = (APP_ENV == 'production')
+app.config['PERMANENT_SESSION_LIFETIME'] = datetime.timedelta(hours=8)
+
+csrf = CSRFProtect(app)
+
+limiter = Limiter(key_func=get_remote_address, storage_uri="memory://", app=app)
 
 
 def get_db_config_from_table():
@@ -282,8 +327,11 @@ def index():
             GROUP BY TipoStock
         """, (tenant_id, tenant_id))
         for row in cursor.fetchall():
-            if row['TipoStock'] in stock_por_tipo:
-                stock_por_tipo[row['TipoStock']] = int(row['total'])
+            clave = str(row['TipoStock']).upper()
+            for k in stock_por_tipo:
+                if k.upper() == clave:
+                    stock_por_tipo[k] = int(row['total'])
+                    break
 
         cursor.execute(f"""
             SELECT t.{sql_quote('descripcion')} AS tipo_ubi, SUM(sc.StockTotal) AS total
@@ -337,6 +385,7 @@ def index():
 
 # ============================================================================
 @app.route('/login', methods=['GET', 'POST'])
+@limiter.limit("5 per 15 minutes", methods=['POST'])
 def login():
     if 'user_id' in session and 'login_timestamp' in session:
         tiempo_transcurrido = time.time() - session['login_timestamp']
@@ -383,6 +432,7 @@ def login():
                 session['nombre'] = usuario['nombre']
                 session['rol'] = usuario['rol']
                 session['login_timestamp'] = time.time()
+                session.permanent = True
                 session['tenant_id'] = usuario['tenant_id']
                 session['tenant_nombre'] = usuario['tenant_nombre']
 
@@ -402,9 +452,8 @@ def login():
                 flash('Usuario o contraseña incorrectos', 'error')
 
         except Exception as e:
-            flash(f'Error al conectar con la base de datos: {str(e)}', 'error')
-        except Exception as e:
-            flash(f'Error inesperado: {str(e)}', 'error')
+            logger.error("Error en login: %s", e, exc_info=True)
+            flash(f'Error al iniciar sesión: {str(e)}', 'error')
 
     return render_template('login.html')
 

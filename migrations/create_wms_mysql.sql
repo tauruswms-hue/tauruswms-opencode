@@ -139,10 +139,12 @@ CREATE TABLE `transporte_rutas` (
     `id_transporte` int NOT NULL,
     `id_ruta` int NOT NULL,
     `observaciones` text,
+    `tenant_id` int,
     PRIMARY KEY (`id_transporte`, `id_ruta`),
     CONSTRAINT `fk_transporte_rutas_id_transporte` FOREIGN KEY (`id_transporte`) REFERENCES `transportes` (`id_transporte`) ON DELETE CASCADE,
     CONSTRAINT `fk_transporte_rutas_id_ruta` FOREIGN KEY (`id_ruta`) REFERENCES `rutas` (`id_ruta`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE INDEX `idx_transporte_rutas_tenant` ON `transporte_rutas` (`tenant_id`);
 
 -- --- clientes ---;
 CREATE TABLE `clientes` (

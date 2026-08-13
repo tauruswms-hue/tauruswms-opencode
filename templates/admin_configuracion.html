@@ -123,10 +123,12 @@
                                             onclick="editarConfig({{ config.id }}, '{{ config.clave }}', '{{ config.valor | e }}', '{{ config.descripcion or '' | e }}')">
                                         <i class="fas fa-edit"></i>
                                     </button>
-                                    <button type="button" class="btn btn-outline-danger btn-sm"
-                                            onclick="eliminarConfig('{{ url_for('admin.configuracion_eliminar', config_id=config.id) }}', '{{ config.clave }}')">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
+                                    <form method="POST" action="{{ url_for('admin.configuracion_eliminar', config_id=config.id) }}" style="display:inline;" onsubmit="return confirmarEliminarConfig('{{ config.clave }}')">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-outline-danger btn-sm" title="Eliminar">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </form>
                                 </td>
                             </tr>
                             {% else %}
@@ -145,6 +147,7 @@
         <div class="modal-dialog">
             <div class="modal-content">
                 <form method="POST" action="{{ url_for('admin.configuracion_guardar') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="modal-header">
                         <h5 class="modal-title" id="modalTitulo">Nueva Configuración</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -200,10 +203,8 @@
         modal.show();
     }
 
-    function eliminarConfig(url, clave) {
-        if (confirm('¿Está seguro de eliminar la configuración "' + clave + '"?')) {
-            window.location.href = url;
-        }
+    function confirmarEliminarConfig(clave) {
+        return confirm('¿Está seguro de eliminar la configuración "' + clave + '"?');
     }
     </script>
 </body>

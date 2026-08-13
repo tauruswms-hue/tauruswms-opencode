@@ -28,7 +28,7 @@ def listar():
             transportes = cursor.fetchall()
             cursor.execute("SELECT * FROM rutas WHERE (%s IS NULL OR tenant_id = %s) ORDER BY nombre_ruta", (tenant_id, tenant_id))
             rutas_lista = cursor.fetchall()
-            cursor.execute("SELECT * FROM transporte_rutas")
+            cursor.execute("SELECT * FROM transporte_rutas WHERE (%s IS NULL OR tenant_id = %s)", (tenant_id, tenant_id))
             relaciones = cursor.fetchall()
             cursor.execute("""
                 SELECT u.id, u.codigo, u.descipcion
@@ -53,7 +53,7 @@ def guardar():
     email = d.get('email')
 
     if cuit and not validar_cuit(cuit):
-        flash("Error: El CUIT debe contener 11 dÃ­gitos numÃ©ricos.", "danger")
+        flash("Error: El CUIT debe contener 11 dígitos numéricos.", "danger")
         return redirect(url_for('transportes.listar'))
 
     rutas_ids = request.form.getlist('rutas_ids[]')
@@ -81,13 +81,13 @@ def guardar():
                 current_id = execute_insert(cursor, """INSERT INTO transportes (codigo, razonsocial, cuit, telefono, email, activo, id_muelle_salida, tenant_id)
                          VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""", params + (tenant_id,))
 
-            cursor.execute("DELETE FROM transporte_rutas WHERE id_transporte = %s", (current_id,))
+            cursor.execute("DELETE FROM transporte_rutas WHERE id_transporte = %s AND (%s IS NULL OR tenant_id = %s)", (current_id, tenant_id, tenant_id))
             for i in range(len(rutas_ids)):
                 if rutas_ids[i]:
                     cursor.execute("""
-                        INSERT INTO transporte_rutas (id_transporte, id_ruta, observaciones) 
-                        VALUES (%s, %s, %s)
-                    """, (current_id, rutas_ids[i], rutas_obs[i]))
+                        INSERT INTO transporte_rutas (id_transporte, id_ruta, observaciones, tenant_id) 
+                        VALUES (%s, %s, %s, %s)
+                    """, (current_id, rutas_ids[i], rutas_obs[i], tenant_id))
 
             conn.commit()
             flash("Transporte guardado exitosamente.", "success")
@@ -99,7 +99,7 @@ def guardar():
     return redirect(url_for('transportes.listar'))
 
 
-# â”€â”€ Batch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Batch ─────────────────────────────────────────────────────────────────────
 _CAMPOS_EXPORT = ['codigo', 'razonsocial', 'cuit', 'telefono', 'email', 'activo']
 _CAMPOS_IMPORT = ['codigo', 'razonsocial', 'cuit', 'telefono', 'email', 'activo']
 _EJEMPLO_IMPORT = ['TRA001', 'Transporte Ejemplo S.A.', '30-12345678-9',
@@ -111,7 +111,7 @@ def importar():
     tenant_id = get_tenant_filter()
     file = request.files.get('archivo')
     if not file or not file.filename:
-        return jsonify({'error': 'No se proporcionÃ³ archivo'}), 400
+        return jsonify({'error': 'No se proporcionó archivo'}), 400
     try:
         rows = parse_file(file, request.form.get('hoja'))
     except Exception as e:
@@ -124,8 +124,8 @@ def importar():
             codigo = str(row.get('codigo', '') or '').strip()
             razon = str(row.get('razonsocial', '') or '').strip()
             if not codigo or not razon:
-                errores.append({'fila': i, 'codigo': codigo or '(vacÃ­o)',
-                                'razon': 'CÃ³digo y RazÃ³n Social son obligatorios'})
+                errores.append({'fila': i, 'codigo': codigo or '(vacío)',
+                                'razon': 'Código y Razón Social son obligatorios'})
                 continue
             try:
                 with conn.cursor() as cursor:
@@ -180,7 +180,7 @@ def exportar(formato):
         return export_json(rows, _CAMPOS_EXPORT, 'transportes.json')
     elif formato == 'xlsx':
         return export_xlsx(rows, _CAMPOS_EXPORT, 'transportes.xlsx')
-    return 'Formato no vÃ¡lido', 400
+    return 'Formato no válido', 400
 
 
 @transportes_bp.route('/transportes/plantilla/<formato>')
@@ -191,4 +191,4 @@ def plantilla(formato):
         return plantilla_json(_CAMPOS_IMPORT, _EJEMPLO_IMPORT, 'plantilla_transportes.json')
     elif formato == 'xlsx':
         return plantilla_xlsx(_CAMPOS_IMPORT, _EJEMPLO_IMPORT, 'plantilla_transportes.xlsx')
-    return 'Formato no vÃ¡lido', 400
+    return 'Formato no válido', 400

@@ -34,7 +34,7 @@ from modules.db_config import (
     _get_admin_connection,
     get_db_engine,
 )
-from modules.sql_dialect import set_engine, execute_insert
+from modules.sql_dialect import set_engine, execute_insert, in_clause_sql
 
 logger = logging.getLogger(__name__)
 
@@ -401,25 +401,27 @@ def _aplicar_registro_transporte_ruta(reg, conn_wms, cursor_wms, cursor_admin):
 
     if accion == 'baja':
         cursor_wms.execute(
-            "DELETE FROM transporte_rutas WHERE id_transporte = %s AND id_ruta = %s",
-            (transporte_id, ruta_id))
+            "DELETE FROM transporte_rutas WHERE id_transporte = %s AND id_ruta = %s "
+            "AND tenant_id = %s",
+            (transporte_id, ruta_id, tenant_id))
         return True, 'baja aplicada', None
 
     observaciones = (reg.get('observaciones') or '').strip() or None
     cursor_wms.execute(
-        "SELECT 1 FROM transporte_rutas WHERE id_transporte = %s AND id_ruta = %s",
-        (transporte_id, ruta_id))
+        "SELECT 1 FROM transporte_rutas WHERE id_transporte = %s AND id_ruta = %s "
+        "AND tenant_id = %s",
+        (transporte_id, ruta_id, tenant_id))
     if cursor_wms.fetchone():
         cursor_wms.execute(
             "UPDATE transporte_rutas SET observaciones = %s "
-            "WHERE id_transporte = %s AND id_ruta = %s",
-            (observaciones, transporte_id, ruta_id))
+            "WHERE id_transporte = %s AND id_ruta = %s AND tenant_id = %s",
+            (observaciones, transporte_id, ruta_id, tenant_id))
         return True, 'actualizado', None
 
     cursor_wms.execute(
-        "INSERT INTO transporte_rutas (id_transporte, id_ruta, observaciones) "
-        "VALUES (%s, %s, %s)",
-        (transporte_id, ruta_id, observaciones))
+        "INSERT INTO transporte_rutas (id_transporte, id_ruta, observaciones, tenant_id) "
+        "VALUES (%s, %s, %s, %s)",
+        (transporte_id, ruta_id, observaciones, tenant_id))
     return True, 'insertado', None
 
 
@@ -929,7 +931,7 @@ def reintentar_intercambio(ids=None, tenant_id=None, tabla='intercambio_material
         where = "estado = 'error'"
         params = []
         if ids:
-            placeholders = ','.join(['%s'] * len(ids))
+            placeholders = in_clause_sql(ids)
             where += f" AND id IN ({placeholders})"
             params.extend(ids)
         if tenant_id is not None:
