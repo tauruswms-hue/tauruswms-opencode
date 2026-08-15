@@ -48,7 +48,7 @@ from modules.db_config import (
     get_db_connection,
     get_db_engine,
     get_wms_runtime_config,
-    test_connection,
+    probar_conexion,
 )
 from modules.despacho import despacho_bp
 from modules.intercambio import intercambio_bp
@@ -498,7 +498,7 @@ def get_env_file_modification_time():
 # ============================================================================
 @app.route('/test_db_connection', methods=['POST'])
 @verificar_permiso_decorator
-def test_db_connection():
+def probar_conexion_db():
     """Prueba la conexión a la base de datos con la configuración proporcionada"""
     try:
         data = request.get_json()
@@ -536,7 +536,7 @@ def test_db_connection():
         # Intentar conexión con el engine efectivo (la app decide el engine;
         # los datos del formulario solo aportan host/puerto/usuario/password).
         engine = get_db_engine()
-        test_connection(engine, **test_config)
+        probar_conexion(engine, **test_config)
 
         return jsonify({
             'success': True,

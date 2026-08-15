@@ -320,7 +320,7 @@ def get_wms_runtime_config():
     }
 
 
-def test_connection(engine, host=None, port=None, user=None, password=None,
+def probar_conexion(engine, host=None, port=None, user=None, password=None,
                     database=None, charset=None):
     """Prueba una conexion contra un engine con los datos dados.
 

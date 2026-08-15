@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
-from flask import Flask
+from flask import Flask, redirect, url_for
 from flask_wtf.csrf import CSRFProtect
 from werkzeug.security import generate_password_hash
 
@@ -46,6 +46,12 @@ check_default_secrets(APP_ENV, [
 harden_session_config(app, APP_ENV)
 
 register_error_handlers(app, logger, template='admin_error.html')
+
+
+@app.route('/')
+def home():
+    """La UI del panel vive en /admin; redirige la raíz para no mostrar 404."""
+    return redirect(url_for('admin.index'))
 
 
 def init_admin_db():

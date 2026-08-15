@@ -311,11 +311,11 @@ def test_api_validaciones(client, tenant_api, datos_api):
 
 
 @requires_db
-def test_api_token_desde_admin(admin_client, client, tenant_api):
+def test_api_token_desde_admin(admin_client, client, tenant_api, usuario_panel):
     tid = tenant_api['tenant_id']
 
     resp = admin_client.post('/admin/login', data={
-        'username': 'admin', 'password': 'Admin@2024!',
+        'username': usuario_panel['username'], 'password': usuario_panel['password'],
     })
     assert resp.status_code in (302, 200)
 

@@ -7,8 +7,10 @@ MySQL se marcan con `requires_db` (salto automático si no hay conexión).
 
 import os
 import sys
+import uuid
 
 import pytest
+from werkzeug.security import generate_password_hash
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
@@ -74,20 +76,78 @@ def admin_client():
 
 
 @pytest.fixture
-def logged_client(client):
-    """Cliente WMS autenticado como operador (credenciales seed reales)."""
+def usuario_wms():
+    """Usuario WMS temporal en taurus_admin (credenciales propias, no seed).
+
+    Se crea con rol ADMIN en el primer tenant activo y se elimina al final,
+    de modo que los tests no dependen de los passwords de los seeds.
+    """
+    if not DB_OK:
+        pytest.skip('MySQL no disponible')
+    from modules.db_config import _get_admin_connection
+    username = 'testwms' + uuid.uuid4().hex[:8]
+    conn = _get_admin_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT id FROM tenants WHERE activo = 1 ORDER BY id LIMIT 1")
+        tid = cur.fetchone()['id']
+        cur.execute("""
+            INSERT INTO usuarios (username, password_hash, nombre, rol, tenant_id, activo)
+            VALUES (%s, %s, %s, 'ADMIN', %s, 1)
+        """, (username, generate_password_hash('Test@2024!'),
+              'Usuario test conftest', tid))
+        conn.commit()
+        yield {'username': username, 'password': 'Test@2024!', 'tenant_id': tid}
+    finally:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM usuarios WHERE username = %s", (username,))
+        conn.commit()
+        conn.close()
+
+
+@pytest.fixture
+def usuario_panel():
+    """Usuario del panel admin temporal (admin_usuarios, credenciales propias).
+
+    Se crea con rol SUPERADMIN y se elimina al final, sin depender de los
+    passwords de los seeds.
+    """
+    if not DB_OK:
+        pytest.skip('MySQL no disponible')
+    from modules.db_config import _get_admin_connection
+    username = 'testpanel' + uuid.uuid4().hex[:8]
+    conn = _get_admin_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO admin_usuarios (username, password_hash, nombre, rol, activo)
+            VALUES (%s, %s, %s, 'SUPERADMIN', 1)
+        """, (username, generate_password_hash('Test@2024!'),
+              'Usuario panel test'))
+        conn.commit()
+        yield {'username': username, 'password': 'Test@2024!'}
+    finally:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM admin_usuarios WHERE username = %s", (username,))
+        conn.commit()
+        conn.close()
+
+
+@pytest.fixture
+def logged_client(client, usuario_wms):
+    """Cliente WMS autenticado con un usuario temporal propio (no seed)."""
     resp = client.post('/login', data={
-        'username': 'operador', 'password': 'Admin@2024!',
+        'username': usuario_wms['username'], 'password': usuario_wms['password'],
     })
     assert resp.status_code in (302, 200)
     return client
 
 
 @pytest.fixture
-def admin_logged_client(admin_client):
-    """Cliente admin autenticado (admin/Admin@2024!)."""
+def admin_logged_client(admin_client, usuario_panel):
+    """Cliente del panel admin autenticado con un usuario temporal propio."""
     resp = admin_client.post('/admin/login', data={
-        'username': 'admin', 'password': 'Admin@2024!',
+        'username': usuario_panel['username'], 'password': usuario_panel['password'],
     })
     assert resp.status_code in (302, 200)
     return admin_client

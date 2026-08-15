@@ -88,10 +88,10 @@ def test_login_sesion_permanente(logged_client):
         assert sess.permanent is True
 
 
-def test_cookie_http_only_y_samesite(client):
+def test_cookie_http_only_y_samesite(client, usuario_wms):
     """La cookie de sesión debe salir con HttpOnly y SameSite=Lax."""
     resp = client.post('/login', data={
-        'username': 'operador', 'password': 'Admin@2024!',
+        'username': usuario_wms['username'], 'password': usuario_wms['password'],
     })
     set_cookie = resp.headers.get('Set-Cookie', '')
     assert 'HttpOnly' in set_cookie

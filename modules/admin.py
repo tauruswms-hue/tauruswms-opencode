@@ -446,6 +446,43 @@ def usuarios_eliminar(usuario_id, encoded_tenant_id):
     return redirect(url_for('admin.tenants_ver', encoded_id=encode_id(tenant_id)))
 
 
+@admin_bp.route('/usuarios/borrar/<int:usuario_id>/<encoded_tenant_id>', methods=['POST'])
+@admin_required
+def usuarios_borrar(usuario_id, encoded_tenant_id):
+    """Elimina el usuario definitivamente de la BD (solo dentro de su tenant)."""
+    tenant_id = decode_id(encoded_tenant_id)
+    if tenant_id is None:
+        flash('ID inválido', 'danger')
+        return redirect(url_for('admin.tenants'))
+
+    conn = _get_admin_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "DELETE FROM usuarios WHERE id = %s AND tenant_id = %s",
+            (usuario_id, tenant_id)
+        )
+        conn.commit()
+        filas_afectadas = cursor.rowcount
+        cursor.close()
+
+        if filas_afectadas > 0:
+            flash('Usuario eliminado definitivamente de la base de datos.', 'success')
+            log_audit('DELETE', 'usuarios', {
+                'id': usuario_id, 'tenant_id': tenant_id, 'action': 'borrado_fisico',
+            })
+        else:
+            flash('Usuario no encontrado para este tenant.', 'warning')
+    except Exception as e:
+        conn.rollback()
+        flash(f'Error: {e!s}', 'danger')
+        log_audit('ERROR', 'usuarios', {'error': str(e)})
+    finally:
+        conn.close()
+
+    return redirect(url_for('admin.tenants_ver', encoded_id=encode_id(tenant_id)))
+
+
 @admin_bp.route('/usuarios/activar/<int:usuario_id>/<encoded_tenant_id>', methods=['POST'])
 @admin_required
 def usuarios_activar(usuario_id, encoded_tenant_id):

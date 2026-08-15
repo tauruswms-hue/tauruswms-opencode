@@ -147,6 +147,12 @@
                                                     <i class="fas fa-check"></i>
                                                 </button>
                                             </form>{% endif %}
+                                            <form method="POST" action="{{ url_for('admin.usuarios_borrar', usuario_id=usuario.id, encoded_tenant_id=tenant.id|encode_id) }}" style="display:inline;" onsubmit="return confirm('¿Eliminar definitivamente a \'{{ usuario.username }}\'? Esta acción no se puede deshacer.');">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <button type="submit" class="btn btn-outline-danger btn-sm" title="Eliminar de la BD">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </form>
                                         </td>
                                     </tr>
                                     {% endfor %}
