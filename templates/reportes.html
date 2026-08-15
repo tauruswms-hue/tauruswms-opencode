@@ -1,0 +1,483 @@
+{% extends "base.html" %}
+
+{% block title %}Reportes{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+
+<style>
+.reportes-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+.reportes-header h1 { margin: 0; font-size: 1.4rem; color: #2d3748; }
+.reportes-header p { margin: 4px 0 0; color: #718096; font-size: .9rem; }
+
+.stats-grid-reportes {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+}
+.stat-mini {
+    background: #fff;
+    border-radius: 8px;
+    padding: 14px 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    border-left: 4px solid #2b6cb0;
+}
+.stat-mini h4 { margin: 0 0 4px; font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: #718096; }
+.stat-mini .stat-num { font-size: 1.25rem; font-weight: 700; color: #2d3748; }
+
+.tabs-reportes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 16px;
+}
+.tab-btn {
+    padding: 8px 16px;
+    border: 1px solid #cbd5e0;
+    border-radius: 6px;
+    background: #fff;
+    cursor: pointer;
+    font-size: .9rem;
+    font-weight: 500;
+    color: #4a5568;
+}
+.tab-btn:hover { background: #edf2f7; }
+.tab-btn.active { background: #2b6cb0; border-color: #2b6cb0; color: #fff; }
+
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+.card {
+    background: #fff;
+    border-radius: 8px;
+    padding: 16px 20px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+}
+.card-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+.card-toolbar h2 { margin: 0; font-size: 1.05rem; color: #2d3748; }
+.export-btns { display: flex; gap: 6px; }
+.btn-export {
+    padding: 5px 12px;
+    border: 1px solid #2b6cb0;
+    border-radius: 5px;
+    background: #ebf8ff;
+    color: #2b6cb0;
+    cursor: pointer;
+    font-size: .82rem;
+    font-weight: 600;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.btn-export:hover { background: #bee3f8; }
+
+.filtros-card { margin-bottom: 12px; }
+.filtros-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.filtro-group { display: flex; flex-direction: column; gap: 4px; min-width: 150px; }
+.filtro-group label { font-size: .72rem; font-weight: 600; color: #555; text-transform: uppercase; letter-spacing: .04em; }
+.filtro-group select,
+.filtro-group input[type="text"],
+.filtro-group input[type="date"] {
+    padding: 6px 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: .9rem;
+    background: #fafafa;
+}
+.btn-filtrar {
+    padding: 7px 16px;
+    border: none;
+    border-radius: 5px;
+    background: #2b6cb0;
+    color: #fff;
+    cursor: pointer;
+    font-size: .88rem;
+    font-weight: 600;
+}
+.btn-filtrar:hover { background: #2c5282; }
+
+.badge { padding: 3px 8px; border-radius: 12px; font-size: .78rem; font-weight: 600; }
+.badge-success  { background: #d4edda; color: #155724; }
+.badge-warning  { background: #fff3cd; color: #856404; }
+.badge-danger   { background: #f8d7da; color: #721c24; }
+.badge-info     { background: #d1ecf1; color: #0c5460; }
+.badge-secondary{ background: #e2e3e5; color: #383d41; }
+.text-right { text-align: right; }
+.text-pos { color: #276749; font-weight: 600; }
+.text-neg { color: #c53030; font-weight: 600; }
+.mono { font-variant-numeric: tabular-nums; }
+.tabla-card table { width: 100%; border-collapse: collapse; }
+.tabla-card th, .tabla-card td { padding: 6px 8px; border-bottom: 1px solid #edf2f7; font-size: .85rem; }
+.tabla-card thead th { text-align: left; color: #4a5568; font-weight: 600; white-space: nowrap; }
+</style>
+
+<div class="reportes-header">
+    <div>
+        <h1><i class="fas fa-chart-bar"></i> Reportes</h1>
+        <p>Consultas de stock, valorización y auditoría de movimientos.</p>
+    </div>
+</div>
+
+<div class="stats-grid-reportes">
+    <div class="stat-mini">
+        <h4>Stock disponible</h4>
+        <div class="stat-num">{{ '{:,.2f}'.format(kpis.stock_total).replace(',', '.') }}</div>
+    </div>
+    <div class="stat-mini" style="border-left-color: #38a169;">
+        <h4>Valor stock disponible</h4>
+        <div class="stat-num">$ {{ '{:,.2f}'.format(kpis.stock_valorizado_total).replace(',', '.') }}</div>
+    </div>
+    <div class="stat-mini" style="border-left-color: #d69e2e;">
+        <h4>Pedidos despachados</h4>
+        <div class="stat-num">{{ kpis.pedidos_despachados }}</div>
+    </div>
+    <div class="stat-mini" style="border-left-color: #e53e3e;">
+        <h4>Recepciones abiertas</h4>
+        <div class="stat-num">{{ kpis.recepciones_abiertas }}</div>
+    </div>
+    <div class="stat-mini" style="border-left-color: #805ad5;">
+        <h4>OMC pendientes</h4>
+        <div class="stat-num">{{ kpis.omc_pendientes }}</div>
+    </div>
+    <div class="stat-mini" style="border-left-color: #3182ce;">
+        <h4>Movimientos auditados</h4>
+        <div class="stat-num">{{ kpis.movimientos_total }}</div>
+    </div>
+</div>
+
+<div class="tabs-reportes">
+    <button type="button" class="tab-btn active" data-tab="tab-stock">Stock actual</button>
+    <button type="button" class="tab-btn" data-tab="tab-valorizado">Stock valorizado</button>
+    <button type="button" class="tab-btn" data-tab="tab-movimientos">Auditoría de movimientos</button>
+    <button type="button" class="tab-btn" data-tab="tab-recepciones">Recepciones</button>
+    <button type="button" class="tab-btn" data-tab="tab-pedidos">Pedidos</button>
+</div>
+
+{# Stock actual #}
+<div class="tab-panel active" id="tab-stock">
+    <div class="card tabla-card">
+        <div class="card-toolbar">
+            <h2><i class="fas fa-boxes"></i> Stock por posición</h2>
+            <div class="export-btns">
+                <a class="btn-export" href="{{ url_for('reportes.exportar', tipo='stock', formato='csv') }}"><i class="fas fa-file-csv"></i> CSV</a>
+                <a class="btn-export" href="{{ url_for('reportes.exportar', tipo='stock', formato='xlsx') }}"><i class="fas fa-file-excel"></i> XLSX</a>
+                <a class="btn-export" href="{{ url_for('reportes.exportar', tipo='stock', formato='json') }}"><i class="fas fa-code"></i> JSON</a>
+            </div>
+        </div>
+        <table id="tabla-stock" class="display" style="width:100%">
+            <thead>
+                <tr>
+                    <th>Ubicación</th>
+                    <th>Contenedor</th>
+                    <th>Material</th>
+                    <th>Descripción</th>
+                    <th>Lote</th>
+                    <th>Tipo Stock</th>
+                    <th>Vencimiento</th>
+                    <th class="text-right">Total</th>
+                    <th class="text-right">Disponible</th>
+                    <th class="text-right">Entrando</th>
+                    <th class="text-right">Saliendo</th>
+                    <th class="text-right">Valor</th>
+                    <th>Último movimiento</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pos in stock %}
+                <tr>
+                    <td>{{ pos.ubicacion_codigo or pos.Ubicacion }}</td>
+                    <td>{{ pos.IDContenedor }}</td>
+                    <td>{{ pos.material_codigo or pos.Material }}</td>
+                    <td>{{ pos.material_nombre or '' }}</td>
+                    <td>{{ pos.Lote }}</td>
+                    <td>{{ pos.TipoStock }}</td>
+                    <td>{{ pos.FechaVencimiento.strftime('%d/%m/%Y') if pos.FechaVencimiento else '' }}</td>
+                    <td class="text-right mono">{{ '{:,.4f}'.format(pos.StockTotal).rstrip('0').rstrip('.') }}</td>
+                    <td class="text-right mono">{{ '{:,.4f}'.format(pos.StockDisponible).rstrip('0').rstrip('.') }}</td>
+                    <td class="text-right mono">{{ '{:,.4f}'.format(pos.StockEntrando).rstrip('0').rstrip('.') }}</td>
+                    <td class="text-right mono">{{ '{:,.4f}'.format(pos.StockSaliendo).rstrip('0').rstrip('.') }}</td>
+                    <td class="text-right mono">$ {{ '{:,.2f}'.format(pos.valor_posicion or 0).replace(',', '.') }}</td>
+                    <td>{{ pos.UltimoMovimiento.strftime('%d/%m/%Y %H:%M') if pos.UltimoMovimiento else '' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{# Stock valorizado #}
+<div class="tab-panel" id="tab-valorizado">
+    <div class="card tabla-card">
+        <div class="card-toolbar">
+            <h2><i class="fas fa-dollar-sign"></i> Stock valorizado por material</h2>
+            <div class="export-btns">
+                <a class="btn-export" href="{{ url_for('reportes.exportar', tipo='valorizado', formato='csv') }}"><i class="fas fa-file-csv"></i> CSV</a>
+                <a class="btn-export" href="{{ url_for('reportes.exportar', tipo='valorizado', formato='xlsx') }}"><i class="fas fa-file-excel"></i> XLSX</a>
+                <a class="btn-export" href="{{ url_for('reportes.exportar', tipo='valorizado', formato='json') }}"><i class="fas fa-code"></i> JSON</a>
+            </div>
+        </div>
+        <table id="tabla-valorizado" class="display" style="width:100%">
+            <thead>
+                <tr>
+                    <th>Material</th>
+                    <th>Descripción</th>
+                    <th class="text-right">Costo promedio</th>
+                    <th class="text-right">Cant. total</th>
+                    <th class="text-right">Cant. disponible</th>
+                    <th class="text-right">Valor</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in valorizado %}
+                <tr>
+                    <td>{{ m.material_codigo }}</td>
+                    <td>{{ m.material_nombre }}</td>
+                    <td class="text-right mono">$ {{ '{:,.2f}'.format(m.costo_promedio or 0).replace(',', '.') }}</td>
+                    <td class="text-right mono">{{ '{:,.4f}'.format(m.cantidad_total).rstrip('0').rstrip('.') }}</td>
+                    <td class="text-right mono">{{ '{:,.4f}'.format(m.cantidad_disponible).rstrip('0').rstrip('.') }}</td>
+                    <td class="text-right mono">$ {{ '{:,.2f}'.format(m.valor_total).replace(',', '.') }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{# Auditoría de movimientos #}
+<div class="tab-panel" id="tab-movimientos">
+    <div class="card filtros-card">
+        <form method="get" action="{{ url_for('reportes.listar') }}" class="filtros-row">
+            <div class="filtro-group">
+                <label for="f-accion">Acción</label>
+                <select id="f-accion" name="accion">
+                    <option value="">Todas</option>
+                    {% for a in acciones %}
+                    <option value="{{ a }}" {{ 'selected' if filtros.accion == a else '' }}>{{ a }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="filtro-group">
+                <label for="f-ubicacion">Ubicación</label>
+                <select id="f-ubicacion" name="id_ubicacion">
+                    <option value="">Todas</option>
+                    {% for u in ubicaciones %}
+                    <option value="{{ u.id }}" {{ 'selected' if filtros.id_ubicacion|int == u.id else '' }}>{{ u.codigo }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="filtro-group">
+                <label for="f-material">Material</label>
+                <select id="f-material" name="id_material">
+                    <option value="">Todos</option>
+                    {% for m in materiales %}
+                    <option value="{{ m.id }}" {{ 'selected' if filtros.id_material|int == m.id else '' }}>{{ m.codigo }} — {{ m.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="filtro-group">
+                <label for="f-desde">Desde</label>
+                <input type="date" id="f-desde" name="desde" value="{{ filtros.desde or '' }}">
+            </div>
+            <div class="filtro-group">
+                <label for="f-hasta">Hasta</label>
+                <input type="date" id="f-hasta" name="hasta" value="{{ filtros.hasta or '' }}">
+            </div>
+            <div class="filtro-group">
+                <button type="submit" class="btn-filtrar"><i class="fas fa-filter"></i> Filtrar</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="card tabla-card">
+        <div class="card-toolbar">
+            <h2><i class="fas fa-history"></i> Historial de movimientos (últimos {{ movimientos|length }})</h2>
+            {% set params = [] %}
+            {% if filtros.accion %}{% set _ = params.append('accion=' ~ filtros.accion) %}{% endif %}
+            {% if filtros.id_ubicacion %}{% set _ = params.append('id_ubicacion=' ~ filtros.id_ubicacion) %}{% endif %}
+            {% if filtros.id_material %}{% set _ = params.append('id_material=' ~ filtros.id_material) %}{% endif %}
+            {% if filtros.desde %}{% set _ = params.append('desde=' ~ filtros.desde) %}{% endif %}
+            {% if filtros.hasta %}{% set _ = params.append('hasta=' ~ filtros.hasta) %}{% endif %}
+            {% set qs = '?' ~ (params|join('&')) if params else '' %}
+            <div class="export-btns">
+                <a class="btn-export" href="{{ url_for('reportes.exportar', tipo='movimientos', formato='csv') }}{{ qs }}"><i class="fas fa-file-csv"></i> CSV</a>
+                <a class="btn-export" href="{{ url_for('reportes.exportar', tipo='movimientos', formato='xlsx') }}{{ qs }}"><i class="fas fa-file-excel"></i> XLSX</a>
+                <a class="btn-export" href="{{ url_for('reportes.exportar', tipo='movimientos', formato='json') }}{{ qs }}"><i class="fas fa-code"></i> JSON</a>
+            </div>
+        </div>
+        <table id="tabla-movimientos" class="display" style="width:100%">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Acción</th>
+                    <th>Usuario</th>
+                    <th>Módulo</th>
+                    <th>Ubicación</th>
+                    <th>Material</th>
+                    <th>Contenedor</th>
+                    <th>Lote</th>
+                    <th>Tipo Stock</th>
+                    <th class="text-right">Cantidad</th>
+                    <th>Detalle</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in movimientos %}
+                <tr>
+                    <td>{{ m.fecha.strftime('%d/%m/%Y %H:%M') }}</td>
+                    <td><span class="badge badge-info">{{ m.accion }}</span></td>
+                    <td>{{ m.usuario or '' }}</td>
+                    <td>{{ m.modulo or '' }}</td>
+                    <td>{{ m.ubicacion_codigo or m.id_ubicacion }}</td>
+                    <td>{{ m.material_codigo or m.id_material }}</td>
+                    <td>{{ m.id_contenedor or '' }}</td>
+                    <td>{{ m.lote or '' }}</td>
+                    <td>{{ m.tipo_stock or '' }}</td>
+                    <td class="text-right mono">
+                        {% if m.cantidad is none %}—{% else %}<span class="{{ 'text-pos' if m.cantidad > 0 else 'text-neg' }}">{{ '{:+,.4f}'.format(m.cantidad).rstrip('0').rstrip('.').rstrip(',') }}</span>{% endif %}
+                    </td>
+                    <td>{{ m.detalle or '' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{# Recepciones #}
+<div class="tab-panel" id="tab-recepciones">
+    <div class="card tabla-card">
+        <div class="card-toolbar">
+            <h2><i class="fas fa-sign-in-alt"></i> Recepciones</h2>
+            <div class="export-btns">
+                <a class="btn-export" href="{{ url_for('reportes.exportar', tipo='recepciones', formato='csv') }}"><i class="fas fa-file-csv"></i> CSV</a>
+                <a class="btn-export" href="{{ url_for('reportes.exportar', tipo='recepciones', formato='xlsx') }}"><i class="fas fa-file-excel"></i> XLSX</a>
+            </div>
+        </div>
+        <table id="tabla-recepciones" class="display" style="width:100%">
+            <thead>
+                <tr>
+                    <th>Número</th>
+                    <th>Estado</th>
+                    <th>Fecha</th>
+                    <th>Proveedor</th>
+                    <th>Contenedor</th>
+                    <th>Ubicación</th>
+                    <th class="text-right">Items</th>
+                    <th class="text-right">Unidades</th>
+                    <th>Observaciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in recepciones %}
+                <tr>
+                    <td>{{ r.numero }}</td>
+                    <td>
+                        {% if r.estado == 'Confirmada' %}<span class="badge badge-success">{{ r.estado }}</span>
+                        {% elif r.estado == 'Cerrada' %}<span class="badge badge-info">{{ r.estado }}</span>
+                        {% elif r.estado == 'Anulada' %}<span class="badge badge-secondary">{{ r.estado }}</span>
+                        {% else %}<span class="badge badge-warning">{{ r.estado }}</span>{% endif %}
+                    </td>
+                    <td>{{ r.fecha_recepcion.strftime('%d/%m/%Y %H:%M') }}</td>
+                    <td>{{ r.proveedor or '' }}</td>
+                    <td>{{ r.id_contenedor }}</td>
+                    <td>{{ r.ubicacion_recep or '' }}</td>
+                    <td class="text-right">{{ r.total_items }}</td>
+                    <td class="text-right mono">{{ '{:,.2f}'.format(r.total_unidades).rstrip('0').rstrip('.') }}</td>
+                    <td>{{ r.observaciones or '' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{# Pedidos #}
+<div class="tab-panel" id="tab-pedidos">
+    <div class="card tabla-card">
+        <div class="card-toolbar">
+            <h2><i class="fas fa-shopping-cart"></i> Pedidos</h2>
+            <div class="export-btns">
+                <a class="btn-export" href="{{ url_for('reportes.exportar', tipo='pedidos', formato='csv') }}"><i class="fas fa-file-csv"></i> CSV</a>
+                <a class="btn-export" href="{{ url_for('reportes.exportar', tipo='pedidos', formato='xlsx') }}"><i class="fas fa-file-excel"></i> XLSX</a>
+            </div>
+        </div>
+        <table id="tabla-pedidos" class="display" style="width:100%">
+            <thead>
+                <tr>
+                    <th>Nro Pedido</th>
+                    <th>Estado</th>
+                    <th>Fecha</th>
+                    <th>Cliente</th>
+                    <th class="text-right">Items</th>
+                    <th class="text-right">Unidades</th>
+                    <th>Observaciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in pedidos %}
+                <tr>
+                    <td>{{ p.nro_pedido }}</td>
+                    <td>
+                        {% if p.estado == 'Despachado' %}<span class="badge badge-success">{{ p.estado }}</span>
+                        {% elif p.estado == 'Preparado' %}<span class="badge badge-info">{{ p.estado }}</span>
+                        {% else %}<span class="badge badge-warning">{{ p.estado }}</span>{% endif %}
+                    </td>
+                    <td>{{ p.fecha_pedido.strftime('%d/%m/%Y') }}</td>
+                    <td>{{ p.cliente or '' }}</td>
+                    <td class="text-right">{{ p.total_items }}</td>
+                    <td class="text-right mono">{{ '{:,.2f}'.format(p.total_unidades).rstrip('0').rstrip('.') }}</td>
+                    <td>{{ p.observaciones or '' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script>
+$(document).ready(function() {
+    $('.tab-btn').on('click', function() {
+        $('.tab-btn').removeClass('active');
+        $(this).addClass('active');
+        $('.tab-panel').removeClass('active');
+        $('#' + $(this).data('tab')).addClass('active');
+    });
+
+    var order_map = {
+        '#tabla-stock': [[0, 'asc']],
+        '#tabla-valorizado': [[5, 'desc']],
+        '#tabla-movimientos': [[0, 'desc']],
+        '#tabla-recepciones': [[2, 'desc']],
+        '#tabla-pedidos': [[2, 'desc']]
+    };
+    Object.keys(order_map).forEach(function(sel) {
+        if ($(sel).length) {
+            $(sel).DataTable({
+                order: order_map[sel],
+                pageLength: 15,
+                language: {
+                    url: 'https://cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json'
+                }
+            });
+        }
+    });
+});
+</script>
+{% endblock %}

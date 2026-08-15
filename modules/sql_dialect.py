@@ -1,4 +1,3 @@
-import re
 
 
 _engine = 'mysql'
@@ -314,8 +313,8 @@ def insert_ignore_sql(table, columns):
 
     if _engine == 'sqlserver':
         conflict_col = columns[0]
-        src_values = ', '.join([f'@p{i}' for i in range(len(columns))])
-        src_alias = ', '.join(columns)
+        ', '.join([f'@p{i}' for i in range(len(columns))])
+        ', '.join(columns)
         return (
             f'IF NOT EXISTS (SELECT 1 FROM {table} WHERE {conflict_col} = @p0) '
             f'INSERT INTO {table} ({cols}) VALUES ({placeholders})'
@@ -325,9 +324,9 @@ def insert_ignore_sql(table, columns):
 
 
 def get_lastrowid(cursor, result=None):
-    if _engine == 'postgresql' and result is not None:
-        if hasattr(result, 'inserted_primary_key') and result.inserted_primary_key:
-            return result.inserted_primary_key[0]
+    if (_engine == 'postgresql' and result is not None
+            and hasattr(result, 'inserted_primary_key') and result.inserted_primary_key):
+        return result.inserted_primary_key[0]
     return cursor.lastrowid
 
 
@@ -351,7 +350,6 @@ def is_duplicate_key_error(exc):
         return hasattr(exc, 'args') and exc.args[0] == 1062
     if _engine == 'postgresql':
         return hasattr(exc, 'orig') and hasattr(exc.orig, 'pgcode') and exc.orig.pgcode == '23505'
-    if _engine == 'sqlserver':
-        if hasattr(exc, 'args') and len(exc.args) > 0:
-            return exc.args[0] in (2627, 2601)
+    if _engine == 'sqlserver' and hasattr(exc, 'args') and len(exc.args) > 0:
+        return exc.args[0] in (2627, 2601)
     return False

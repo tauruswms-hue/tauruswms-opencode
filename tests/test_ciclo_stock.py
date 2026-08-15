@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Test de integración del ciclo de stock (Fase 2.3).
 
 Flujo HTTP: crear material/proveedor/ubicaciones -> recepcion -> guardar_item
@@ -9,11 +8,10 @@ Requiere MySQL. Crea y limpia todos los datos de prueba.
 import uuid
 
 import pytest
+from conftest import DB_OK, requires_db
 from werkzeug.security import generate_password_hash
 
-from conftest import requires_db, DB_OK
-
-from modules.db_config import get_db_connection, _get_admin_connection
+from modules.db_config import _get_admin_connection, get_db_connection
 
 
 @pytest.fixture(scope='module')
@@ -117,7 +115,7 @@ def test_ciclo_stock_recepcion_confirmacion(client, usuario_superadmin, datos_st
     # extraer id_recepcion de la URL de la respuesta (ultima redirect /recepciones/ver/<id>)
     import re
     html = resp.get_data(as_text=True)
-    m = re.search(r'/recepciones/ver/(\d+)', html)
+    re.search(r'/recepciones/ver/(\d+)', html)
     # no se puede extraer del body; buscar en history de la respuesta
     id_recepcion = None
     for h in resp.history:

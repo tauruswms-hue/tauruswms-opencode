@@ -1,14 +1,34 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session
 from datetime import datetime
+
+from flask import (
+    Blueprint,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
+)
 from werkzeug.security import check_password_hash
-from modules.db_config import get_db_connection, _get_admin_connection
-from modules.sql_dialect import upsert_incremental_sql, cast_as_int, substring_index, year as year_func, concat, group_concat, quote, execute_insert, limit_sql, in_clause_sql
+
+from modules.auditoria import registrar_movimiento
+from modules.context import get_tenant_filter
+from modules.db_config import _get_admin_connection, get_db_connection
+from modules.sql_dialect import (
+    cast_as_int,
+    concat,
+    execute_insert,
+    group_concat,
+    in_clause_sql,
+    limit_sql,
+    quote,
+    substring_index,
+    upsert_incremental_sql,
+)
+from modules.sql_dialect import year as year_func
 
 omc_bp = Blueprint('omc', __name__)
-
-
-def get_tenant_filter():
-    return session.get('tenant_id')
 
 
 def _generar_numero_omc(cursor, tenant_id):
@@ -23,7 +43,14 @@ def _generar_numero_omc(cursor, tenant_id):
     return f"OMC-{anio}-{seq:05d}"
 
 
-def _crear_stock_saliendo(cursor, contenedor, id_ubicacion, usuario, ahora, tenant_id):
+def _crear_stock_saliendo(cursor, contenedor, id_ubicacion, usuario, ahora, tenant_id, conn=None):
+    cursor.execute("""
+        SELECT Material, Lote, TipoStock, StockDisponible AS cantidad
+        FROM stockcontable
+        WHERE IDContenedor = %s AND Ubicacion = %s AND StockDisponible > 0
+          AND (%s IS NULL OR tenant_id = %s)
+    """, (contenedor, id_ubicacion, tenant_id, tenant_id))
+    salientes = cursor.fetchall()
     cursor.execute("""
         UPDATE stockcontable
         SET StockSaliendo    = StockDisponible,
@@ -34,11 +61,19 @@ def _crear_stock_saliendo(cursor, contenedor, id_ubicacion, usuario, ahora, tena
         WHERE IDContenedor = %s AND Ubicacion = %s AND StockDisponible > 0
           AND (%s IS NULL OR tenant_id = %s)
     """, (ahora, usuario, contenedor, id_ubicacion, tenant_id, tenant_id))
+    if conn is not None:
+        for rec in salientes:
+            registrar_movimiento(
+                conn, tenant_id=tenant_id, accion='OMC_CREAR', usuario=usuario,
+                modulo='omc', id_ubicacion=id_ubicacion, id_material=rec['Material'],
+                id_contenedor=contenedor, lote=rec['Lote'], tipo_stock=rec['TipoStock'],
+                cantidad=-rec['cantidad'],
+                detalle='Stock reservado como saliente al crear la OMC')
     return cursor.rowcount
 
 
 def _crear_stock_entrando(cursor, contenedor_origen, id_origen, id_destino,
-                          usuario, ahora, contenedor_destino=None, tenant_id=None):
+                          usuario, ahora, contenedor_destino=None, tenant_id=None, conn=None):
     contenedor_dest = contenedor_destino or contenedor_origen
     cursor.execute("""
         SELECT Material, Lote, TipoStock, StockSaliendo, FechaVencimiento
@@ -58,6 +93,13 @@ def _crear_stock_entrando(cursor, contenedor_origen, id_origen, id_destino,
             id_destino, rec['Material'], rec['Lote'], rec['TipoStock'], contenedor_dest,
             0, 0, rec['StockSaliendo'], 0, None, ahora, rec['FechaVencimiento'], usuario, tenant_id
         ))
+        if conn is not None:
+            registrar_movimiento(
+                conn, tenant_id=tenant_id, accion='OMC_CREAR', usuario=usuario,
+                modulo='omc', id_ubicacion=id_destino, id_material=rec['Material'],
+                id_contenedor=contenedor_dest, lote=rec['Lote'], tipo_stock=rec['TipoStock'],
+                cantidad=rec['StockSaliendo'],
+                detalle='Stock entrando al destino de la OMC')
     return len(registros)
 
 
@@ -235,9 +277,9 @@ def guardar():
 
             # Stock operations per container
             for par in pares:
-                _crear_stock_saliendo(cursor, par['contenedor'], par['id_origen'], usuario, ahora, tenant_id)
+                _crear_stock_saliendo(cursor, par['contenedor'], par['id_origen'], usuario, ahora, tenant_id, conn=conn)
                 _crear_stock_entrando(cursor, par['contenedor'], par['id_origen'], id_destino,
-                                      usuario, ahora, contenedor_destino, tenant_id)
+                                      usuario, ahora, contenedor_destino, tenant_id, conn=conn)
 
             id_omc = execute_insert(cursor, """
                 INSERT INTO omc
@@ -261,7 +303,7 @@ def guardar():
 
     except Exception as e:
         conn.rollback()
-        flash(f"Error al crear la OMC: {str(e)}", "danger")
+        flash(f"Error al crear la OMC: {e!s}", "danger")
         return redirect(url_for('omc.nueva'))
     finally:
         conn.close()
@@ -325,7 +367,7 @@ def ver(id_omc):
                     WHERE sc.IDContenedor IN ({ph}) AND sc.Ubicacion = %s
                       AND (%s IS NULL OR sc.tenant_id = %s)
                     ORDER BY sc.IDContenedor, m.codigo
-                """, tuple(cont_dests) + (omc['id_ubicacion_destino'], tenant_id, tenant_id))
+                """, (*tuple(cont_dests), omc['id_ubicacion_destino'], tenant_id, tenant_id))
                 stock_destino = cursor.fetchall()
 
             cursor.execute("SELECT id, codigo, descipcion AS nombre FROM ubicaciones WHERE (%s IS NULL OR tenant_id = %s) ORDER BY codigo", (tenant_id, tenant_id))
@@ -406,6 +448,24 @@ def confirmar(id_omc):
             for cont in contenedores:
                 cont_dest = cont.get('id_contenedor_destino') or cont['id_contenedor']
 
+                cursor.execute("""
+                    SELECT Material, Lote, TipoStock, StockSaliendo AS cantidad
+                    FROM stockcontable
+                    WHERE IDContenedor = %s AND Ubicacion = %s AND StockSaliendo > 0
+                      AND (%s IS NULL OR tenant_id = %s)
+                """, (cont['id_contenedor'], cont['id_ubicacion_origen'], tenant_id, tenant_id))
+                origen_salientes = cursor.fetchall()
+
+                cursor.execute("""
+                    SELECT Ubicacion, Material, Lote, TipoStock,
+                           SUM(StockEntrando) AS cantidad
+                    FROM stockcontable
+                    WHERE IDContenedor = %s AND Ubicacion = %s AND StockEntrando > 0
+                      AND (%s IS NULL OR tenant_id = %s)
+                    GROUP BY Ubicacion, Material, Lote, TipoStock
+                """, (cont_dest, omc['id_ubicacion_destino'], tenant_id, tenant_id))
+                destino_entrantes = cursor.fetchall()
+
                 # Eliminar contenedor de la ubicación origen
                 cursor.execute("""
                     DELETE FROM stockcontable
@@ -426,6 +486,21 @@ def confirmar(id_omc):
                       AND (%s IS NULL OR tenant_id = %s)
                 """, (ahora, ahora, usuario, cont_dest, omc['id_ubicacion_destino'], tenant_id, tenant_id))
                 filas += cursor.rowcount
+
+                for rec in origen_salientes:
+                    registrar_movimiento(
+                        conn, tenant_id=tenant_id, accion='CONFIRMAR_OMC', usuario=usuario,
+                        modulo='omc', id_ubicacion=cont['id_ubicacion_origen'],
+                        id_material=rec['Material'], id_contenedor=cont['id_contenedor'],
+                        lote=rec['Lote'], tipo_stock=rec['TipoStock'], cantidad=-rec['cantidad'],
+                        detalle=f"Stock sale del origen al confirmar OMC {omc['numero']}")
+                for rec in destino_entrantes:
+                    registrar_movimiento(
+                        conn, tenant_id=tenant_id, accion='CONFIRMAR_OMC', usuario=usuario,
+                        modulo='omc', id_ubicacion=rec['Ubicacion'],
+                        id_material=rec['Material'], id_contenedor=cont_dest,
+                        lote=rec['Lote'], tipo_stock=rec['TipoStock'], cantidad=rec['cantidad'],
+                        detalle=f"Stock pasó a Disponible en destino (OMC {omc['numero']})")
 
             # Actualizar estado OMC
             cursor.execute("""
@@ -473,7 +548,7 @@ def confirmar(id_omc):
 
     except Exception as e:
         conn.rollback()
-        flash(f"Error al confirmar la OMC: {str(e)}", "danger")
+        flash(f"Error al confirmar la OMC: {e!s}", "danger")
     finally:
         conn.close()
 
@@ -515,6 +590,14 @@ def modificar(id_omc):
             for cont in contenedores:
                 cont_dest = cont.get('id_contenedor_destino') or cont['id_contenedor']
 
+                cursor.execute("""
+                    SELECT Material, Lote, TipoStock, StockEntrando AS cantidad
+                    FROM stockcontable
+                    WHERE IDContenedor = %s AND Ubicacion = %s AND StockEntrando > 0
+                      AND (%s IS NULL OR tenant_id = %s)
+                """, (cont_dest, old_destino, tenant_id, tenant_id))
+                dest_entrantes = cursor.fetchall()
+
                 # Eliminar StockEntrando en destino actual
                 cursor.execute("""
                     UPDATE stockcontable
@@ -522,11 +605,18 @@ def modificar(id_omc):
                     WHERE IDContenedor = %s AND Ubicacion = %s AND StockEntrando > 0
                       AND (%s IS NULL OR tenant_id = %s)
                 """, (ahora, usuario, cont_dest, old_destino, tenant_id, tenant_id))
+                for rec in dest_entrantes:
+                    registrar_movimiento(
+                        conn, tenant_id=tenant_id, accion='MODIFICAR_OMC', usuario=usuario,
+                        modulo='omc', id_ubicacion=old_destino, id_material=rec['Material'],
+                        id_contenedor=cont_dest, lote=rec['Lote'], tipo_stock=rec['TipoStock'],
+                        cantidad=-rec['cantidad'],
+                        detalle=f"Stock entrando removido del destino anterior (OMC {omc['numero']})")
 
                 # Crear StockEntrando en nuevo destino
                 _crear_stock_entrando(cursor, cont['id_contenedor'], cont['id_ubicacion_origen'],
                                       new_destino_int, usuario, ahora,
-                                      cont.get('id_contenedor_destino'), tenant_id)
+                                      cont.get('id_contenedor_destino'), tenant_id, conn=conn)
 
             cursor.execute("""
                 UPDATE omc
@@ -539,7 +629,7 @@ def modificar(id_omc):
 
     except Exception as e:
         conn.rollback()
-        flash(f"Error al modificar la OMC: {str(e)}", "danger")
+        flash(f"Error al modificar la OMC: {e!s}", "danger")
     finally:
         conn.close()
 
@@ -571,6 +661,22 @@ def anular(id_omc):
             for cont in contenedores:
                 cont_dest = cont.get('id_contenedor_destino') or cont['id_contenedor']
 
+                cursor.execute("""
+                    SELECT Material, Lote, TipoStock, StockEntrando AS cantidad
+                    FROM stockcontable
+                    WHERE IDContenedor = %s AND Ubicacion = %s AND StockEntrando > 0
+                      AND (%s IS NULL OR tenant_id = %s)
+                """, (cont_dest, omc['id_ubicacion_destino'], tenant_id, tenant_id))
+                dest_entrantes = cursor.fetchall()
+
+                cursor.execute("""
+                    SELECT Material, Lote, TipoStock, StockSaliendo AS cantidad
+                    FROM stockcontable
+                    WHERE IDContenedor = %s AND Ubicacion = %s AND StockSaliendo > 0
+                      AND (%s IS NULL OR tenant_id = %s)
+                """, (cont['id_contenedor'], cont['id_ubicacion_origen'], tenant_id, tenant_id))
+                origen_salientes = cursor.fetchall()
+
                 # Eliminar StockEntrando en destino
                 cursor.execute("""
                     UPDATE stockcontable
@@ -593,6 +699,21 @@ def anular(id_omc):
                     WHERE IDContenedor = %s AND Ubicacion = %s AND StockSaliendo > 0
                       AND (%s IS NULL OR tenant_id = %s)
                 """, (ahora, ahora, usuario, cont['id_contenedor'], cont['id_ubicacion_origen'], tenant_id, tenant_id))
+
+                for rec in dest_entrantes:
+                    registrar_movimiento(
+                        conn, tenant_id=tenant_id, accion='ANULAR_OMC', usuario=usuario,
+                        modulo='omc', id_ubicacion=omc['id_ubicacion_destino'],
+                        id_material=rec['Material'], id_contenedor=cont_dest,
+                        lote=rec['Lote'], tipo_stock=rec['TipoStock'], cantidad=-rec['cantidad'],
+                        detalle=f"Stock entrando removido al anular OMC {omc['numero']}")
+                for rec in origen_salientes:
+                    registrar_movimiento(
+                        conn, tenant_id=tenant_id, accion='ANULAR_OMC', usuario=usuario,
+                        modulo='omc', id_ubicacion=cont['id_ubicacion_origen'],
+                        id_material=rec['Material'], id_contenedor=cont['id_contenedor'],
+                        lote=rec['Lote'], tipo_stock=rec['TipoStock'], cantidad=rec['cantidad'],
+                        detalle=f"Stock vuelve a Disponible en origen al anular OMC {omc['numero']}")
 
             # Si vino de una recepción (no hace nada extra)
             if omc['id_recepcion']:
@@ -618,7 +739,7 @@ def anular(id_omc):
 
     except Exception as e:
         conn.rollback()
-        flash(f"Error al anular la OMC: {str(e)}", "danger")
+        flash(f"Error al anular la OMC: {e!s}", "danger")
     finally:
         conn.close()
 

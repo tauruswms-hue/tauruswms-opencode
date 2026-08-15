@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Taurus Móvil - {% block title %}Inicio{% endblock %}</title>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <script>
+    (function() {
+        var meta = document.querySelector('meta[name="csrf-token"]');
+        if (!meta) return;
+        var token = meta.content;
+        window.csrfToken = token;
+        var origFetch = window.fetch;
+        if (origFetch) {
+            window.fetch = function(url, options) {
+                options = options || {};
+                var method = (options.method || 'GET').toUpperCase();
+                if (['POST', 'PUT', 'PATCH', 'DELETE'].indexOf(method) !== -1) {
+                    var headers = new Headers(options.headers || {});
+                    if (!headers.has('X-CSRFToken')) headers.set('X-CSRFToken', token);
+                    options.headers = headers;
+                }
+                return origFetch(url, options);
+            };
+        }
+        function addToken(form) {
+            if (!form.querySelector('input[name="csrf_token"]')) {
+                var input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'csrf_token';
+                input.value = token;
+                form.appendChild(input);
+            }
+        }
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('form').forEach(addToken);
+        });
+        document.addEventListener('submit', function(e) {
+            var form = e.target && e.target.tagName === 'FORM'
+                ? e.target
+                : (e.target && e.target.closest ? e.target.closest('form') : null);
+            if (form) addToken(form);
+        }, true);
+    })();
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * { box-sizing: border-box; }
+        :root {
+            --color-primary: #1a365d;
+            --color-accent: #2b6cb0;
+            --color-bg: #f0f4f8;
+            --color-card: #ffffff;
+            --color-border: #e2e8f0;
+            --color-success: #2f855a;
+            --color-danger: #c53030;
+            --color-warning: #b7791f;
+        }
+        html, body {
+            margin: 0;
+            padding: 0;
+            background: var(--color-bg);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #2d3748;
+        }
+        header.movil-header {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            background: var(--color-primary);
+            color: white;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+        header.movil-header h1 {
+            margin: 0;
+            font-size: 1.05rem;
+            font-weight: 600;
+        }
+        header.movil-header a {
+            color: white;
+            text-decoration: none;
+        }
+        .movil-body { padding: 14px; max-width: 640px; margin: 0 auto; }
+        .movil-card {
+            background: var(--color-card);
+            border: 1px solid var(--color-border);
+            border-radius: 10px;
+            padding: 14px;
+            margin-bottom: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        }
+        .movil-btn {
+            display: block;
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: center;
+            text-decoration: none;
+            margin-top: 8px;
+        }
+        .movil-btn-primary { background: var(--color-accent); color: white; }
+        .movil-btn-primary:active { background: #1e4f82; }
+        .movil-btn-success { background: var(--color-success); color: white; }
+        .movil-btn-danger { background: var(--color-danger); color: white; }
+        .movil-btn-light { background: #e2e8f0; color: #2d3748; }
+        .movil-input, .movil-select {
+            width: 100%;
+            padding: 13px;
+            border: 2px solid var(--color-border);
+            border-radius: 10px;
+            font-size: 1rem;
+            background: white;
+            color: #2d3748;
+        }
+        .movil-input:focus, .movil-select:focus {
+            border-color: var(--color-accent);
+            outline: none;
+        }
+        label.movil-label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #4a5568;
+            margin: 12px 0 4px;
+        }
+        .movil-row { display: flex; gap: 10px; align-items: center; }
+        .movil-row > * { flex: 1; }
+        .movil-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 999px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .badge-abierta { background: #bee3f8; color: #2a4365; }
+        .badge-cerrada { background: #fed7d7; color: #742a2a; }
+        .badge-confirmada { background: #c6f6d5; color: #22543d; }
+        .badge-pendiente { background: #fefcbf; color: #744210; }
+        .movil-lista { list-style: none; margin: 0; padding: 0; }
+        .movil-lista li {
+            padding: 12px 4px;
+            border-bottom: 1px solid var(--color-border);
+        }
+        .movil-lista li:last-child { border-bottom: none; }
+        .movil-titulo { font-weight: 600; font-size: 0.98rem; }
+        .movil-sub { color: #718096; font-size: 0.85rem; }
+        .movil-flash {
+            margin: 10px 0;
+            padding: 12px 14px;
+            border-radius: 8px;
+            font-weight: 500;
+        }
+        .movil-flash-success { background: #c6f6d5; color: #22543d; }
+        .movil-flash-danger { background: #fed7d7; color: #742a2a; }
+        .movil-flash-warning { background: #fefcbf; color: #744210; }
+        .movil-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+        .movil-kpi { text-align: center; padding: 18px 10px; }
+        .movil-kpi .num { font-size: 1.9rem; font-weight: 700; color: var(--color-accent); }
+        .movil-kpi .lab { font-size: 0.8rem; color: #718096; text-transform: uppercase; }
+        .scan-input {
+            font-size: 1.1rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            text-align: center;
+        }
+        .movil-empty {
+            text-align: center;
+            color: #a0aec0;
+            padding: 30px 10px;
+            font-size: 0.9rem;
+        }
+        .text-success { color: var(--color-success); }
+        .text-danger { color: var(--color-danger); }
+        .small { font-size: 0.8rem; }
+        table.movil-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        table.movil-table th, table.movil-table td {
+            padding: 7px 4px;
+            text-align: left;
+            border-bottom: 1px solid var(--color-border);
+        }
+        table.movil-table th { color: #718096; font-size: 0.72rem; text-transform: uppercase; }
+    </style>
+</head>
+<body>
+    <header class="movil-header">
+        <a href="{{ url_for('movil.hub') }}" title="Inicio móvil"><i class="fas fa-home"></i></a>
+        <h1>{% block header %}Taurus Móvil{% endblock %}</h1>
+        <a href="{{ url_for('index') }}" title="Versión escritorio"><i class="fas fa-desktop"></i></a>
+    </header>
+
+    <div class="movil-body">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                <div class="movil-flash movil-flash-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </div>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

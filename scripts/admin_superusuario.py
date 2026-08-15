@@ -1,9 +1,11 @@
 import os
-import sys
 import re
-from werkzeug.security import generate_password_hash
-from dotenv import load_dotenv
+import sys
 from pathlib import Path
+
+from dotenv import load_dotenv
+from werkzeug.security import generate_password_hash
+
 from modules.db_config import _get_admin_connection
 
 env_path = Path('.') / '.env'
@@ -26,7 +28,7 @@ def limpiar_pantalla():
 
 def mostrar_titulo():
     print(f"\n{Color.CYAN}{Color.BOLD}{'=' * 60}")
-    print(f"  TAURUS WMS — Administración de Superusuarios")
+    print("  TAURUS WMS — Administración de Superusuarios")
     print(f"{'=' * 60}{Color.RESET}\n")
 
 
@@ -73,13 +75,9 @@ def pedir_input(prompt, obligatorio=True):
 
 
 def pedir_password(prompt="  Contraseña: "):
-    import sys
     import getpass
     try:
-        if sys.stdin.isatty():
-            pw = getpass.getpass(prompt)
-        else:
-            pw = input(prompt)
+        pw = getpass.getpass(prompt) if sys.stdin.isatty() else input(prompt)
     except (KeyboardInterrupt, getpass.GetPassWarning, OSError):
         print()
         return None
@@ -145,7 +143,7 @@ while True:
                     continue
 
                 print(f"\n  {Color.YELLOW}Modo: Actualizar usuario existente{Color.RESET}")
-                print(f"  (Dejar en blanco para mantener el valor actual)\n")
+                print("  (Dejar en blanco para mantener el valor actual)\n")
 
                 password = pedir_password("  Nueva contraseña: ")
                 if password is None:

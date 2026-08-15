@@ -1,15 +1,38 @@
-﻿from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session
+﻿from collections import OrderedDict
 from datetime import datetime
-from collections import OrderedDict
-from modules.batch_utils import parse_file, float_or_zero, plantilla_csv, plantilla_json, plantilla_xlsx
-from modules.db_config import get_db_connection, _get_admin_connection
-from modules.sql_dialect import upsert_incremental_sql, cast_as_int, substring_index, year as year_func, quote, execute_insert, limit_sql
+
+from flask import (
+    Blueprint,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
+)
+
+from modules.auditoria import registrar_movimiento
+from modules.batch_utils import (
+    float_or_zero,
+    parse_file,
+    plantilla_csv,
+    plantilla_json,
+    plantilla_xlsx,
+)
+from modules.context import get_tenant_filter
+from modules.db_config import _get_admin_connection, get_db_connection
+from modules.sql_dialect import (
+    cast_as_int,
+    execute_insert,
+    limit_sql,
+    quote,
+    substring_index,
+    upsert_incremental_sql,
+)
+from modules.sql_dialect import year as year_func
 
 recepciones_bp = Blueprint('recepciones', __name__)
-
-
-def get_tenant_filter():
-    return session.get('tenant_id')
 
 
 # ============================================================================
@@ -145,7 +168,7 @@ def guardar():
 
     except Exception as e:
         conn.rollback()
-        flash(f"Error al crear la recepción: {str(e)}", "danger")
+        flash(f"Error al crear la recepción: {e!s}", "danger")
         return redirect(url_for('recepciones.nueva'))
     finally:
         conn.close()
@@ -468,6 +491,13 @@ def cerrar(id_recepcion):
                     0, 0, 0, item['cantidad_recibida'],
                     None, ahora, item['fecha_vencimiento'], usuario, tenant_id
                 ))
+                registrar_movimiento(
+                    conn, tenant_id=tenant_id, accion='RECEPCION', usuario=usuario,
+                    modulo='recepciones', id_ubicacion=recepcion['id_ubicacion_recep'],
+                    id_material=item['id_material'], id_contenedor=contenedor,
+                    lote=item['lote'], tipo_stock=item['tipo_stock'],
+                    cantidad=-item['cantidad_recibida'],
+                    detalle=f"Stock saliendo al cerrar recepción {recepcion['numero']}")
 
                 # Crear StockEntrando en la ubicación destino
                 sql_entrando = upsert_incremental_sql('stockcontable', cols_stock, ['Ubicacion', 'Material', 'IDContenedor'],
@@ -478,6 +508,13 @@ def cerrar(id_recepcion):
                     0, 0, item['cantidad_recibida'], 0,
                     None, ahora, item['fecha_vencimiento'], usuario, tenant_id
                 ))
+                registrar_movimiento(
+                    conn, tenant_id=tenant_id, accion='RECEPCION', usuario=usuario,
+                    modulo='recepciones', id_ubicacion=id_ubicacion_destino,
+                    id_material=item['id_material'], id_contenedor=contenedor,
+                    lote=item['lote'], tipo_stock=item['tipo_stock'],
+                    cantidad=item['cantidad_recibida'],
+                    detalle=f"Stock entrando al cerrar recepción {recepcion['numero']}")
 
             # Generar número de OMC
             anio_omc = ahora.year
@@ -527,7 +564,7 @@ def cerrar(id_recepcion):
 
     except Exception as e:
         conn.rollback()
-        flash(f"Error al cerrar la recepción (sin cambios guardados): {str(e)}", "danger")
+        flash(f"Error al cerrar la recepción (sin cambios guardados): {e!s}", "danger")
         return redirect(url_for('recepciones.ver', id_recepcion=id_recepcion))
     finally:
         conn.close()
@@ -567,7 +604,7 @@ def eliminar(id_recepcion):
             flash(f"Recepción {rec['numero']} eliminada.", "success")
     except Exception as e:
         conn.rollback()
-        flash(f"Error: {str(e)}", "danger")
+        flash(f"Error: {e!s}", "danger")
     finally:
         conn.close()
     return redirect(url_for('recepciones.listar'))
@@ -592,6 +629,16 @@ def confirmar_stock(id_recepcion):
             usuario = session.get('nombre', 'sistema')
 
             cursor.execute("""
+                SELECT Material, Lote, TipoStock, Ubicacion,
+                       SUM(StockEntrando) AS cantidad
+                FROM stockcontable
+                WHERE IDContenedor = %s AND StockEntrando > 0
+                  AND (%s IS NULL OR tenant_id = %s)
+                GROUP BY Ubicacion, Material, Lote, TipoStock
+            """, (recepcion['id_contenedor'], tenant_id, tenant_id))
+            movimientos = cursor.fetchall()
+
+            cursor.execute("""
                 UPDATE stockcontable
                 SET StockTotal       = StockTotal + StockEntrando,
                     StockDisponible  = StockDisponible + StockEntrando,
@@ -604,6 +651,14 @@ def confirmar_stock(id_recepcion):
 
             filas = cursor.rowcount
 
+            for mov in movimientos:
+                registrar_movimiento(
+                    conn, tenant_id=tenant_id, accion='CONFIRMAR_RECEPCION', usuario=usuario,
+                    modulo='recepciones', id_ubicacion=mov['Ubicacion'],
+                    id_material=mov['Material'], id_contenedor=recepcion['id_contenedor'],
+                    lote=mov['Lote'], tipo_stock=mov['TipoStock'], cantidad=mov['cantidad'],
+                    detalle=f"Stock pasó a Disponible (recepción {recepcion['numero']})")
+
             cursor.execute(
                 "UPDATE recepciones_cabecera SET estado = 'Confirmada' WHERE id_recepcion = %s AND (%s IS NULL OR tenant_id = %s)",
                 (id_recepcion, tenant_id, tenant_id)
@@ -614,7 +669,7 @@ def confirmar_stock(id_recepcion):
 
     except Exception as e:
         conn.rollback()
-        flash(f"Error al confirmar la entrada: {str(e)}", "danger")
+        flash(f"Error al confirmar la entrada: {e!s}", "danger")
     finally:
         conn.close()
 
@@ -649,7 +704,7 @@ def anular(id_recepcion):
             flash(f"Recepción {rec['numero']} anulada.", "success")
     except Exception as e:
         conn.rollback()
-        flash(f"Error: {str(e)}", "danger")
+        flash(f"Error: {e!s}", "danger")
     finally:
         conn.close()
     return redirect(url_for('recepciones.listar'))
@@ -676,7 +731,7 @@ def importar():
     try:
         rows = parse_file(file, request.form.get('hoja'))
     except Exception as e:
-        return jsonify({'error': f'Error al leer el archivo: {str(e)}'}), 400
+        return jsonify({'error': f'Error al leer el archivo: {e!s}'}), 400
 
     grupos = OrderedDict()
     for i, row in enumerate(rows, 1):

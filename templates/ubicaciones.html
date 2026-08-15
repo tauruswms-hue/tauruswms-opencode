@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 
 {% block content %}
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
@@ -149,6 +149,9 @@
                         <button class="btn-icon edit" onclick='editUbicacion({{ u | tojson }})'>
                             <i class="fas fa-edit"></i>
                         </button>
+                        <form method="POST" action="{{ url_for('ubicaciones.eliminar', id=u.id) }}" style="display:inline;" onsubmit="return confirm('¿Inactivar ubicación?')">
+                            <button type="submit" class="btn-icon delete"><i class="fas fa-trash"></i></button>
+                        </form>
                     </td>
                 </tr>
                 {% endfor %}
@@ -160,7 +163,6 @@
 {% include "partials/_modal_ubicaciones.html" %}
 {% include "partials/_modal_importar_ubicaciones.html" %}
 
-<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 <script>const listaZonas = {{ zonas | tojson }};</script>
 <script src="{{ url_for('static', filename='js/ubicaciones.js') }}"></script>

@@ -1,6 +1,8 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 import json
-from modules.db_config import _get_admin_connection, get_db_connection
+
+from flask import Blueprint, flash, redirect, render_template, request, session, url_for
+
+from modules.db_config import _get_admin_connection
 
 parametros_bp = Blueprint('parametros', __name__)
 
@@ -107,7 +109,7 @@ def actualizar():
             flash("Configuración guardada correctamente", "success")
     except Exception as e:
         conn.rollback()
-        flash(f"Error al guardar: {str(e)}", "danger")
+        flash(f"Error al guardar: {e!s}", "danger")
     finally:
         conn.close()
 

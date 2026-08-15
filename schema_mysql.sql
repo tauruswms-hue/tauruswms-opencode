@@ -59,7 +59,8 @@ CREATE TABLE `tenants` (
     `prompt` text,
     `proveedor_api_ia` text,
     `modelo_api_ia` text,
-    `api_key` text
+    `api_key` text,
+    `api_token` varchar(255)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE INDEX `idx_codigo` ON `tenants` (`codigo`);
 CREATE INDEX `idx_activo` ON `tenants` (`activo`);
@@ -160,6 +161,7 @@ INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/materiale
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/materiales/eliminar/*');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/ubicaciones');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/ubicaciones/guardar');
+INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/ubicaciones/eliminar/*');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/ubicaciones/importar');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/ubicaciones/exportar/*');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/ubicaciones/plantilla/*');
@@ -177,6 +179,7 @@ INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/proveedor
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/proveedores/plantilla/*');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/clientes');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/clientes/guardar');
+INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/clientes/eliminar/*');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/clientes/importar');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/clientes/exportar/*');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/clientes/plantilla/*');
@@ -191,6 +194,7 @@ INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/unidades/
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/unidades/plantilla/*');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/transportes');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/transportes/guardar');
+INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/transportes/eliminar/*');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/transportes/importar');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/transportes/exportar/*');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/transportes/plantilla/*');
@@ -249,6 +253,8 @@ INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/inventari
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/inventario/*');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/parametros');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/actualizar_parametros');
+INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/movil');
+INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/movil/*');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/sidebar-preferences');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('CONSULTA', '/materiales');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('CONSULTA', '/ubicaciones');
@@ -282,11 +288,8 @@ INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('CONSULTA', '/parametro
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('CONSULTA', '/stock');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('CONSULTA', '/entradas');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('CONSULTA', '/salidas');
-INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('CONSULTA', '/movimientos');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('CONSULTA', '/reportes');
-INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('CONSULTA', '/rentradas');
-INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('CONSULTA', '/rsalidas');
-INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('CONSULTA', '/dashboard');
+INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('CONSULTA', '/reportes/*');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('CONSULTA', '/sidebar-preferences');
 
 
@@ -553,6 +556,28 @@ CREATE INDEX `idx_lote` ON `stockcontable` (`Lote`);
 CREATE INDEX `idx_tipo_stock` ON `stockcontable` (`TipoStock`);
 CREATE INDEX `idx_contenedor` ON `stockcontable` (`IDContenedor`);
 CREATE INDEX `idx_stockcontable_tenant` ON `stockcontable` (`tenant_id`);
+
+-- --- stock_movimientos ---;
+CREATE TABLE `stock_movimientos` (
+    `id` bigint AUTO_INCREMENT PRIMARY KEY,
+    `tenant_id` int,
+    `fecha` datetime NOT NULL,
+    `usuario` varchar(100),
+    `accion` varchar(60) NOT NULL,
+    `modulo` varchar(50),
+    `id_ubicacion` int,
+    `id_material` int,
+    `id_contenedor` varchar(10),
+    `lote` varchar(100),
+    `tipo_stock` varchar(50),
+    `cantidad` decimal(15,4),
+    `detalle` varchar(500)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE INDEX `idx_stockmov_tenant` ON `stock_movimientos` (`tenant_id`);
+CREATE INDEX `idx_stockmov_fecha` ON `stock_movimientos` (`fecha`);
+CREATE INDEX `idx_stockmov_material` ON `stock_movimientos` (`id_material`);
+CREATE INDEX `idx_stockmov_ubicacion` ON `stock_movimientos` (`id_ubicacion`);
+CREATE INDEX `idx_stockmov_contenedor` ON `stock_movimientos` (`id_contenedor`);
 
 -- --- clases_pedido ---;
 CREATE TABLE `clases_pedido` (

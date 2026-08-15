@@ -1,16 +1,26 @@
-from flask import Flask, render_template, session, redirect, url_for, request, flash, jsonify, abort
-from flask_wtf.csrf import CSRFProtect
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
-from werkzeug.security import check_password_hash
-import os
-import time
 import datetime
 import json
-from dotenv import load_dotenv
-from pathlib import Path
-from functools import wraps
 import logging
+import os
+import time
+from functools import wraps
+from pathlib import Path
+
+from dotenv import load_dotenv
+from flask import (
+    Flask,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
+)
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from flask_wtf.csrf import CSRFProtect
+from werkzeug.security import check_password_hash
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -19,29 +29,48 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-from modules.materiales import materiales_bp
-from modules.ubicaciones import ubicaciones_bp
-from modules.parametros import parametros_bp
-from modules.unidades import unidades_bp
-from modules.tipoubicacion import tipoubicacion_bp
+from modules.api import api_bp
+from modules.bootstrap import (
+    check_default_secrets,
+    harden_session_config,
+    register_error_handlers,
+)
 from modules.categorias import categorias_bp
-from modules.proveedores import proveedores_bp
-from modules.clientes import clientes_bp
-from modules.transportes import transportes_bp
-from modules.rutas import rutas_bp
-from modules.pedidos import pedidos_bp
 from modules.clases_pedido import clases_pedido_bp
-from modules.stockcontable import stockcontable_bp
-from modules.recepciones import recepciones_bp
-from modules.zonas import zonas_bp
-from modules.omc import omc_bp
-from modules.inventario import inventario_bp
+from modules.clientes import clientes_bp
+from modules.context import (
+    LOGIN_IDLE_TIMEOUT_SECONDS,
+    SESSION_MAX_AGE_SECONDS,
+    get_tenant_filter,
+)
+from modules.db_config import (
+    _get_admin_connection,
+    get_db_connection,
+    get_db_engine,
+    get_wms_runtime_config,
+    test_connection,
+)
 from modules.despacho import despacho_bp
 from modules.intercambio import intercambio_bp
-from modules.db_config import get_db_config, clear_config_cache, get_db_connection, _get_admin_connection, get_db_engine
-from modules.sql_dialect import quote as sql_quote, set_engine
+from modules.inventario import inventario_bp
+from modules.materiales import materiales_bp
+from modules.movil import movil_bp
+from modules.omc import omc_bp
+from modules.parametros import parametros_bp
+from modules.pedidos import pedidos_bp
+from modules.permisos_cache import obtener_rutas_cached
+from modules.proveedores import proveedores_bp
+from modules.recepciones import recepciones_bp
+from modules.reportes import reportes_bp
+from modules.rutas import rutas_bp
 from modules.schema_generator import ROUTE_CATALOG
-
+from modules.sql_dialect import quote as sql_quote
+from modules.stockcontable import stockcontable_bp
+from modules.tipoubicacion import tipoubicacion_bp
+from modules.transportes import transportes_bp
+from modules.ubicaciones import ubicaciones_bp
+from modules.unidades import unidades_bp
+from modules.zonas import zonas_bp
 
 app = Flask(__name__)
 app.register_blueprint(materiales_bp)
@@ -63,6 +92,9 @@ app.register_blueprint(omc_bp)
 app.register_blueprint(inventario_bp)
 app.register_blueprint(despacho_bp)
 app.register_blueprint(intercambio_bp)
+app.register_blueprint(movil_bp)
+app.register_blueprint(api_bp)
+app.register_blueprint(reportes_bp)
 
 env_path = Path('.') / '.env'
 load_dotenv(dotenv_path=env_path)
@@ -74,72 +106,24 @@ if not _SECRET_KEY:
     raise RuntimeError("Falta SECRET_KEY en .env (ver .env.example)")
 app.secret_key = _SECRET_KEY
 
-_DEFAULT_SECRETOS = (
-    'taurus-wms-secret-2024-dev', 'taurus-admin-secret-2024-dev',
-    'taurus-wms-salt-2024', 'Admin@2024!', 'Taurus_2001', 'dev-fallback',
-)
+check_default_secrets(APP_ENV, [
+    ('SECRET_KEY', os.getenv('SECRET_KEY')),
+    ('ADMIN_SECRET_KEY', os.getenv('ADMIN_SECRET_KEY')),
+    ('SECRET_SALT', os.getenv('SECRET_SALT')),
+    ('DB_ADMIN_PASSWORD', os.getenv('DB_ADMIN_PASSWORD')),
+    ('DB_PASSWORD', os.getenv('DB_PASSWORD')),
+    ('DB_INTERCAMBIO_PASSWORD', os.getenv('DB_INTERCAMBIO_PASSWORD')),
+], logger)
 
-
-def _check_secretos():
-    """Fuerza el cambio de secretos/passwords por defecto en production."""
-    valores = [
-        ('SECRET_KEY', os.getenv('SECRET_KEY')),
-        ('ADMIN_SECRET_KEY', os.getenv('ADMIN_SECRET_KEY')),
-        ('SECRET_SALT', os.getenv('SECRET_SALT')),
-        ('DB_ADMIN_PASSWORD', os.getenv('DB_ADMIN_PASSWORD')),
-        ('DB_PASSWORD', os.getenv('DB_PASSWORD')),
-        ('DB_INTERCAMBIO_PASSWORD', os.getenv('DB_INTERCAMBIO_PASSWORD')),
-    ]
-    encontrados = [f"{k}={v}" for k, v in valores if v and v in _DEFAULT_SECRETOS]
-    if encontrados:
-        mensaje = ("Se detectaron credenciales/secretos por defecto. Cambiarlos "
-                   "antes de producción: " + ", ".join(encontrados))
-        if APP_ENV == 'production':
-            raise RuntimeError(mensaje)
-        logger.warning("[SEGURIDAD] %s", mensaje)
-
-
-_check_secretos()
-
-# Hardening de sesión
-app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-app.config['SESSION_COOKIE_SECURE'] = (APP_ENV == 'production')
-app.config['PERMANENT_SESSION_LIFETIME'] = datetime.timedelta(hours=8)
+harden_session_config(app, APP_ENV)
 
 csrf = CSRFProtect(app)
+csrf.exempt(api_bp)
 
 limiter = Limiter(key_func=get_remote_address, storage_uri="memory://", app=app)
+limiter.limit("60 per minute")(api_bp)
 
-
-def get_db_config_from_table():
-    config = get_db_config()
-    engine = config.get('DB_ENGINE', 'mysql')
-    return {
-        'host': config.get('DB_HOST', 'localhost'),
-        'user': config.get('DB_USER', 'taurus'),
-        'password': config.get('DB_PASSWORD', ''),
-        'database': config.get('DB_NAME', 'taurus_wms'),
-        'charset': config.get('DB_CHAR_SET', 'utf8mb4'),
-        'port': int(config.get('DB_PORT', 3306)),
-        'engine': engine
-    }
-
-
-try:
-    DB_CONFIG = get_db_config_from_table()
-except Exception as e:
-    logger.warning("No se pudo cargar config de BD desde tabla: %s", e)
-    logger.warning("Usando valores por defecto del entorno (.env)")
-    DB_CONFIG = {
-        'host': os.getenv('DB_HOST', 'localhost'),
-        'user': os.getenv('DB_USER', 'taurus'),
-        'password': os.getenv('DB_PASSWORD', ''),
-        'database': os.getenv('DB_NAME', 'taurus_wms'),
-        'charset': os.getenv('DB_CHAR_SET', 'utf8mb4'),
-        'port': int(os.getenv('DB_PORT', 3306)),
-        'engine': os.getenv('DB_ENGINE', 'mysql')
-    }
+register_error_handlers(app, logger)
 
 
 # ============================================================================
@@ -154,15 +138,19 @@ def verificar_mysql():
         parte1 = str(e)[:60]
         parte2 = str(e)[60:]
         todo = parte1 + "\n" + parte2
-        return False, f"⚠️ Motor BD no disponible: {str(todo)}"
+        return False, f"⚠️ Motor BD no disponible: {todo!s}"
 
 
 def obtener_rutas_por_rol(rol):
     """Obtiene las rutas habilitadas para un rol específico.
 
     roles_rutas vive en taurus_admin, no en taurus_wms.
+    El resultado se cachea por rol (TTL PERMISOS_CACHE_TTL, por defecto 30s)
+    para no abrir una conexion admin en cada request; los cambios de rutas en
+    el panel admin aplican sin re-login dentro del TTL.
     """
-    try:
+
+    def _consultar():
         conn = _get_admin_connection()
         cursor = conn.cursor()
 
@@ -182,6 +170,8 @@ def obtener_rutas_por_rol(rol):
         # Si no, devolver la lista de rutas específicas
         return [ruta['ruta'] for ruta in rutas]
 
+    try:
+        return obtener_rutas_cached(rol, _consultar)
     except Exception as e:
         logger.error("Error al obtener rutas por rol: %s", e)
         return []
@@ -293,7 +283,7 @@ def index():
         return redirect(url_for('login'))
 
     tiempo_transcurrido = time.time() - session['login_timestamp']
-    if tiempo_transcurrido > 28800:
+    if tiempo_transcurrido > SESSION_MAX_AGE_SECONDS:
         session.clear()
         flash('La sesión ha expirado. Por favor, inicie sesión nuevamente.', 'info')
         return redirect(url_for('login'))
@@ -303,7 +293,7 @@ def index():
 
     estado_db = verificar_mysql()
 
-    tenant_id = session.get('tenant_id')
+    tenant_id = get_tenant_filter()
     pedidos_por_estado = {'Pendiente': 0, 'Preparado': 0, 'Despachado': 0}
     stock_por_tipo = {'Libre Venta': 0, 'Calidad': 0, 'Bloqueado': 0, 'Mal Estado': 0}
     try:
@@ -389,7 +379,7 @@ def index():
 def login():
     if 'user_id' in session and 'login_timestamp' in session:
         tiempo_transcurrido = time.time() - session['login_timestamp']
-        if tiempo_transcurrido <= 300:  # 5 minutos en segundos
+        if tiempo_transcurrido <= LOGIN_IDLE_TIMEOUT_SECONDS:  # 5 minutos
             return redirect(url_for('index'))
         else:
             session.clear()
@@ -453,7 +443,7 @@ def login():
 
         except Exception as e:
             logger.error("Error en login: %s", e, exc_info=True)
-            flash(f'Error al iniciar sesión: {str(e)}', 'error')
+            flash(f'Error al iniciar sesión: {e!s}', 'error')
 
     return render_template('login.html')
 
@@ -482,15 +472,15 @@ def configuracion_db():
 # FUNCIONES AUXILIARES PARA CONFIGURACIÓN
 # ============================================================================
 def get_db_config_from_env():
-    """Obtiene la configuración de BD desde la tabla configuracion en taurus_admin"""
-    config = get_db_config()
+    """Obtiene la configuración de BD desde la tabla configuracion en taurus_admin."""
+    config = get_wms_runtime_config()
     return {
-        'DB_HOST': config.get('DB_HOST', 'localhost'),
-        'DB_PORT': config.get('DB_PORT', '3306'),
-        'DB_NAME': config.get('DB_NAME', 'taurus_wms'),
-        'DB_USER': config.get('DB_USER', 'taurus'),
-        'DB_PASSWORD': config.get('DB_PASSWORD', ''),
-        'DB_CHARSET': config.get('DB_CHAR_SET', 'utf8mb4')
+        'DB_HOST': config['host'],
+        'DB_PORT': str(config['port']),
+        'DB_NAME': config['database'],
+        'DB_USER': config['user'],
+        'DB_PASSWORD': config['password'],
+        'DB_CHARSET': config['charset'],
     }
 
 
@@ -540,25 +530,13 @@ def test_db_connection():
             'user': data.get('username', os.getenv('DB_USER', 'taurus')),
             'password': password,
             'database': data.get('database', os.getenv('DB_NAME', 'taurus_wms')),
-            'charset': data.get('charset', os.getenv('DB_CHARSET', 'utf8')),
-            'connect_timeout': 5
+            'charset': data.get('charset', os.getenv('DB_CHARSET', 'utf8mb4')),
         }
 
-        # Intentar conexión
-        from modules.db_config import _get_driver_for_engine
-        engine = DB_CONFIG.get('engine', 'mysql')
-        driver = _get_driver_for_engine(engine)
-        if engine == 'sqlite':
-            connection = driver.connect(test_config['database'])
-        elif engine == 'postgresql':
-            connection = driver.connect(
-                host=test_config['host'], port=test_config['port'],
-                user=test_config['user'], password=test_config['password'],
-                database=test_config['database']
-            )
-        else:
-            connection = driver.connect(**test_config)
-        connection.close()
+        # Intentar conexión con el engine efectivo (la app decide el engine;
+        # los datos del formulario solo aportan host/puerto/usuario/password).
+        engine = get_db_engine()
+        test_connection(engine, **test_config)
 
         return jsonify({
             'success': True,
@@ -582,12 +560,6 @@ def test_db_connection():
             'success': False,
             'message': f'❌ {error_msg}'
         })
-    except Exception as e:
-        logger.error("Error inesperado en test_db_connection: %s", e)
-        return jsonify({
-            'success': False,
-            'message': f'❌ Error inesperado: {str(e)}'
-        })
 
 
 # ============================================================================
@@ -606,62 +578,7 @@ def api_xlsx_sheetnames():
     try:
         return jsonify({'hojas': xlsx_sheetnames(file)})
     except Exception as e:
-        return jsonify({'error': f'Error al leer el archivo: {str(e)}'}), 400
-
-
-@app.route('/ubicaciones')
-@verificar_permiso_decorator
-def ubicaciones():
-    """Gestión de ubicaciones"""
-    return render_template('ubicaciones.html')
-
-
-@app.route('/stock')
-@verificar_permiso_decorator
-def stock():
-    """Consulta de stock"""
-    return render_template('stock.html')
-
-
-@app.route('/entradas')
-@verificar_permiso_decorator
-def entradas():
-    """Registro de entradas"""
-    return render_template('entradas.html')
-
-
-@app.route('/salidas')
-@verificar_permiso_decorator
-def salidas():
-    """Registro de salidas"""
-    return render_template('salidas.html')
-
-
-@app.route('/movimientos')
-def movimientos():
-    """Redirige al listado de OMC"""
-    return redirect(url_for('omc.listar'))
-
-
-@app.route('/rentradas')
-@verificar_permiso_decorator
-def rentradas():
-    """Registro de entradas"""
-    return render_template('entradas.html')
-
-
-@app.route('/rsalidas')
-@verificar_permiso_decorator
-def rsalidas():
-    """Registro de salidas"""
-    return render_template('salidas.html')
-
-
-@app.route('/reportes')
-@verificar_permiso_decorator
-def reportes():
-    """Reportes y consultas"""
-    return render_template('reportes.html')
+        return jsonify({'error': f'Error al leer el archivo: {e!s}'}), 400
 
 
 @app.route('/sidebar-preferences', methods=['POST'])
@@ -699,25 +616,13 @@ def guardar_sidebar_preferences():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/parametros')
-@verificar_permiso_decorator
-def parametros():
-    """Parámetros del sistema"""
-    return render_template('parametros.html')
-
-
 # ============================================================================
 # RUTAS ADICIONALES
 # ============================================================================
-@app.route('/dashboard')
-def dashboard():
-    return redirect(url_for('index'))
-
-
 @app.route('/estado')
 @verificar_permiso_decorator
 def estado():
-    mysql_ok, mysql_msg = verificar_mysql()
+    _mysql_ok, mysql_msg = verificar_mysql()
     fecha_hora = datetime.datetime.fromtimestamp(session.get('login_timestamp', time.time()))
     fecha_formateada = fecha_hora.strftime('%d/%m/%Y %H:%M:%S')
     info = {
@@ -731,12 +636,6 @@ def estado():
     return render_template('estado.html', info=info)
 
 
-@app.route('/acerca')
-def acerca():
-    """Página acerca de - Pública"""
-    return render_template('acerca.html')
-
-
 # ============================================================================
 # MIDDLEWARE PARA VERIFICAR AUTENTICACIÓN Y PERMISOS
 # ============================================================================
@@ -745,7 +644,11 @@ def verificar_autenticacion_y_permisos():
     """Verificar autenticación y permisos para rutas protegidas"""
 
     # Lista de rutas públicas (no requieren autenticación)
-    rutas_publicas = ['login', 'acerca', 'static']
+    rutas_publicas = ['login', 'static']
+
+    # La API REST /api/v1 se autentica por token Bearer (no usa sesión).
+    if request.path.startswith('/api/v1/'):
+        return
 
     # Si la ruta es pública, permitir acceso
     if request.endpoint in rutas_publicas:
@@ -759,7 +662,7 @@ def verificar_autenticacion_y_permisos():
     # Verificar expiración de sesión
     if 'login_timestamp' in session:
         tiempo_transcurrido = time.time() - session['login_timestamp']
-        if tiempo_transcurrido > 28800:  # 8 horas
+        if tiempo_transcurrido > SESSION_MAX_AGE_SECONDS:  # 8 horas
             session.clear()
             flash('La sesión ha expirado. Por favor, inicie sesión nuevamente.', 'info')
             return redirect(url_for('login'))
@@ -780,7 +683,7 @@ def verificar_autenticacion_y_permisos():
 # ============================================================================
 if __name__ == '__main__':
     mysql_ok, mysql_msg = verificar_mysql()
-    logger.info("Estado BD (%s): %s", DB_CONFIG.get('engine', 'mysql'), mysql_msg)
+    logger.info("Estado BD (%s): %s", get_db_engine(), mysql_msg)
     logger.info("=" * 50)
     logger.info("TAURUS WMS")
     logger.info("=" * 50)

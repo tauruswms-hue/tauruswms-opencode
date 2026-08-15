@@ -36,7 +36,6 @@ Lectura de configuracion:
 
 import argparse
 import os
-import re
 import sys
 
 from dotenv import load_dotenv
@@ -44,8 +43,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from modules.schema_generator import generate_schema, ENGINE_MAP
+import contextlib
 
+from modules.schema_generator import ENGINE_MAP, generate_schema
 
 # ============================================================================
 # CONEXION
@@ -195,10 +195,8 @@ def execute_schema(conn, sql_text, dry_run=False, verbose=False):
                 errors += 1
 
     if not dry_run:
-        try:
+        with contextlib.suppress(Exception):
             conn.commit()
-        except Exception:
-            pass
 
     return executed, errors
 

@@ -1,11 +1,11 @@
 """Utilidades compartidas para importación/exportación batch."""
 import csv
-import json
 import io
-import openpyxl
-from openpyxl.styles import Font, PatternFill, Alignment
-from flask import send_file
+import json
 
+import openpyxl
+from flask import send_file
+from openpyxl.styles import Alignment, Font, PatternFill
 
 # ── Parsers ──────────────────────────────────────────────────────────────────
 
@@ -150,7 +150,7 @@ def plantilla_csv(campos, ejemplo, filename):
 
 
 def plantilla_json(campos, ejemplo, filename):
-    data = [dict(zip(campos, ejemplo))]
+    data = [dict(zip(campos, ejemplo, strict=False))]
     out = io.BytesIO(json.dumps(data, ensure_ascii=False, indent=2).encode('utf-8'))
     return send_file(out, mimetype='application/json', as_attachment=True, download_name=filename)
 

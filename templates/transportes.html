@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 
 {% block content %}
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
@@ -61,6 +61,11 @@
                         <button class="btn-icon edit" onclick='editTransporte({{ t | tojson }})' style="color: #3498db; background: none; border: none; cursor: pointer; font-size: 1.1rem;">
                             <i class="fas fa-edit"></i>
                         </button>
+                        <form method="POST" action="{{ url_for('transportes.eliminar', id_transporte=t.id_transporte) }}" style="display:inline;" onsubmit="return confirm('¿Inactivar transporte?')">
+                            <button type="submit" class="btn-icon delete" style="color: #e74c3c; background: none; border: none; cursor: pointer; font-size: 1.1rem;">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </form>
                     </td>
                 </tr>
                 {% endfor %}
@@ -72,7 +77,6 @@
 {% include "partials/_modal_transportes.html" %}
 {% include "partials/_modal_importar_transportes.html" %}
 
-<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/fixedheader/3.4.0/js/dataTables.fixedHeader.min.js"></script>
 <script>

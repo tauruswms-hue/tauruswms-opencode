@@ -1,0 +1,69 @@
+{% extends 'movil_base.html' %}
+{% block title %}Inventario{% endblock %}
+{% block header %}Inventario{% endblock %}
+{% block content %}
+<div class="movil-card">
+    <label class="movil-label" for="q">Escanear o buscar material</label>
+    <div class="movil-row">
+        <input id="q" class="movil-input scan-input" placeholder="ESCANEE AQUÍ" autocomplete="off" autofocus>
+        <button type="button" class="movil-btn movil-btn-primary" style="flex:0 0 auto; padding:13px 16px; margin:0;" onclick="buscar()">
+            <i class="fas fa-search"></i>
+        </button>
+    </div>
+</div>
+
+<div id="result"></div>
+
+<div class="movil-card">
+    <div class="movil-titulo">¿Cómo funciona?</div>
+    <div class="movil-sub">
+        Escanee el código de barras de un material para ver su posición actual:
+        ubicación, contenedor, lote, stock disponible y total por cada posición.
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function buscar() {
+    var q = document.getElementById('q').value.trim();
+    if (!q) return;
+    var result = document.getElementById('result');
+    result.innerHTML = '<div class="movil-sub">Buscando...</div>';
+
+    fetch('{{ url_for('movil.inventario_buscar') }}?q=' + encodeURIComponent(q))
+        .then(function(resp) { return resp.json(); })
+        .then(function(data) {
+            if (!data.ok) {
+                result.innerHTML = '<div class="movil-flash movil-flash-warning">' + (data.msg || 'Material no encontrado.') + '</div>';
+                return;
+            }
+            var html =
+                '<div class="movil-card">' +
+                    '<div class="movil-titulo">' + data.material.codigo + ' - ' + data.material.nombre + '</div>' +
+                    '<div class="movil-sub">' + (data.material.unidad_nombre || '') + '</div>' +
+                '</div>';
+            if (data.posiciones.length === 0) {
+                html += '<div class="movil-empty">Sin stock registrado para este material.</div>';
+            } else {
+                html += '<div class="movil-card"><table class="movil-table"><thead><tr>' +
+                    '<th>Ubicación</th><th>Contenedor</th><th>Disp.</th><th>Total</th><th>Lote</th></tr></thead><tbody>';
+                data.posiciones.forEach(function(p) {
+                    html += '<tr><td>' + p.ubicacion_codigo + '</td><td>' + p.IDContenedor + '</td>' +
+                            '<td>' + p.StockDisponible + '</td><td>' + p.StockTotal + '</td><td>' + p.Lote + '</td></tr>';
+                });
+                html += '</tbody></table></div>';
+            }
+            result.innerHTML = html;
+            document.getElementById('q').value = '';
+            document.getElementById('q').focus();
+        })
+        .catch(function() {
+            result.innerHTML = '<div class="movil-flash movil-flash-danger">Error de conexión.</div>';
+        });
+}
+
+document.getElementById('q').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); buscar(); }
+});
+</script>
+{% endblock %}

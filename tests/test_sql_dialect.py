@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Tests unitarios de modules/sql_dialect.py en los 4 engines."""
 
 import pytest

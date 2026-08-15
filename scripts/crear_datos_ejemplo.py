@@ -1,7 +1,8 @@
-import os
 from pathlib import Path
+
 from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash
+
 from modules.db_config import get_db_connection
 from modules.sql_dialect import insert_ignore_sql
 

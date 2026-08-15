@@ -1,0 +1,24 @@
+{% extends 'movil_base.html' %}
+{% block title %}Inicio{% endblock %}
+{% block header %}Taurus Móvil{% endblock %}
+{% block content %}
+<div class="movil-grid">
+    <a href="{{ url_for('movil.recepcion_listar') }}" class="movil-card movil-kpi" style="text-decoration:none; color:inherit;">
+        <div class="num">{{ recepciones_abiertas }}</div>
+        <div class="lab">Recepción</div>
+        <div class="small text-success"><i class="fas fa-sign-in-alt"></i> Recepción de mercadería</div>
+    </a>
+
+    <a href="{{ url_for('movil.picking_listar') }}" class="movil-card movil-kpi" style="text-decoration:none; color:inherit;">
+        <div class="num">{{ omcs_pendientes }}</div>
+        <div class="lab">Picking</div>
+        <div class="small" style="color:var(--color-warning);"><i class="fas fa-boxes"></i> Movimientos pendientes</div>
+    </a>
+
+    <a href="{{ url_for('movil.inventario') }}" class="movil-card movil-kpi" style="text-decoration:none; color:inherit;">
+        <div class="num"><i class="fas fa-qrcode"></i></div>
+        <div class="lab">Inventario</div>
+        <div class="small"><i class="fas fa-clipboard-list"></i> Consulta de stock por escaneo</div>
+    </a>
+</div>
+{% endblock %}

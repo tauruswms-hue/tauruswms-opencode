@@ -1,13 +1,26 @@
-﻿from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session
+﻿from flask import (
+    Blueprint,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
+
+from modules.batch_utils import (
+    export_csv,
+    export_json,
+    export_xlsx,
+    parse_file,
+    plantilla_csv,
+    plantilla_json,
+    plantilla_xlsx,
+)
+from modules.context import get_tenant_filter
 from modules.db_config import get_db_connection
-from modules.batch_utils import (parse_file, export_csv, export_json, export_xlsx,
-                                  plantilla_csv, plantilla_json, plantilla_xlsx)
 
 rutas_bp = Blueprint('rutas', __name__)
-
-
-def get_tenant_filter():
-    return session.get('tenant_id')
 
 
 @rutas_bp.route('/rutas')
@@ -46,7 +59,7 @@ def guardar():
             flash("Ruta guardada correctamente", "success")
     except Exception as e:
         conn.rollback()
-        flash(f"Error: {str(e)}", "danger")
+        flash(f"Error: {e!s}", "danger")
     finally:
         conn.close()
     return redirect(url_for('rutas.listar'))
@@ -83,7 +96,7 @@ def importar():
     try:
         rows = parse_file(file, request.form.get('hoja'))
     except Exception as e:
-        return jsonify({'error': f'Error al leer el archivo: {str(e)}'}), 400
+        return jsonify({'error': f'Error al leer el archivo: {e!s}'}), 400
 
     insertados, omitidos, errores = 0, [], []
     conn = get_db_connection()

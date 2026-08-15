@@ -13,8 +13,8 @@ Tambien se puede importar para uso programatico:
 """
 
 import argparse
-import sys
 import os
+import sys
 
 # ============================================================================
 # DEFINICION DE COLUMNAS (tipos genericos, se traducen por engine)
@@ -97,6 +97,7 @@ ADMIN_TABLES = [
             {"name": "proveedor_api_ia",  "type": "text"},
             {"name": "modelo_api_ia",     "type": "text"},
             {"name": "api_key",           "type": "text"},
+            {"name": "api_token",         "type": "varchar(255)"},
         ],
         "indexes": [
             {"columns": ["codigo"],  "name": "idx_codigo"},
@@ -484,6 +485,31 @@ WMS_TABLES = [
              "on_delete": "RESTRICT", "on_update": "CASCADE"},
             {"columns": ["Material"],  "ref_table": "materiales",  "ref_columns": ["id"],
              "on_delete": "RESTRICT", "on_update": "CASCADE"},
+        ],
+    },
+    {
+        "name": "stock_movimientos",
+        "columns": [
+            {"name": "id",            "type": "bigint",       "pk": True, "autoincrement": True},
+            {"name": "tenant_id",     "type": "int"},
+            {"name": "fecha",         "type": "datetime",     "not_null": True},
+            {"name": "usuario",       "type": "varchar(100)"},
+            {"name": "accion",        "type": "varchar(60)",  "not_null": True},
+            {"name": "modulo",        "type": "varchar(50)"},
+            {"name": "id_ubicacion",  "type": "int"},
+            {"name": "id_material",   "type": "int"},
+            {"name": "id_contenedor", "type": "varchar(10)"},
+            {"name": "lote",          "type": "varchar(100)"},
+            {"name": "tipo_stock",    "type": "varchar(50)"},
+            {"name": "cantidad",      "type": "decimal(15,4)"},
+            {"name": "detalle",       "type": "varchar(500)"},
+        ],
+        "indexes": [
+            {"columns": ["tenant_id"],     "name": "idx_stockmov_tenant"},
+            {"columns": ["fecha"],         "name": "idx_stockmov_fecha"},
+            {"columns": ["id_material"],   "name": "idx_stockmov_material"},
+            {"columns": ["id_ubicacion"],  "name": "idx_stockmov_ubicacion"},
+            {"columns": ["id_contenedor"], "name": "idx_stockmov_contenedor"},
         ],
     },
     {
@@ -954,8 +980,8 @@ ROUTE_CATALOG = [
         "/materiales/exportar/*", "/materiales/plantilla/*", "/materiales/eliminar/*",
     ]},
     {"grupo": "Ubicaciones", "rutas": [
-        "/ubicaciones", "/ubicaciones/guardar", "/ubicaciones/importar",
-        "/ubicaciones/exportar/*", "/ubicaciones/plantilla/*",
+        "/ubicaciones", "/ubicaciones/guardar", "/ubicaciones/eliminar/*",
+        "/ubicaciones/importar", "/ubicaciones/exportar/*", "/ubicaciones/plantilla/*",
     ]},
     {"grupo": "Tipos de ubicacion", "rutas": [
         "/tipoubicacion", "/tipoubicacion/guardar", "/tipoubicacion/eliminar/*",
@@ -966,8 +992,8 @@ ROUTE_CATALOG = [
         "/proveedores/importar", "/proveedores/exportar/*", "/proveedores/plantilla/*",
     ]},
     {"grupo": "Clientes", "rutas": [
-        "/clientes", "/clientes/guardar", "/clientes/importar",
-        "/clientes/exportar/*", "/clientes/plantilla/*",
+        "/clientes", "/clientes/guardar", "/clientes/eliminar/*",
+        "/clientes/importar", "/clientes/exportar/*", "/clientes/plantilla/*",
     ]},
     {"grupo": "Categorias", "rutas": [
         "/categorias", "/categorias/guardar", "/categorias/eliminar/*",
@@ -978,8 +1004,8 @@ ROUTE_CATALOG = [
         "/unidades/importar", "/unidades/exportar/*", "/unidades/plantilla/*",
     ]},
     {"grupo": "Transportes", "rutas": [
-        "/transportes", "/transportes/guardar", "/transportes/importar",
-        "/transportes/exportar/*", "/transportes/plantilla/*",
+        "/transportes", "/transportes/guardar", "/transportes/eliminar/*",
+        "/transportes/importar", "/transportes/exportar/*", "/transportes/plantilla/*",
     ]},
     {"grupo": "Rutas de reparto", "rutas": [
         "/rutas", "/rutas/guardar", "/rutas/eliminar/*",
@@ -1025,14 +1051,19 @@ ROUTE_CATALOG = [
     {"grupo": "Parametros", "rutas": [
         "/parametros", "/actualizar_parametros",
     ]},
+    {"grupo": "Reportes", "rutas": [
+        "/reportes", "/reportes/*",
+    ]},
     {"grupo": "Sistema", "rutas": [
-        "/dashboard", "/stock", "/entradas", "/salidas", "/movimientos",
-        "/reportes", "/rentradas", "/rsalidas", "/configuracion-db",
+        "/configuracion-db",
         "/test_db_connection", "/sidebar-preferences",
     ]},
     {"grupo": "Intercambio", "rutas": [
         "/intercambio", "/intercambio/procesar", "/intercambio/reintentar",
         "/intercambio/reintentar/*",
+    ]},
+    {"grupo": "Móvil", "rutas": [
+        "/movil", "/movil/*",
     ]},
 ]
 
@@ -1040,18 +1071,18 @@ ROUTE_CATALOG = [
 ROUTES_OPERADOR = [
     "/materiales", "/materiales/guardar", "/materiales/importar",
     "/materiales/exportar/*", "/materiales/plantilla/*", "/materiales/eliminar/*",
-    "/ubicaciones", "/ubicaciones/guardar", "/ubicaciones/importar",
-    "/ubicaciones/exportar/*", "/ubicaciones/plantilla/*",
+    "/ubicaciones", "/ubicaciones/guardar", "/ubicaciones/eliminar/*",
+    "/ubicaciones/importar", "/ubicaciones/exportar/*", "/ubicaciones/plantilla/*",
     "/tipoubicacion", "/tipoubicacion/guardar", "/tipoubicacion/eliminar/*",
     "/tipoubicacion/importar", "/tipoubicacion/exportar/*", "/tipoubicacion/plantilla/*",
     "/proveedores", "/proveedores/guardar", "/proveedores/eliminar/*",
     "/proveedores/importar", "/proveedores/exportar/*", "/proveedores/plantilla/*",
-    "/clientes", "/clientes/guardar", "/clientes/importar",
-    "/clientes/exportar/*", "/clientes/plantilla/*",
+    "/clientes", "/clientes/guardar", "/clientes/eliminar/*",
+    "/clientes/importar", "/clientes/exportar/*", "/clientes/plantilla/*",
     "/categorias", "/categorias/guardar", "/categorias/eliminar/*",
     "/unidades", "/unidades/guardar", "/unidades/eliminar/*",
     "/unidades/importar", "/unidades/exportar/*", "/unidades/plantilla/*",
-    "/transportes", "/transportes/guardar",
+    "/transportes", "/transportes/guardar", "/transportes/eliminar/*",
     "/transportes/importar", "/transportes/exportar/*", "/transportes/plantilla/*",
     "/rutas", "/rutas/guardar", "/rutas/eliminar/*",
     "/rutas/importar", "/rutas/exportar/*", "/rutas/plantilla/*",
@@ -1073,6 +1104,7 @@ ROUTES_OPERADOR = [
     "/stockcontable/importar", "/stockcontable/exportar/*", "/stockcontable/plantilla/*",
     "/inventario", "/inventario/crear", "/inventario/*",
     "/parametros", "/actualizar_parametros",
+    "/movil", "/movil/*",
     "/sidebar-preferences",
 ]
 
@@ -1088,8 +1120,7 @@ ROUTES_CONSULTA = [
     "/stockcontable/plantilla/*",
     "/inventario", "/inventario/*",
     "/parametros",
-    "/stock", "/entradas", "/salidas", "/movimientos", "/reportes",
-    "/rentradas", "/rsalidas", "/dashboard",
+    "/reportes", "/reportes/*",
     "/sidebar-preferences",
 ]
 
@@ -1335,7 +1366,6 @@ class DDLEngine:
 
     def index_statements(self, table_def):
         """Post CreateTable hook for engines that use separate CREATE INDEX."""
-        pass
 
 
 class MySQLEngine(DDLEngine):

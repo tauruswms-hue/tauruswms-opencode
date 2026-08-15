@@ -1,11 +1,24 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, send_file, session
-import os
 import csv
-import json
 import io
-from dotenv import load_dotenv
+import json
+
 import openpyxl
-from modules.db_config import get_db_connection, _get_admin_connection
+from dotenv import load_dotenv
+from flask import (
+    Blueprint,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    send_file,
+    session,
+    url_for,
+)
+
+from modules.batch_utils import export_csv, export_json, export_xlsx, float_or_zero, int_or_none, parse_file
+from modules.context import get_tenant_filter
+from modules.db_config import _get_admin_connection, get_db_connection
 from modules.sql_dialect import cast_as_char, execute_insert
 
 load_dotenv()
@@ -98,10 +111,6 @@ def validar_gtin14(barcode):
     return True, None
 
 
-def get_tenant_filter():
-    return session.get('tenant_id')
-
-
 @materiales_bp.route('/materiales')
 def listar():
     tenant_id = get_tenant_filter()
@@ -174,7 +183,6 @@ def guardar():
     pres_pesos_brutos = request.form.getlist('pres_pesos_brutos[]')
     pres_pesos_netos = request.form.getlist('pres_pesos_netos[]')
 
-    import json
     
     barcode = d.get('codigo_barras', '')
     valido, error_msg = validar_ean(barcode)
@@ -253,46 +261,10 @@ def guardar():
             flash("Material guardado correctamente", "success")
     except Exception as e:
         conn.rollback()
-        flash(f"Error: {str(e)}", "danger")
+        flash(f"Error: {e!s}", "danger")
     finally:
         conn.close()
     return redirect(url_for('materiales.listar'))
-
-
-def _parse_csv(file):
-    content = file.read().decode('utf-8-sig')
-    reader = csv.DictReader(io.StringIO(content))
-    return [{k.strip().lower(): v for k, v in row.items()} for row in reader]
-
-
-def _parse_json(file):
-    data = json.load(file)
-    if not isinstance(data, list):
-        raise ValueError('El JSON debe ser un array de objetos')
-    return [{k.lower(): v for k, v in row.items()} for row in data]
-
-
-def _parse_xlsx(file, hoja=None):
-    wb = openpyxl.load_workbook(file, read_only=True, data_only=True)
-    if hoja:
-        if hoja not in wb.sheetnames:
-            raise ValueError(
-                f'La hoja "{hoja}" no existe en el archivo. '
-                f'Hojas disponibles: {", ".join(wb.sheetnames)}'
-            )
-        ws = wb[hoja]
-    else:
-        ws = wb.active
-    rows = list(ws.iter_rows(values_only=True))
-    if not rows:
-        return []
-    headers = [str(h).strip().lower() if h is not None else '' for h in rows[0]]
-    result = []
-    for row in rows[1:]:
-        obj = {headers[i]: (str(v).strip() if v is not None else '') for i, v in enumerate(row) if i < len(headers) and headers[i]}
-        if any(obj.values()):
-            result.append(obj)
-    return result
 
 
 @materiales_bp.route('/materiales/importar', methods=['POST'])
@@ -307,16 +279,12 @@ def importar():
 
     filename = file.filename.lower()
     try:
-        if filename.endswith('.csv'):
-            rows = _parse_csv(file)
-        elif filename.endswith('.json'):
-            rows = _parse_json(file)
-        elif filename.endswith('.xlsx'):
-            rows = _parse_xlsx(file, request.form.get('hoja'))
+        if filename.endswith(('.csv', '.json', '.xlsx')):
+            rows = parse_file(file, request.form.get('hoja'))
         else:
             return jsonify({'error': 'Formato no soportado. Use CSV, JSON o XLSX'}), 400
     except Exception as e:
-        return jsonify({'error': f'Error al leer el archivo: {str(e)}'}), 400
+        return jsonify({'error': f'Error al leer el archivo: {e!s}'}), 400
 
     insertados = 0
     omitidos = []
@@ -338,14 +306,6 @@ def importar():
                     if cursor.fetchone():
                         omitidos.append(codigo)
                         continue
-
-                    def _int_or_none(val):
-                        v = str(val).strip() if val else ''
-                        return int(float(v)) if v else None
-
-                    def _float_or_zero(val):
-                        v = str(val).strip() if val else ''
-                        return float(v) if v else 0.0
 
                     traz = str(row.get('trazabilidad', '') or '').strip().lower()
                     if traz not in ('lote', 'serie', 'ninguna'):
@@ -379,18 +339,18 @@ def importar():
                         nombre,
                         str(row.get('descripcion', '') or '').strip() or None,
                         barcode_import or None,
-                        _int_or_none(row.get('categoria_id')),
-                        _float_or_zero(row.get('stock_minimo')),
-                        _float_or_zero(row.get('stock_maximo')),
-                        _int_or_none(row.get('unidad_medida_id')),
+                        int_or_none(row.get('categoria_id')),
+                        float_or_zero(row.get('stock_minimo')),
+                        float_or_zero(row.get('stock_maximo')),
+                        int_or_none(row.get('unidad_medida_id')),
                         traz,
                         metodo_picking,
-                        _float_or_zero(row.get('peso_bruto')) or None,
-                        _float_or_zero(row.get('peso_neto')) or None,
+                        float_or_zero(row.get('peso_bruto')) or None,
+                        float_or_zero(row.get('peso_neto')) or None,
                         tenant_id,
                     ))
 
-                    id_prov_hab = _int_or_none(row.get('id_proveedor_habitual'))
+                    id_prov_hab = int_or_none(row.get('id_proveedor_habitual'))
                     if id_prov_hab:
                         cursor.execute("SELECT id FROM proveedores WHERE id = %s AND (%s IS NULL OR tenant_id = %s)", (id_prov_hab, tenant_id, tenant_id))
                         if cursor.fetchone():
@@ -448,51 +408,11 @@ def exportar(formato):
         conn.close()
 
     if formato == 'csv':
-        buf = io.StringIO()
-        writer = csv.DictWriter(buf, fieldnames=CAMPOS, extrasaction='ignore')
-        writer.writeheader()
-        for r in rows:
-            writer.writerow({k: (r[k] if r[k] is not None else '') for k in CAMPOS})
-        out = io.BytesIO(buf.getvalue().encode('utf-8-sig'))
-        return send_file(out, mimetype='text/csv', as_attachment=True,
-                         download_name='materiales.csv')
-
+        return export_csv(rows, CAMPOS, 'materiales.csv')
     elif formato == 'json':
-        data = [{k: (r[k] if r[k] is not None else '') for k in CAMPOS} for r in rows]
-        out = io.BytesIO(json.dumps(data, ensure_ascii=False, indent=2, default=str).encode('utf-8'))
-        return send_file(out, mimetype='application/json', as_attachment=True,
-                         download_name='materiales.json')
-
+        return export_json(rows, CAMPOS, 'materiales.json')
     elif formato == 'xlsx':
-        wb = openpyxl.Workbook()
-        ws = wb.active
-        ws.title = 'Materiales'
-
-        # Cabecera con estilo
-        from openpyxl.styles import Font, PatternFill, Alignment
-        header_font = Font(bold=True, color='FFFFFF')
-        header_fill = PatternFill(fill_type='solid', fgColor='2980B9')
-
-        ws.append(CAMPOS)
-        for cell in ws[1]:
-            cell.font = header_font
-            cell.fill = header_fill
-            cell.alignment = Alignment(horizontal='center')
-
-        for r in rows:
-            ws.append([(r[k] if r[k] is not None else '') for k in CAMPOS])
-
-        for col in ws.columns:
-            max_len = max((len(str(cell.value)) if cell.value else 0) for cell in col)
-            ws.column_dimensions[col[0].column_letter].width = min(max_len + 4, 40)
-
-        out = io.BytesIO()
-        wb.save(out)
-        out.seek(0)
-        return send_file(out,
-                         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                         as_attachment=True, download_name='materiales.xlsx')
-
+        return export_xlsx(rows, CAMPOS, 'materiales.xlsx')
     return 'Formato no válido', 400
 
 
@@ -546,7 +466,7 @@ def plantilla(formato):
 
     elif formato == 'json':
         data = {
-            'materiales': [dict(zip(HEADERS, EJEMPLO))],
+            'materiales': [dict(zip(HEADERS, EJEMPLO, strict=False))],
             'categorias': [{'id_categoria': c['id_categoria'], 'nombre': c['nombre']} for c in categorias],
             'unidades': [{'id': u['id_unidad'], 'nombre': u['nombre'], 'abreviatura': u['simbolo']} for u in unidades],
             'proveedores': [{'id': p['id'], 'razonsocial': p['razonsocial']} for p in proveedores]
@@ -565,10 +485,10 @@ def plantilla(formato):
         ws_mat.append(EJEMPLO)
         
         # Estilo para cabecera
-        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
         header_font = Font(bold=True, color='FFFFFF')
         header_fill = PatternFill(fill_type='solid', fgColor='2980B9')
-        thin_border = Border(left=Side(style='thin'), right=Side(style='thin'),
+        Border(left=Side(style='thin'), right=Side(style='thin'),
                             top=Side(style='thin'), bottom=Side(style='thin'))
         
         for cell in ws_mat[1]:

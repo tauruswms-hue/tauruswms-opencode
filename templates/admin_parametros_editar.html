@@ -81,6 +81,11 @@
                                 <i class="fas fa-robot me-1"></i> Inteligencia Artificial
                             </button>
                         </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-api" type="button" role="tab">
+                                <i class="fas fa-code me-1"></i> API REST
+                            </button>
+                        </li>
                     </ul>
 
                     <div class="tab-content pt-4">
@@ -200,6 +205,43 @@
                                 <div class="col-md-12 mb-3">
                                     <label class="form-label">Prompt</label>
                                     <textarea class="form-control" name="prompt" rows="4" style="resize:vertical;">{{ param.prompt or '' }}</textarea>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="tab-pane fade" id="tab-api" role="tabpanel">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Token API REST</label>
+                                    <p class="form-text">
+                                        Token Bearer por tenant para integraciones con sistemas externos
+                                        (endpoints de consulta y operaciones de stock bajo <code>/api/v1</code>).
+                                        El token se guarda con hash; solo se muestra una vez al generarlo.
+                                    </p>
+                                    <div class="d-flex align-items-center gap-3">
+                                        {% if param.api_token_activo %}
+                                            <span class="badge bg-success"><i class="fas fa-check me-1"></i>Token generado</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Sin token generado</span>
+                                        {% endif %}
+                                        <form method="POST" action="{{ url_for('admin.api_token_generar', tenant_id=tenant_id) }}">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" class="btn btn-outline-primary btn-sm"
+                                                    onclick="return confirm('¿Generar un nuevo token API? El token actual dejará de funcionar.');">
+                                                <i class="fas fa-key me-1"></i>
+                                                {% if param.api_token_activo %}Regenerar{% else %}Generar{% endif %}
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Cómo usar</label>
+                                    <pre class="bg-light border rounded p-2 small mb-0">curl -H "Authorization: Bearer &lt;TOKEN&gt;" \
+  http://localhost:5000/api/v1/materiales
+
+curl -X POST -H "Authorization: Bearer &lt;TOKEN&gt;" \
+  -H "Content-Type: application/json" \
+  -d '{"proveedor_codigo":"P001","ubicacion_recep_codigo":"UB-R","items":[{"material_codigo":"M001","cantidad":100}]}' \
+  http://localhost:5000/api/v1/recepciones</pre>
                                 </div>
                             </div>
                         </div>

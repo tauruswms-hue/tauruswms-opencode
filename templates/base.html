@@ -366,9 +366,39 @@
             padding: 8px 15px;
             font-size: 0.9rem;
         }
+        .skip-link {
+            position: absolute;
+            left: -9999px;
+            top: 0;
+            background: #1a365d;
+            color: #fff;
+            padding: 8px 14px;
+            z-index: 10000;
+            border-radius: 0 0 6px 0;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .skip-link:focus {
+            left: 0;
+        }
+        a:focus-visible,
+        button:focus-visible,
+        input:focus-visible,
+        select:focus-visible,
+        textarea:focus-visible {
+            outline: 3px solid #f6ad55;
+            outline-offset: 2px;
+        }
+        @media (max-width: 768px) {
+            .navbar-menu { gap: 6px; }
+            .navbar-link .link-text { display: none; }
+            .sidebar { width: var(--sidebar-width); }
+            .main-content { margin-left: 0; }
+        }
     </style>
 </head>
 <body>
+    <a class="skip-link" href="#contenido-principal">Saltar al contenido</a>
     {% if session.user_id %}
     <!-- Sidebar -->
     <nav class="sidebar">
@@ -406,6 +436,10 @@
                         <a href="{{ url_for('stockcontable.listar') }}" class="sidebar-link">
                             <i class="fas fa-clipboard-check"></i>
                             <span class="link-text">Stock</span>
+                        </a>
+                        <a href="{{ url_for('movil.hub') }}" class="sidebar-link">
+                            <i class="fas fa-mobile-alt"></i>
+                            <span class="link-text">Móvil</span>
                         </a>
                     </div>
                 </div>
@@ -527,6 +561,12 @@
                             <i class="fas fa-exchange-alt"></i>
                             <span class="link-text">Movimientos (OMC)</span>
                         </a>
+                        {% if tiene_permiso_ruta('/reportes') %}
+                        <a href="{{ url_for('reportes.listar') }}" class="sidebar-link">
+                            <i class="fas fa-chart-bar"></i>
+                            <span class="link-text">Reportes</span>
+                        </a>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -587,7 +627,7 @@
         {% endif %}
     </nav>
     
-    <main {% if session.user_id %}class="main-content"{% else %}class="container" style="padding-top: 20px;"{% endif %}>
+    <main id="contenido-principal" {% if session.user_id %}class="main-content"{% else %}class="container" style="padding-top: 20px;"{% endif %}>
         {% block content %}{% endblock %}
     </main>
 
@@ -630,17 +670,16 @@
     </div>
     {% endif %}
 
+    <script src="{{ url_for('static', filename='js/data_tables.js') }}"></script>
     <script>
     var collapsed = {{ session.get('sidebar_collapsed', '{}')|tojson }};
-    console.log('sidebar collapsed:', collapsed);
-    
+
     $(document).ready(function() {
         // Restaurar estado de las secciones desde la sesion
         // true = expandido, false o no existe = colapsado
         Object.keys(collapsed).forEach(function(section) {
             var $submenu = $('#section-' + section);
             var $toggle = $('.sidebar-toggle[data-section="' + section + '"]');
-            console.log('aplicando', section, '=', collapsed[section]);
             if ($submenu.length && $toggle.length) {
                 if (collapsed[section] === true) {
                     // true = expandido (visible)

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Fixtures compartidos para los tests de Taurus WMS.
 
 Se importan las apps reales (app.py / admin.py). Para tests que no tocan la
@@ -17,8 +16,8 @@ if ROOT not in sys.path:
 
 os.environ.setdefault('APP_ENV', 'development')
 
-import app as wms_app_module            # noqa: E402
-import admin as admin_app_module        # noqa: E402
+import admin as admin_app_module
+import app as wms_app_module
 
 
 # --------------------------------------------------------------------------
@@ -44,11 +43,19 @@ requires_db = pytest.mark.skipif(
 
 @pytest.fixture(autouse=True)
 def _desactivar_limiter_y_csrf():
-    """Por defecto: sin rate limiting y sin CSRF para poder testear flujos."""
-    wms_app_module.app.config['RATELIMIT_ENABLED'] = False
+    """Por defecto: sin rate limiting y sin CSRF para poder testear flujos.
+
+    flask-limiter fija `limiter.enabled` al inicializarse (init_app), así que
+    cambiar RATELIMIT_ENABLED en config después no surte efecto: se toca el
+    atributo directamente. Los tests de rate-limiting lo re-habilitan y usan
+    reset() para partir de cero.
+    """
     wms_app_module.app.config['WTF_CSRF_ENABLED'] = False
-    admin_app_module.app.config['RATELIMIT_ENABLED'] = False
     admin_app_module.app.config['WTF_CSRF_ENABLED'] = False
+    if getattr(wms_app_module.limiter, 'initialized', False):
+        wms_app_module.limiter.enabled = False
+    if getattr(admin_app_module.admin_limiter, 'initialized', False):
+        admin_app_module.admin_limiter.enabled = False
     yield
 
 

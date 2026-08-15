@@ -58,7 +58,8 @@ CREATE TABLE IF NOT EXISTS "tenants" (
     "prompt" text,
     "proveedor_api_ia" text,
     "modelo_api_ia" text,
-    "api_key" text
+    "api_key" text,
+    "api_token" TEXT
 );
 CREATE INDEX IF NOT EXISTS "idx_codigo" ON "tenants" ("codigo");
 CREATE INDEX IF NOT EXISTS "idx_activo" ON "tenants" ("activo");
@@ -159,6 +160,7 @@ INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/materi
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/materiales/eliminar/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/ubicaciones');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/ubicaciones/guardar');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/ubicaciones/eliminar/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/ubicaciones/importar');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/ubicaciones/exportar/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/ubicaciones/plantilla/*');
@@ -176,6 +178,7 @@ INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/provee
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/proveedores/plantilla/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/clientes');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/clientes/guardar');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/clientes/eliminar/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/clientes/importar');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/clientes/exportar/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/clientes/plantilla/*');
@@ -190,6 +193,7 @@ INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/unidad
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/unidades/plantilla/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/transportes');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/transportes/guardar');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/transportes/eliminar/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/transportes/importar');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/transportes/exportar/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/transportes/plantilla/*');
@@ -248,6 +252,8 @@ INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/invent
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/inventario/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/parametros');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/actualizar_parametros');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/movil');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/movil/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/sidebar-preferences');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/materiales');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/ubicaciones');
@@ -281,11 +287,8 @@ INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/parame
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/stock');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/entradas');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/salidas');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/movimientos');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/reportes');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/rentradas');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/rsalidas');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/dashboard');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/reportes/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/sidebar-preferences');
 
 
@@ -551,6 +554,28 @@ CREATE INDEX IF NOT EXISTS "idx_lote" ON "stockcontable" ("Lote");
 CREATE INDEX IF NOT EXISTS "idx_tipo_stock" ON "stockcontable" ("TipoStock");
 CREATE INDEX IF NOT EXISTS "idx_contenedor" ON "stockcontable" ("IDContenedor");
 CREATE INDEX IF NOT EXISTS "idx_stockcontable_tenant" ON "stockcontable" ("tenant_id");
+
+-- --- stock_movimientos ---;
+CREATE TABLE IF NOT EXISTS "stock_movimientos" (
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+    "tenant_id" INTEGER,
+    "fecha" TEXT NOT NULL,
+    "usuario" TEXT,
+    "accion" TEXT NOT NULL,
+    "modulo" TEXT,
+    "id_ubicacion" INTEGER,
+    "id_material" INTEGER,
+    "id_contenedor" TEXT,
+    "lote" TEXT,
+    "tipo_stock" TEXT,
+    "cantidad" REAL,
+    "detalle" TEXT
+);
+CREATE INDEX IF NOT EXISTS "idx_stockmov_tenant" ON "stock_movimientos" ("tenant_id");
+CREATE INDEX IF NOT EXISTS "idx_stockmov_fecha" ON "stock_movimientos" ("fecha");
+CREATE INDEX IF NOT EXISTS "idx_stockmov_material" ON "stock_movimientos" ("id_material");
+CREATE INDEX IF NOT EXISTS "idx_stockmov_ubicacion" ON "stock_movimientos" ("id_ubicacion");
+CREATE INDEX IF NOT EXISTS "idx_stockmov_contenedor" ON "stock_movimientos" ("id_contenedor");
 
 -- --- clases_pedido ---;
 CREATE TABLE IF NOT EXISTS "clases_pedido" (

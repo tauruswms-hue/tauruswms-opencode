@@ -255,6 +255,28 @@ CREATE INDEX IF NOT EXISTS "idx_tipo_stock" ON "stockcontable" ("TipoStock");
 CREATE INDEX IF NOT EXISTS "idx_contenedor" ON "stockcontable" ("IDContenedor");
 CREATE INDEX IF NOT EXISTS "idx_stockcontable_tenant" ON "stockcontable" ("tenant_id");
 
+-- --- stock_movimientos ---;
+CREATE TABLE IF NOT EXISTS "stock_movimientos" (
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+    "tenant_id" INTEGER,
+    "fecha" TEXT NOT NULL,
+    "usuario" TEXT,
+    "accion" TEXT NOT NULL,
+    "modulo" TEXT,
+    "id_ubicacion" INTEGER,
+    "id_material" INTEGER,
+    "id_contenedor" TEXT,
+    "lote" TEXT,
+    "tipo_stock" TEXT,
+    "cantidad" REAL,
+    "detalle" TEXT
+);
+CREATE INDEX IF NOT EXISTS "idx_stockmov_tenant" ON "stock_movimientos" ("tenant_id");
+CREATE INDEX IF NOT EXISTS "idx_stockmov_fecha" ON "stock_movimientos" ("fecha");
+CREATE INDEX IF NOT EXISTS "idx_stockmov_material" ON "stock_movimientos" ("id_material");
+CREATE INDEX IF NOT EXISTS "idx_stockmov_ubicacion" ON "stock_movimientos" ("id_ubicacion");
+CREATE INDEX IF NOT EXISTS "idx_stockmov_contenedor" ON "stock_movimientos" ("id_contenedor");
+
 -- --- clases_pedido ---;
 CREATE TABLE IF NOT EXISTS "clases_pedido" (
     "id_clase" INTEGER PRIMARY KEY AUTOINCREMENT,

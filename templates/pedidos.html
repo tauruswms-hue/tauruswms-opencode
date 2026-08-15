@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 
 {% block content %}
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
@@ -145,7 +145,6 @@
 
 {% include "partials/_modal_importar_pedidos.html" %}
 
-<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 <script src="{{ url_for('static', filename='js/batch_ui.js') }}"></script>
 
@@ -422,7 +421,7 @@
                 <td style="padding:8px 10px;"><code style="background:#f0f0f0;padding:2px 6px;border-radius:4px;">${l.material_codigo}</code></td>
                 <td style="padding:8px 10px;">${l.material_nombre}</td>
                 <td style="padding:8px 10px;">
-                    <span style="color:${tc}; font-weight:bold;">● ${l.tipo_stock}</span>
+                    <span style="color:${tc}; font-weight:bold;">â— ${l.tipo_stock}</span>
                 </td>
                 <td style="padding:8px 10px; text-align:right;">${fmt(l.cantidad_total)} ${l.unidad_nombre}</td>
                 <td style="padding:8px 10px; text-align:right;">${fmt(l.stock_disponible)}</td>
@@ -964,7 +963,7 @@ function aplicarCambioRuta() {
             const rutaNombre       = document.getElementById('crt-ruta').selectedOptions[0].text;
             const transporteNombre = document.getElementById('crt-transporte').selectedOptions[0].text;
             const continuar = confirm(
-                '⚠️ Advertencia: la combinación\n\n' +
+                'âš ï¸ Advertencia: la combinación\n\n' +
                 '   Transporte: ' + transporteNombre + '\n' +
                 '   Ruta: ' + rutaNombre + '\n\n' +
                 'no está configurada en las relaciones de transporte-ruta.\n\n' +

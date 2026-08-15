@@ -1,13 +1,21 @@
-from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for, flash
 import datetime
+
+from flask import (
+    Blueprint,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
+)
+
+from modules.context import get_tenant_filter
 from modules.db_config import get_db_connection
-from modules.sql_dialect import execute_insert, limit_sql, in_clause_sql
+from modules.sql_dialect import execute_insert, in_clause_sql, limit_sql
 
 inventario_bp = Blueprint('inventario', __name__)
-
-
-def get_tenant_filter():
-    return session.get('tenant_id')
 
 
 def _siguiente_numero(cursor, tenant_id):
@@ -17,10 +25,7 @@ def _siguiente_numero(cursor, tenant_id):
         (f'INV-{anio}-%', tenant_id, tenant_id)
     )
     row = cursor.fetchone()
-    if row:
-        ultimo = int(row['numero'].split('-')[-1])
-    else:
-        ultimo = 0
+    ultimo = int(row['numero'].split('-')[-1]) if row else 0
     return f'INV-{anio}-{ultimo + 1:05d}'
 
 
@@ -108,7 +113,7 @@ def crear():
                 FROM stockcontable sc
                 WHERE 1=1 AND (%s IS NULL OR sc.tenant_id = %s) {where_extra}
                 ORDER BY sc.Ubicacion, sc.Material, sc.IDContenedor
-            """, (tenant_id, tenant_id) + tuple(params))
+            """, (tenant_id, tenant_id, *tuple(params)))
             posiciones = cursor.fetchall()
 
             if not posiciones:
@@ -135,7 +140,7 @@ def crear():
         return redirect(url_for('inventario.detalle', id_inventario=id_inventario))
     except Exception as e:
         conn.rollback()
-        flash(f'Error al crear inventario: {str(e)}', 'danger')
+        flash(f'Error al crear inventario: {e!s}', 'danger')
         return redirect(url_for('inventario.listar'))
     finally:
         conn.close()
@@ -267,7 +272,7 @@ def anular(id_inventario):
         flash('Inventario anulado.', 'warning')
     except Exception as e:
         conn.rollback()
-        flash(f'Error al anular inventario: {str(e)}', 'danger')
+        flash(f'Error al anular inventario: {e!s}', 'danger')
     finally:
         conn.close()
     return redirect(url_for('inventario.detalle', id_inventario=id_inventario))
@@ -300,7 +305,7 @@ def cerrar(id_inventario):
         flash('Inventario cerrado correctamente.', 'success')
     except Exception as e:
         conn.rollback()
-        flash(f'Error al cerrar inventario: {str(e)}', 'danger')
+        flash(f'Error al cerrar inventario: {e!s}', 'danger')
     finally:
         conn.close()
     return redirect(url_for('inventario.detalle', id_inventario=id_inventario))

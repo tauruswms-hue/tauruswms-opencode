@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}{{ codigo }} - Error{% endblock %}
+{% block content %}
+<style>
+.error-page {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    min-height: 60vh;
+    padding: 40px 20px;
+}
+.error-page .error-code {
+    font-size: 6rem;
+    font-weight: 800;
+    color: #1a365d;
+    line-height: 1;
+    margin: 0;
+}
+.error-page .error-title {
+    font-size: 1.5rem;
+    color: #2d3748;
+    margin: 16px 0 8px;
+    font-weight: 700;
+}
+.error-page .error-detail {
+    color: #718096;
+    max-width: 480px;
+    margin: 0 0 24px;
+}
+.error-page .error-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+.error-page .btn-back {
+    background: #1a365d;
+    color: #fff;
+    padding: 10px 22px;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+}
+.error-page .btn-back:hover { background: #2c5282; }
+</style>
+<div class="error-page">
+    <p class="error-code">{{ codigo }}</p>
+    <h1 class="error-title">{{ mensaje }}</h1>
+    <p class="error-detail">{{ detalle }}</p>
+    <div class="error-actions">
+        <a href="{{ url_for('index') }}" class="btn-back">
+            <i class="fas fa-home"></i> Volver al inicio
+        </a>
+    </div>
+</div>
+{% endblock %}

@@ -256,6 +256,28 @@ CREATE INDEX `idx_tipo_stock` ON `stockcontable` (`TipoStock`);
 CREATE INDEX `idx_contenedor` ON `stockcontable` (`IDContenedor`);
 CREATE INDEX `idx_stockcontable_tenant` ON `stockcontable` (`tenant_id`);
 
+-- --- stock_movimientos ---;
+CREATE TABLE `stock_movimientos` (
+    `id` bigint AUTO_INCREMENT PRIMARY KEY,
+    `tenant_id` int,
+    `fecha` datetime NOT NULL,
+    `usuario` varchar(100),
+    `accion` varchar(60) NOT NULL,
+    `modulo` varchar(50),
+    `id_ubicacion` int,
+    `id_material` int,
+    `id_contenedor` varchar(10),
+    `lote` varchar(100),
+    `tipo_stock` varchar(50),
+    `cantidad` decimal(15,4),
+    `detalle` varchar(500)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE INDEX `idx_stockmov_tenant` ON `stock_movimientos` (`tenant_id`);
+CREATE INDEX `idx_stockmov_fecha` ON `stock_movimientos` (`fecha`);
+CREATE INDEX `idx_stockmov_material` ON `stock_movimientos` (`id_material`);
+CREATE INDEX `idx_stockmov_ubicacion` ON `stock_movimientos` (`id_ubicacion`);
+CREATE INDEX `idx_stockmov_contenedor` ON `stock_movimientos` (`id_contenedor`);
+
 -- --- clases_pedido ---;
 CREATE TABLE `clases_pedido` (
     `id_clase` int AUTO_INCREMENT PRIMARY KEY,

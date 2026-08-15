@@ -1,13 +1,20 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session
 from datetime import datetime
+
+from flask import (
+    Blueprint,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
+
+from modules.context import get_tenant_filter
 from modules.db_config import get_db_connection
 from modules.sql_dialect import in_clause_sql
 
 despacho_bp = Blueprint('despacho', __name__)
-
-
-def get_tenant_filter():
-    return session.get('tenant_id')
 
 
 @despacho_bp.route('/despacho')
@@ -54,7 +61,7 @@ def despachar(id_pedido):
             flash(f"Pedido {p['nro_pedido']} despachado.", "success")
     except Exception as e:
         conn.rollback()
-        flash(f"Error: {str(e)}", "danger")
+        flash(f"Error: {e!s}", "danger")
     finally:
         conn.close()
     return redirect(url_for('despacho.listar'))
@@ -74,7 +81,7 @@ def despachar_masivo():
             cursor.execute(
                 f"UPDATE pedidos_cabecera SET estado = 'Despachado', fecha_despacho = %s "
                 f"WHERE id_pedido IN ({ph}) AND estado = 'Preparado' AND (%s IS NULL OR tenant_id = %s)",
-                tuple([datetime.now()] + list(ids) + [tenant_id, tenant_id])
+                (datetime.now(), *list(ids), tenant_id, tenant_id)
             )
             conn.commit()
             return jsonify({"status": "success", "message": f"{cursor.rowcount} pedido(s) despachado(s)."})

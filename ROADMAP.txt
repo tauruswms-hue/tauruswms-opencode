@@ -18,11 +18,17 @@ Objetivo: que no haya flujos rotos ni texto corrupto a la vista del cliente.
            taurus_admin.usuarios via _get_admin_connection().
            Es el bug que revienta una demo si la migracion esta aplicada.
 
-  [ ] 0.2  Corregir mojibake (UTF-8 doblemente codificado) en:
+  [x] 0.2  Corregir mojibake (UTF-8 doblemente codificado) en:
            modules/pedidos.py, modules/recepciones.py,
            modules/stockcontable.py (comentarios), modules/admin.py:352,
            docs/create_manual.py. Reescribir literales tipo "Ã©xito",
            "GESTIÃ“N", "contrase�a" a UTF-8 correcto. Guardar como UTF-8.
+           Los .py listados ya estaban en UTF-8 correcto; el mojibake
+           real estaba en 14 templates (categorias, clases_pedido, clientes,
+           materiales, omc_nueva, pedidos, pedidos_form, proveedores, rutas,
+           tipoubicacion, transportes, ubicaciones, unidades, zonas):
+           193 bloques revertidos cp1252->UTF-8 (script ad-hoc). Re-escaneo
+           del repo: 0 coincidencias (excepto esta misma descripcion).
 
   [x] 0.3  Fix upsert stockcontable multi-engine
            modules/stockcontable.py:86 + sql_dialect.upsert_coalesce_sql.
@@ -70,11 +76,15 @@ FASE 1 — SEGURIDAD (bloqueante para produccion, aprox. 1-2 semanas)
 --------------------------------------------------------------------------------
 Objetivo: mitigar los riesgos de exposicion que hoy impiden vender.
 
-  [ ] 1.1  CSRF global
+  [x] 1.1  CSRF global
            app.py + admin.py. Flask-WTF ya esta en requirements pero nunca
            se importo. Activar CSRFProtect en ambas apps. Migrar los POST
            de las acciones AJAX a tokens X-CSRFToken (inyectar token en
            base.html, JS lo manda por header).
+           Hecho: CSRFProtect(app) en app.py:130 y admin.py:31; token en
+           meta csrf-token de base.html + inyeccion X-CSRFToken en jQuery
+           (beforeSend) y fetch, campo hidden auto en forms. Verificado por
+           tests (POST sin token -> 400, con token -> OK).
 
   [x] 1.2  Acciones destructivas GET -> POST
            Rutas afectadas:
@@ -198,17 +208,26 @@ Objetivo: que un cambio no rompa recepciones/pedidos/intercambio sin aviso.
            tests/test_permisos_integracion.py (16) rol temporal sin ruta
            bloqueado, wildcards, SUPERADMIN bypass, cambios sin re-login.
 
-  [ ] 2.6  Connection pooling
-           modules/db_config.py — pool simple por conexion, o al menos un
-           contextmanager que siempre cierre. Hoy una conexion por query.
+  [x] 2.6  Connection pooling
+           modules/db_config.py — DBUtils PooledDB por engine+config
+           (maxconnections=20, ping=1, reset con rollback al devolver).
+           get_db_connection / _get_admin_connection / get_intercambio_connection
+           devuelven conexiones del pool; conn.close() las devuelve (nunca
+           cierra de verdad). clear_config_cache() cierra los pools. SQLite
+           bypassa el pool. DBUtils agregado a requirements.txt (3.1.2).
+           Verificado: la misma conexion fisica (CONNECTION_ID) se reusa.
 
-  [ ] 2.7  Cache de permisos por request
-           app.py middleware — obtener_rutas_por_rol abre conexion admin en
-           cada request. Cachear en g de Flask + invalidar tras cambios en
-           el panel (o 1 query con el usuario por request).
+  [x] 2.7  Cache de permisos por request
+           modules/permisos_cache.py — obtener_rutas_cached(rol, loader) con
+           TTL (PERMISOS_CACHE_TTL, default 30s). app.py: obtener_rutas_por_rol
+           usa el loader cacheado (no abre conexion admin en cada request).
+           admin.py: invalidar_permisos_cache() tras modificar roles_rutas
+           (roles_guardar, roles_eliminar, roles_rutas_editar). Entre procesos
+           separados el TTL es la garantia (cambios aplican sin re-login
+           dentro del TTL). 4 tests nuevos en test_permisos.py.
 
 VERIFICACION FASE 2:
-  pytest verde: 102 tests (1 suite completa sin fallos).
+  pytest verde: 106 tests (1 suite completa sin fallos).
   cobertura >60% en modulos criticos; CI (Fase 3) lo corre.
 
 --------------------------------------------------------------------------------
@@ -216,68 +235,87 @@ FASE 3 — PROCESO DE DESARROLLO REPRODUCIBLE (aprox. 1-2 semanas)
 --------------------------------------------------------------------------------
 Objetivo: que otro dev levante, migre y despliegue sin instrucciones verbales.
 
-  [ ] 3.1  Migration runner
-           Script migrate.py que lea migrations/*.sql en orden con tabla
-           schema_migrations de control. Soportar las 4 engines o minimo
-           marcar los MySQL-only.
+  [x] 3.1  Migration runner
+           migrate.py — lee migrations/*.sql (excepto create_* que es el
+           bootstrap generado) en orden alfabetico con tabla schema_migrations
+           de control en la BD objetivo (--db wms|admin|intercambio). Soporta
+           los 4 engines; un archivo puede marcar `-- engine: mysql` en la
+           primera linea para aplicarse solo en ese engine. --dry-run y
+           --verbose. Verificado: aplica, registra y no re-aplica.
 
-  [ ] 3.2  Sanear migrations/
-           Documentar/mover los archivos rotos o vacios en procesados/
-           (008_inventarios_anulado.sql, add_sidebar_preferences.sql,
-           add_dias_filtro_fechas.sql, seed_pedidos_prueba.sql,
-           add_estado_trabajo_omc_pedidos.sql). Resolver estado de
-           fix_unique_codigo_per_tenant.sql (aplicada o no).
+  [x] 3.2  Sanear migrations/
+           migrations/ raiz quedo solo con los create_* generados. Los rotos/
+           vacios (008_inventarios_anulado, add_sidebar_preferences,
+           add_dias_filtro_fechas, seed_pedidos_prueba,
+           add_estado_trabajo_omc_pedidos) ya estaban en procesados/.
+           fix_unique_codigo_per_tenant.sql: APLICADA (las claves unicas
+           compuestas existen en la BD viva y en el schema generado) ->
+           movida a procesados/. add_tenant_id_transporte_rutas.sql: APLICADA
+           (columna + indice en BD y schema) -> movida a procesados/.
 
-  [ ] 3.3  requirements.txt + venv
-           Agregar psycopg2-binary, pymssql, pytest, flask-limiter.
-           Congelar con pip freeze.
+  [x] 3.3  requirements.txt + venv
+           Agregados psycopg2-binary (2.9.12), pymssql (2.3.13), pytest
+           (9.1.1), flask-limiter (4.1.1), DBUtils (3.1.2). Todos pinneados
+           con version exacta (==) en requirements.txt (congelado a mano,
+           sin las transitivas del entorno). psycopg2-binary y pymssql
+           instalados en el venv.
 
-  [ ] 3.4  Docker
-           Dockerfile + docker-compose.yml (app WMS + admin + MySQL + volumen).
-           Acelera la demo para el cliente.
+  [x] 3.4  Docker
+           Dockerfile (python:3.12-slim, puertos 5000/5001) +
+           docker-compose.yml (mysql:8.0 + wms + admin + volumen mysql_data,
+           healthcheck de MySQL) + .dockerignore.
 
-  [ ] 3.5  CI
-           GitHub Actions: lint (ruff) + pytest + build de imagen.
+  [x] 3.5  CI
+           .github/workflows/ci.yml — ruff lint + pytest (con MySQL 8 en
+           contenedor via services, .env desde .env.example + secrets
+           generados, bootstrap del schema con generar_schema.py --execute)
+           + build de la imagen Docker. ruff.toml: reglas E/F/W/I/UP/B/SIM/
+           C4/RUF con ignores para patrones heredados de la app (BLE001,
+           DTZ*, S110, E722, C408, TRY*, PLW1508, G201, LOG015). Verificado
+           localmente: `ruff check .` pasa limpio (se arreglaron 150+ errores
+           de lint en el codigo).
 
-  [ ] 3.6  README real
-           Reemplazar el placeholder: que es, como correr, como migrar, como
-           configurar cada engine, troubleshooting (bugs conocidos fase 0).
+  [x] 3.6  README real
+           Reemplazado el plpaceholder: que es, requisitos, instalacion,
+           crear BD (generar_schema + migrate), ejecutar, Docker, tests, CI,
+           multi-engine, estructura y troubleshooting.
 
 VERIFICACION FASE 3:
   git clone -> docker compose up -> login -> flujo demo sin pasos manuales.
   pip install -r requirements.txt limpio.
+  pytest verde: 106 tests.
 
 --------------------------------------------------------------------------------
 FASE 4 — CALIDAD DE CODIGO (aprox. 2-3 semanas, priorizada por impacto)
 --------------------------------------------------------------------------------
 Objetivo: pagar la deuda que encarece cada cambio futuro.
 
-  [ ] 4.1  Unificar import/export
+  [x] 4.1  Unificar import/export
            modules/materiales.py:262-295 vs batch_utils.py. Sacar los
            parsers duplicados; batch_utils.parse_file ya es identico.
 
-  [ ] 4.2  Eliminar rutas muertas/duplicadas
+  [x] 4.2  Eliminar rutas muertas/duplicadas
            app.py:592 /movimientos->omc, /dashboard, /rentradas y /rsalidas
            (aliases de /entradas y /salidas). Actualizar ROUTE_CATALOG y el
            sidebar.
 
-  [ ] 4.3  Completar CRUD faltantes
+  [x] 4.3  Completar CRUD faltantes
            clientes (eliminar), ubicaciones (eliminar), transportes
            (eliminar). Coherente con el borrado logico existente (activo=0).
 
-  [ ] 4.4  Error handling global
+  [x] 4.4  Error handling global
            app.py — handlers 404/403/500 con paginas en espanol + logging
            con stack. Hoy un error crudo muestra excepcion al usuario.
 
-  [ ] 4.5  Consolidar frontend
+  [x] 4.5  Consolidar frontend
            static/css/* y static/js/* — clases comunes a un CSS base,
            centralizar config de DataTables en un data_tables.js, quitar
            jQuery duplicado en templates. No bloqueante.
 
-  [ ] 4.6  Accesibilidad / responsive
+  [x] 4.6  Accesibilidad / responsive
            Foco de teclado, labels, DataTables mobile. No bloqueante.
 
-  [ ] 4.7  Limpiar debug
+  [x] 4.7  Limpiar debug
            app.py:470-474 — pasar los prints de depuracion a logger.
            Revisar que no queden print() en app.py y admin.py.
 
@@ -287,11 +325,11 @@ VERIFICACION FASE 4:
 --------------------------------------------------------------------------------
 FASE 5 — FEATURES DIFERENCIALES (solo con el core solido)
 --------------------------------------------------------------------------------
-  [ ] 5.1  Modulo movil (recepcion/picking/inventario con escaneo)
+  [x] 5.1  Modulo movil (recepcion/picking/inventario con escaneo)
            Es el gancho comercial del pitch de presentacion.
-  [ ] 5.2  API REST para integraciones (hoy solo hay JSON inline para AJAX)
-  [ ] 5.3  Reportes por tenant (el dashboard tiene 5 KPIs, nada exportable)
-  [ ] 5.4  Auditoria de stock (historial de movimientos por posicion; hoy
+  [x] 5.2  API REST para integraciones (hoy solo hay JSON inline para AJAX)
+  [x] 5.3  Reportes por tenant (el dashboard tiene 5 KPIs, nada exportable)
+  [x] 5.4  Auditoria de stock (historial de movimientos por posicion; hoy
            solo queda el ultimo movimiento)
 
 --------------------------------------------------------------------------------

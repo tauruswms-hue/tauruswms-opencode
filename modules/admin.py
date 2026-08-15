@@ -1,22 +1,32 @@
-from flask import Blueprint, render_template, session, redirect, url_for, request, flash
+import base64
+import datetime
+import hashlib
+import json
+import logging
+import os
+import secrets
+
+from dotenv import load_dotenv
+from flask import Blueprint, flash, redirect, render_template, request, session, url_for
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash, generate_password_hash
-import os
-import datetime
-import json
-import base64
-import hashlib
-import logging
-from dotenv import load_dotenv
-from modules.db_config import _get_admin_connection, get_intercambio_connection, clear_config_cache
-from modules.sql_dialect import date as date_func, is_duplicate_key_error, execute_insert, limit_sql
-from modules.schema_generator import ROUTE_CATALOG
+
+from modules.api import _hash_token
+from modules.db_config import (
+    _get_admin_connection,
+    clear_config_cache,
+    get_intercambio_connection,
+)
 from modules.intercambio import (
+    MODULOS,
     procesar_intercambio,
     reintentar_todo,
-    MODULOS,
 )
+from modules.permisos_cache import invalidar_permisos_cache
+from modules.schema_generator import ROUTE_CATALOG
+from modules.sql_dialect import date as date_func
+from modules.sql_dialect import execute_insert, is_duplicate_key_error, limit_sql
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -61,6 +71,23 @@ def encode_codigo(codigo):
 def decode_codigo(encoded_codigo):
     """Retorna el código encriptado tal cual (para display)"""
     return encoded_codigo
+
+
+@admin_bp.app_template_filter('datetime')
+def format_datetime(value):
+    if value is None:
+        return '-'
+    if isinstance(value, str):
+        try:
+            value = datetime.datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
+        except ValueError:
+            return value
+    return value.strftime('%d/%m/%Y %H:%M')
+
+
+@admin_bp.app_template_filter('encode_id')
+def encode_id_filter(tenant_id):
+    return encode_id(tenant_id)
 
 
 
@@ -149,7 +176,7 @@ def login():
                 log_audit('LOGIN_FAILED', 'auth', {'username': username})
                 
         except Exception as e:
-            flash(f'Error de conexión: {str(e)}', 'error')
+            flash(f'Error de conexión: {e!s}', 'error')
     
     return render_template('admin_login.html')
 
@@ -267,7 +294,7 @@ def tenants_guardar():
         cursor.close()
     except Exception as e:
         conn.rollback()
-        flash(f'Error: {str(e)}', 'danger')
+        flash(f'Error: {e!s}', 'danger')
         log_audit('ERROR', 'tenants', {'error': str(e)})
     finally:
         conn.close()
@@ -380,7 +407,7 @@ def usuarios_guardar():
         if is_duplicate_key_error(e):
             flash('El nombre de usuario ya existe. Elija otro.', 'danger')
         else:
-            flash(f'Error: {str(e)}', 'danger')
+            flash(f'Error: {e!s}', 'danger')
         log_audit('ERROR', 'usuarios', {'error': str(e)})
     finally:
         conn.close()
@@ -411,7 +438,7 @@ def usuarios_eliminar(usuario_id, encoded_tenant_id):
             flash('Usuario no encontrado.', 'warning')
     except Exception as e:
         conn.rollback()
-        flash(f'Error: {str(e)}', 'danger')
+        flash(f'Error: {e!s}', 'danger')
         log_audit('ERROR', 'usuarios', {'error': str(e)})
     finally:
         conn.close()
@@ -442,7 +469,7 @@ def usuarios_activar(usuario_id, encoded_tenant_id):
             flash('Usuario no encontrado.', 'warning')
     except Exception as e:
         conn.rollback()
-        flash(f'Error: {str(e)}', 'danger')
+        flash(f'Error: {e!s}', 'danger')
         log_audit('ERROR', 'usuarios', {'error': str(e)})
     finally:
         conn.close()
@@ -546,6 +573,7 @@ def roles_guardar():
             if anterior and anterior['nombre'] != nombre:
                 cursor.execute("UPDATE roles_rutas SET rol = %s WHERE rol = %s", (nombre, anterior['nombre']))
                 cursor.execute("UPDATE usuarios SET rol = %s WHERE rol = %s", (nombre, anterior['nombre']))
+            invalidar_permisos_cache()
             msg = 'Rol actualizado correctamente'
             log_audit('UPDATE', 'roles', {'id': rol_id, 'nombre': nombre})
         else:
@@ -563,7 +591,7 @@ def roles_guardar():
         if is_duplicate_key_error(e):
             flash('Ya existe un rol con ese nombre', 'danger')
         else:
-            flash(f'Error: {str(e)}', 'danger')
+            flash(f'Error: {e!s}', 'danger')
         log_audit('ERROR', 'roles', {'error': str(e)})
     finally:
         conn.close()
@@ -596,6 +624,7 @@ def roles_eliminar(rol_id):
 
         cursor.execute("UPDATE roles SET activo = FALSE WHERE id = %s", (rol_id,))
         conn.commit()
+        invalidar_permisos_cache()
         flash('Rol desactivado.', 'success')
         log_audit('DELETE', 'roles', {'id': rol_id, 'nombre': rol['nombre']})
         cursor.close()
@@ -652,6 +681,7 @@ def roles_rutas_editar(rol):
                 for ruta in nuevas:
                     cursor.execute("INSERT INTO roles_rutas (rol, ruta) VALUES (%s, %s)", (rol, ruta))
             conn.commit()
+            invalidar_permisos_cache()
             flash('Rutas asignadas correctamente', 'success')
             log_audit('UPDATE', 'roles_rutas', {'rol': rol, 'rutas': nuevas})
             cursor.close()
@@ -832,7 +862,7 @@ def configuracion_guardar():
             flash('La clave ya existe. Elija otra.', 'danger')
             log_audit('ERROR', 'configuracion', {'error': 'clave duplicada'})
         else:
-            flash(f'Error: {str(e)}', 'danger')
+            flash(f'Error: {e!s}', 'danger')
             log_audit('ERROR', 'configuracion', {'error': str(e)})
     finally:
         conn.close()
@@ -863,7 +893,7 @@ def configuracion_eliminar(config_id):
             flash('Configuración no encontrada.', 'warning')
     except Exception as e:
         conn.rollback()
-        flash(f'Error: {str(e)}', 'danger')
+        flash(f'Error: {e!s}', 'danger')
         log_audit('ERROR', 'configuracion', {'error': str(e)})
     finally:
         conn.close()
@@ -959,7 +989,7 @@ def intercambio_procesar():
         log_audit('PROCESS', 'intercambio',
                   {'procesados': resultado['procesados'], 'errores': resultado['errores']})
     except Exception as e:
-        flash(f"Error al procesar el intercambio: {str(e)}", 'danger')
+        flash(f"Error al procesar el intercambio: {e!s}", 'danger')
         log_audit('ERROR', 'intercambio', {'error': str(e)})
     return redirect(url_for('admin.intercambio'))
 
@@ -976,7 +1006,7 @@ def intercambio_reintentar():
         flash(f"{n} registro(s) en error devuelto(s) a pendiente.", 'info')
         log_audit('UPDATE', 'intercambio', {'reintentados': n})
     except Exception as e:
-        flash(f"Error: {str(e)}", 'danger')
+        flash(f"Error: {e!s}", 'danger')
         log_audit('ERROR', 'intercambio', {'error': str(e)})
     return redirect(url_for('admin.intercambio'))
 
@@ -999,7 +1029,7 @@ def parametros_editar(tenant_id):
             SELECT id, nombre, razon_social, cuit, direccion, telefono, email,
                    nombredelalmacen, metodosdepicking, metodo_picking_default,
                    bajostock, dias_filtro_fechas, proveedor_api_ia, api_key, modelo_api_ia,
-                   contexto, prompt
+                   contexto, prompt, api_token
             FROM tenants WHERE id = %s
         """, (tenant_id,))
         tenant_actual = cursor_admin.fetchone()
@@ -1079,6 +1109,7 @@ def parametros_editar(tenant_id):
                 'modelo_api_ia': tenant_actual.get('modelo_api_ia') or '',
                 'contexto': tenant_actual.get('contexto') or '',
                 'prompt': tenant_actual.get('prompt') or '',
+                'api_token_activo': bool(tenant_actual.get('api_token')),
             }
             log_audit('ACCESS', 'parametros', {'tenant_id': tenant_id})
             return render_template('admin_parametros_editar.html', param=param, tenants=tenants_list, tenant_id=tenant_id)
@@ -1087,3 +1118,36 @@ def parametros_editar(tenant_id):
             return redirect(url_for('admin.tenants'))
     finally:
         conn_admin.close()
+
+
+@admin_bp.route('/parametros/<int:tenant_id>/api-token', methods=['POST'])
+@admin_required
+def api_token_generar(tenant_id):
+    if session.get('admin_rol') != 'SUPERADMIN':
+        flash('Solo SUPERADMIN puede gestionar tokens de API', 'danger')
+        return redirect(url_for('admin.tenants'))
+
+    token = secrets.token_urlsafe(32)
+    conn_admin = _get_admin_connection()
+    try:
+        cursor_admin = conn_admin.cursor()
+        cursor_admin.execute(
+            "UPDATE tenants SET api_token = %s WHERE id = %s",
+            (_hash_token(token), tenant_id)
+        )
+        conn_admin.commit()
+        log_audit('UPDATE', 'api_token', {'tenant_id': tenant_id})
+    except Exception as e:
+        conn_admin.rollback()
+        flash(f"Error al generar el token: {e!s}", 'danger')
+        return redirect(url_for('admin.parametros_editar', tenant_id=tenant_id))
+    finally:
+        conn_admin.close()
+
+    flash(
+        "Token API generado. Copialo ahora: ya no se volverá a mostrar. "
+        "Usalo como `Authorization: Bearer <token>` contra /api/v1/. "
+        f"<strong>{token}</strong>",
+        'info'
+    )
+    return redirect(url_for('admin.parametros_editar', tenant_id=tenant_id))

@@ -258,6 +258,28 @@ CREATE INDEX [idx_tipo_stock] ON [stockcontable] ([TipoStock]);
 CREATE INDEX [idx_contenedor] ON [stockcontable] ([IDContenedor]);
 CREATE INDEX [idx_stockcontable_tenant] ON [stockcontable] ([tenant_id]);
 
+-- --- stock_movimientos ---;
+CREATE TABLE [stock_movimientos] (
+    [id] BIGINT IDENTITY(1,1) PRIMARY KEY,
+    [tenant_id] INT,
+    [fecha] DATETIME2 NOT NULL,
+    [usuario] NVARCHAR(100),
+    [accion] NVARCHAR(60) NOT NULL,
+    [modulo] NVARCHAR(50),
+    [id_ubicacion] INT,
+    [id_material] INT,
+    [id_contenedor] NVARCHAR(10),
+    [lote] NVARCHAR(100),
+    [tipo_stock] NVARCHAR(50),
+    [cantidad] decimal(15,4),
+    [detalle] NVARCHAR(500)
+);
+CREATE INDEX [idx_stockmov_tenant] ON [stock_movimientos] ([tenant_id]);
+CREATE INDEX [idx_stockmov_fecha] ON [stock_movimientos] ([fecha]);
+CREATE INDEX [idx_stockmov_material] ON [stock_movimientos] ([id_material]);
+CREATE INDEX [idx_stockmov_ubicacion] ON [stock_movimientos] ([id_ubicacion]);
+CREATE INDEX [idx_stockmov_contenedor] ON [stock_movimientos] ([id_contenedor]);
+
 -- --- clases_pedido ---;
 CREATE TABLE [clases_pedido] (
     [id_clase] INT IDENTITY(1,1) PRIMARY KEY,

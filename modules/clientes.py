@@ -1,14 +1,27 @@
-﻿from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, send_file, session
-from modules.batch_utils import (parse_file, export_csv, export_json, export_xlsx,
-                                  plantilla_csv, plantilla_json, plantilla_xlsx,
-                                  bool_col)
+﻿from flask import (
+    Blueprint,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
+
+from modules.batch_utils import (
+    bool_col,
+    export_csv,
+    export_json,
+    export_xlsx,
+    parse_file,
+    plantilla_csv,
+    plantilla_json,
+    plantilla_xlsx,
+)
+from modules.context import get_tenant_filter
 from modules.db_config import get_db_connection
 
 clientes_bp = Blueprint('clientes', __name__)
-
-
-def get_tenant_filter():
-    return session.get('tenant_id')
 
 
 @clientes_bp.route('/clientes')
@@ -77,19 +90,38 @@ def guardar():
                          email=%s, contacto_nombre=%s, id_ruta=%s, 
                          id_transporte_predeterminado=%s, activo=%s 
                          WHERE id_cliente=%s AND (%s IS NULL OR tenant_id = %s)"""
-                cursor.execute(sql, params + (c_id, tenant_id, tenant_id))
+                cursor.execute(sql, (*params, c_id, tenant_id, tenant_id))
             else:
                 sql = """INSERT INTO clientes (codigo, razonsocial, cuit, direccion, 
                          localidad, provincia, telefono, email, contacto_nombre, 
                          id_ruta, id_transporte_predeterminado, activo, tenant_id) 
                          VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
-                cursor.execute(sql, params + (tenant_id,))
+                cursor.execute(sql, (*params, tenant_id))
 
             conn.commit()
             flash("Cliente guardado correctamente", "success")
     except Exception as e:
         conn.rollback()
-        flash(f"Error: {str(e)}", "danger")
+        flash(f"Error: {e!s}", "danger")
+    finally:
+        conn.close()
+    return redirect(url_for('clientes.listar'))
+
+
+@clientes_bp.route('/clientes/eliminar/<int:id_cliente>', methods=['POST'])
+def eliminar(id_cliente):
+    tenant_id = get_tenant_filter()
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "UPDATE clientes SET activo = 0 WHERE id_cliente = %s AND (%s IS NULL OR tenant_id = %s)",
+                (id_cliente, tenant_id, tenant_id))
+            conn.commit()
+            flash("Cliente inactivado", "success")
+    except Exception as e:
+        conn.rollback()
+        flash(f"Error: {e!s}", "danger")
     finally:
         conn.close()
     return redirect(url_for('clientes.listar'))
@@ -142,7 +174,7 @@ def importar():
     try:
         rows = parse_file(file, request.form.get('hoja'))
     except Exception as e:
-        return jsonify({'error': f'Error al leer el archivo: {str(e)}'}), 400
+        return jsonify({'error': f'Error al leer el archivo: {e!s}'}), 400
 
     insertados, actualizados, omitidos, errores = 0, 0, [], []
     conn = get_db_connection()

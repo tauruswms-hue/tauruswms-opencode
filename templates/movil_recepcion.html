@@ -1,0 +1,51 @@
+{% extends 'movil_base.html' %}
+{% block title %}Recepción{% endblock %}
+{% block header %}Recepción{% endblock %}
+{% block content %}
+<div class="movil-card">
+    <div class="movil-titulo">Nueva recepción</div>
+    <form method="POST" action="{{ url_for('movil.recepcion_guardar') }}">
+        <label class="movil-label" for="id_proveedor">Proveedor</label>
+        <select id="id_proveedor" name="id_proveedor" class="movil-select" required>
+            <option value="">Seleccione...</option>
+            {% for p in proveedores %}
+            <option value="{{ p.id }}">{{ p.codigo }} - {{ p.razonsocial }}</option>
+            {% endfor %}
+        </select>
+        <label class="movil-label" for="id_ubicacion_recep">Ubicación de recepción</label>
+        <select id="id_ubicacion_recep" name="id_ubicacion_recep" class="movil-select" required>
+            <option value="">Seleccione...</option>
+            {% for u in ubicaciones %}
+            <option value="{{ u.id }}">{{ u.codigo }} - {{ u.nombre }}</option>
+            {% endfor %}
+        </select>
+        <label class="movil-label" for="observaciones">Observaciones (opcional)</label>
+        <input id="observaciones" name="observaciones" class="movil-input" placeholder="Nota de la recepción">
+        <button type="submit" class="movil-btn movil-btn-primary">
+            <i class="fas fa-plus"></i> Crear recepción
+        </button>
+    </form>
+</div>
+
+<div class="movil-card">
+    <div class="movil-titulo">Recepciones recientes</div>
+    {% if recepciones %}
+    <ul class="movil-lista">
+        {% for r in recepciones %}
+        <li>
+            <a href="{{ url_for('movil.recepcion_detalle', id_recepcion=r.id_recepcion) }}" style="text-decoration:none; color:inherit;">
+                <div class="movil-row">
+                    <span class="movil-titulo">{{ r.numero }}</span>
+                    <span class="movil-badge badge-{{ r.estado|lower }}">{{ r.estado }}</span>
+                </div>
+                <div class="movil-sub">{{ r.proveedor_nombre }}</div>
+                <div class="movil-sub">Contenedor {{ r.id_contenedor }} · {{ r.total_unidades|int }} uds</div>
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <div class="movil-empty">Sin recepciones registradas.</div>
+    {% endif %}
+</div>
+{% endblock %}

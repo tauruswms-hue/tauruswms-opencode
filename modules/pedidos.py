@@ -1,18 +1,44 @@
-﻿from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session, current_app, Response
-from datetime import datetime, date
-from decimal import Decimal
-from collections import defaultdict, OrderedDict
+﻿import json
 import os
-import json
-from modules.batch_utils import parse_file, float_or_zero, plantilla_csv, plantilla_json, plantilla_xlsx
-from modules.db_config import get_db_connection, _get_admin_connection
-from modules.sql_dialect import upsert_incremental_sql, cast_as_int, substring_index, year as year_func, quote, execute_insert, limit_sql, in_clause_sql
+from collections import OrderedDict, defaultdict
+from datetime import date, datetime
+from decimal import Decimal
+
+from flask import (
+    Blueprint,
+    Response,
+    current_app,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
+)
+
+from modules.auditoria import registrar_movimiento
+from modules.batch_utils import (
+    float_or_zero,
+    parse_file,
+    plantilla_csv,
+    plantilla_json,
+    plantilla_xlsx,
+)
+from modules.context import get_tenant_filter
+from modules.db_config import _get_admin_connection, get_db_connection
+from modules.sql_dialect import (
+    cast_as_int,
+    execute_insert,
+    in_clause_sql,
+    limit_sql,
+    quote,
+    substring_index,
+    upsert_incremental_sql,
+)
+from modules.sql_dialect import year as year_func
 
 pedidos_bp = Blueprint('pedidos', __name__)
-
-
-def get_tenant_filter():
-    return session.get('tenant_id')
 
 
 # --- LISTADO Y CONSOLA DE GESTIÓN ---
@@ -287,6 +313,14 @@ def guardar():
 
                     # Stock operations per container
                     for cv in contenedores_validos:
+                        cursor.execute("""
+                            SELECT Material, Lote, TipoStock, StockDisponible AS cantidad
+                            FROM stockcontable
+                            WHERE IDContenedor = %s AND Ubicacion = %s AND StockDisponible > 0
+                              AND (%s IS NULL OR tenant_id = %s)
+                        """, (cv['contenedor'], cv['id_origen'], tenant_id, tenant_id))
+                        origen_disponible = cursor.fetchall()
+
                         # StockSaliendo en origen
                         cursor.execute("""
                             UPDATE stockcontable
@@ -295,6 +329,13 @@ def guardar():
                             WHERE IDContenedor = %s AND Ubicacion = %s AND StockDisponible > 0
                               AND (%s IS NULL OR tenant_id = %s)
                         """, (ahora, usuario, cv['contenedor'], cv['id_origen'], tenant_id, tenant_id))
+                        for rec in origen_disponible:
+                            registrar_movimiento(
+                                conn, tenant_id=tenant_id, accion='PREPARAR_PEDIDO', usuario=usuario,
+                                modulo='pedidos', id_ubicacion=cv['id_origen'],
+                                id_material=rec['Material'], id_contenedor=cv['contenedor'],
+                                lote=rec['Lote'], tipo_stock=rec['TipoStock'], cantidad=-rec['cantidad'],
+                                detalle=f"Stock reservado al preparar pedido {nro_pedido}")
 
                         # StockEntrando en muelle
                         cursor.execute("""
@@ -312,6 +353,12 @@ def guardar():
                             cursor.execute(sql_ent, (muelle_id, rec['Material'], rec['Lote'], rec['TipoStock'],
                                   cv['contenedor'], 0, 0, rec['StockSaliendo'], 0,
                                   None, ahora, rec['FechaVencimiento'], usuario, tenant_id))
+                            registrar_movimiento(
+                                conn, tenant_id=tenant_id, accion='PREPARAR_PEDIDO', usuario=usuario,
+                                modulo='pedidos', id_ubicacion=muelle_id,
+                                id_material=rec['Material'], id_contenedor=cv['contenedor'],
+                                lote=rec['Lote'], tipo_stock=rec['TipoStock'], cantidad=rec['StockSaliendo'],
+                                detalle=f"Stock en muelle al preparar pedido {nro_pedido}")
 
                     # Crear UNA SOLA OMC para todos los contenedores
                     id_omc = execute_insert(cursor, """
@@ -344,7 +391,7 @@ def guardar():
             conn.commit()
     except Exception as e:
         conn.rollback()
-        flash(f"Error: {str(e)}", "danger")
+        flash(f"Error: {e!s}", "danger")
     finally:
         conn.close()
     return redirect(url_for('pedidos.listar'))
@@ -391,7 +438,7 @@ def verificar_stock_masivo():
                 WHERE p.id_pedido IN ({ph})
                   AND (%s IS NULL OR p.tenant_id = %s)
                 ORDER BY p.nro_pedido
-            """, tuple(ids) + (tenant_id, tenant_id))
+            """, (*tuple(ids), tenant_id, tenant_id))
             pedidos = cursor.fetchall()
 
             # Detalle: cantidad solicitada por material+tipo_stock por pedido
@@ -408,7 +455,7 @@ def verificar_stock_masivo():
                 WHERE d.id_pedido IN ({ph})
                   AND (%s IS NULL OR d.tenant_id = %s)
                 ORDER BY m.codigo, d.tipo_stock, p.nro_pedido
-            """, tuple(ids) + (tenant_id, tenant_id))
+            """, (*tuple(ids), tenant_id, tenant_id))
             detalle_rows = cursor.fetchall()
 
             # Stock disponible por (material, tipo_stock)
@@ -424,7 +471,7 @@ def verificar_stock_masivo():
                     WHERE Material IN ({ph2})
                       AND (%s IS NULL OR tenant_id = %s)
                     GROUP BY Material, TipoStock
-                """, tuple(material_ids) + (tenant_id, tenant_id))
+                """, (*tuple(material_ids), tenant_id, tenant_id))
                 for row in cursor.fetchall():
                     stock_map[(row['Material'], row['TipoStock'])] = {
                         'stock_disponible': float(row['stock_disponible'] or 0),
@@ -498,7 +545,7 @@ def preparar_masivo():
             sql = (f"UPDATE pedidos_cabecera SET estado = 'Trabajo' "
                    f"WHERE id_pedido IN ({in_clause_sql(ids)}) AND estado = 'Pendiente' "
                    f"AND (%s IS NULL OR tenant_id = %s)")
-            cursor.execute(sql, tuple(ids) + (tenant_id, tenant_id))
+            cursor.execute(sql, (*tuple(ids), tenant_id, tenant_id))
             conn.commit()
             return jsonify(
                 {"status": "success", "message": f"{cursor.rowcount} pedidos pasaron a estado 'Trabajo'."})
@@ -526,7 +573,7 @@ def resumen_preparar():
                 LEFT JOIN pedidos_detalle d ON d.id_pedido = p.id_pedido
                 WHERE p.id_pedido IN ({ph})
                   AND (%s IS NULL OR p.tenant_id = %s)
-            """, tuple(ids) + (tenant_id, tenant_id))
+            """, (*tuple(ids), tenant_id, tenant_id))
             row = cursor.fetchone()
 
             # Ubicaciones de picking con stock disponible para los materiales pedidos
@@ -540,7 +587,7 @@ def resumen_preparar():
                     AND tu.soporte_picking = 1
                 WHERE d.id_pedido IN ({ph})
                   AND (%s IS NULL OR sc.tenant_id = %s)
-            """, tuple(ids) + (tenant_id, tenant_id))
+            """, (*tuple(ids), tenant_id, tenant_id))
             row_ubi = cursor.fetchone()
 
         return jsonify({
@@ -586,7 +633,7 @@ def cambiar_ruta_transporte():
         with conn.cursor() as cursor:
             cursor.execute(
                 f"UPDATE pedidos_cabecera SET {', '.join(campos)} WHERE id_pedido IN ({ph}) AND (%s IS NULL OR tenant_id = %s)",
-                tuple(valores) + (tenant_id, tenant_id)
+                (*tuple(valores), tenant_id, tenant_id)
             )
             conn.commit()
             return jsonify({"status": "success",
@@ -858,7 +905,7 @@ def picking_json():
                 WHERE p.id_pedido IN ({ph})
                   AND (%s IS NULL OR p.tenant_id = %s)
                 ORDER BY p.nro_pedido
-            """, tuple(ids) + (tenant_id, tenant_id))
+            """, (*tuple(ids), tenant_id, tenant_id))
             pedidos_cab = cursor.fetchall()
 
             # ── 2. Detalle de pedidos ─────────────────────────────────────
@@ -872,7 +919,7 @@ def picking_json():
                 WHERE d.id_pedido IN ({ph})
                   AND (%s IS NULL OR d.tenant_id = %s)
                 ORDER BY d.id_pedido, m.codigo
-            """, tuple(ids) + (tenant_id, tenant_id))
+            """, (*tuple(ids), tenant_id, tenant_id))
             detalle_rows = cursor.fetchall()
 
         material_ids = list({r['id_material'] for r in detalle_rows})
@@ -918,7 +965,7 @@ def picking_json():
                       AND tu.soporte_picking = 1
                       AND (%s IS NULL OR u.tenant_id = %s)
                     ORDER BY u.orden_picking, u.codigo
-                """, tuple(material_ids) + (tenant_id, tenant_id))
+                """, (*tuple(material_ids), tenant_id, tenant_id))
                 ubicaciones_list = [dict(r) for r in cursor.fetchall()]
 
                 # ── 4. Stock en esas ubicaciones para los materiales pedidos
@@ -1014,7 +1061,7 @@ def importar():
     try:
         rows = parse_file(file, request.form.get('hoja'))
     except Exception as e:
-        return jsonify({'error': f'Error al leer el archivo: {str(e)}'}), 400
+        return jsonify({'error': f'Error al leer el archivo: {e!s}'}), 400
 
     grupos = OrderedDict()
     for i, row in enumerate(rows, 1):

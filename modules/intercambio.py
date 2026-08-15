@@ -26,15 +26,15 @@ import datetime
 import json
 import logging
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session
+from flask import Blueprint, flash, redirect, render_template, request, session, url_for
 
 from modules.db_config import (
-    get_db_connection,
-    get_intercambio_connection,
     _get_admin_connection,
+    get_db_connection,
     get_db_engine,
+    get_intercambio_connection,
 )
-from modules.sql_dialect import set_engine, execute_insert, in_clause_sql
+from modules.sql_dialect import execute_insert, in_clause_sql, set_engine
 
 logger = logging.getLogger(__name__)
 
@@ -513,8 +513,8 @@ def _parse_items_pedido(items_json, tenant_id, cursor_wms):
         return []
     try:
         data = json.loads(str(items_json).strip())
-    except Exception:
-        raise ValueError(f"items_json no es JSON valido: {str(items_json)[:200]}")
+    except Exception as e:
+        raise ValueError(f"items_json no es JSON valido: {str(items_json)[:200]}") from e
     if not isinstance(data, list):
         raise ValueError('items_json debe ser una lista')
 
@@ -533,8 +533,8 @@ def _parse_items_pedido(items_json, tenant_id, cursor_wms):
             raise ValueError(f"Material '{material_codigo}' no encontrado en el WMS")
         try:
             cantidad = float(it.get('cantidad') or 0)
-        except (TypeError, ValueError):
-            raise ValueError(f"Item {i}: cantidad '{it.get('cantidad')}' invalida")
+        except (TypeError, ValueError) as e:
+            raise ValueError(f"Item {i}: cantidad '{it.get('cantidad')}' invalida") from e
         tipo_stock = (str(it.get('tipo_stock') or 'Libre Venta').strip() or 'Libre Venta')
         items.append({'id_material': row['id'], 'cantidad': cantidad,
                       'tipo_stock': tipo_stock})
@@ -567,8 +567,8 @@ def _aplicar_registro_pedido(reg, conn_wms, cursor_wms, cursor_admin):
 
     try:
         datetime.datetime.strptime(fecha_pedido, '%Y-%m-%d')
-    except ValueError:
-        raise ValueError(f"fecha_pedido '{reg.get('fecha_pedido')}' no es una fecha valida (YYYY-MM-DD)")
+    except ValueError as e:
+        raise ValueError(f"fecha_pedido '{reg.get('fecha_pedido')}' no es una fecha valida (YYYY-MM-DD)") from e
 
     tenant_id = _obtener_tenant_id(tenant_codigo, cursor_admin)
     if not tenant_id:
@@ -947,7 +947,7 @@ def reintentar_intercambio(ids=None, tenant_id=None, tabla='intercambio_material
         cursor.execute(
             f"UPDATE {tabla} SET estado = 'pendiente', "
             f"error_mensaje = NULL, updated_at = %s WHERE {where}",
-            [_now()] + params)
+            [_now(), *params])
         conn_int.commit()
         return cursor.rowcount
     finally:
@@ -1090,7 +1090,7 @@ def procesar():
             flash(f"Intercambio procesado: {resultado['procesados']} aplicados, "
                   f"{resultado['errores']} con error. Revise la lista de errores.", 'warning')
     except Exception as e:
-        flash(f"Error al procesar el intercambio: {str(e)}", 'danger')
+        flash(f"Error al procesar el intercambio: {e!s}", 'danger')
     return redirect(url_for('intercambio.listar'))
 
 
@@ -1100,7 +1100,7 @@ def reintentar_todos():
         n = reintentar_todo(tenant_id=session.get('tenant_id'))
         flash(f"{n} registro(s) en error devuelto(s) a pendiente. Ejecute Procesar para aplicarlos.", 'info')
     except Exception as e:
-        flash(f"Error: {str(e)}", 'danger')
+        flash(f"Error: {e!s}", 'danger')
     return redirect(url_for('intercambio.listar'))
 
 
@@ -1115,5 +1115,5 @@ def reintentar_uno(modulo, rid):
                                tabla=conf['tabla'])
         flash("Registro devuelto a pendiente. Ejecute Procesar para aplicarlo.", 'info')
     except Exception as e:
-        flash(f"Error: {str(e)}", 'danger')
+        flash(f"Error: {e!s}", 'danger')
     return redirect(url_for('intercambio.listar'))

@@ -1,11 +1,12 @@
-from modules.db_config import get_db_connection
-import os
+import re
 import tkinter as tk
-from tkinter import ttk, messagebox, StringVar
 from pathlib import Path
+from tkinter import StringVar, messagebox, ttk
+
 from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash
-import re
+
+from modules.db_config import get_db_connection
 
 
 class CrearUsuarioApp:
@@ -223,7 +224,7 @@ class CrearUsuarioApp:
         except Exception as e:
             if is_duplicate_key_error(e):
                 return False, f"El nombre de usuario '{usuario}' o email '{mail}' ya existe"
-            return False, f"Error al crear usuario: {str(e)}"
+            return False, f"Error al crear usuario: {e!s}"
 
     def crear_usuario(self):
         """Procesar la creación del usuario"""
@@ -309,7 +310,7 @@ class CrearUsuarioApp:
 def main():
     """Función principal para ejecutar la aplicación"""
     root = tk.Tk()
-    app = CrearUsuarioApp(root)
+    CrearUsuarioApp(root)
     root.mainloop()
 
 

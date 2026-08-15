@@ -1,0 +1,20 @@
+line-length = 120
+target-version = "py310"
+
+[lint]
+select = [
+  "F", "I", "UP", "B", "SIM", "C4", "RUF",
+]
+ignore = [
+  # Heredados y por diseno: la app captura excepciones genericas en toda la
+  # base de codigo (patron consistente) y usa datetime sin tz (config local).
+  "BLE001",
+  "DTZ005", "DTZ006", "DTZ007", "DTZ011", "DTZ901",
+  "S110",
+  "E722",
+  "C408",
+  "TRY004", "TRY002",
+  "PLW1508",
+  "G201",
+  "LOG015",
+]

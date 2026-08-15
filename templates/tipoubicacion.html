@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 
 {% block content %}
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
@@ -67,7 +67,6 @@
 {% include "partials/_modal_tipoubicacion.html" %}
 {% include "partials/_modal_importar_tipoubicacion.html" %}
 
-<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 <script src="{{ url_for('static', filename='js/tipoubicacion.js') }}"></script>
 <script src="{{ url_for('static', filename='js/batch_ui.js') }}"></script>

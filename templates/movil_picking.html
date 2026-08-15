@@ -1,0 +1,29 @@
+{% extends 'movil_base.html' %}
+{% block title %}Picking{% endblock %}
+{% block header %}Picking{% endblock %}
+{% block content %}
+<div class="movil-card">
+    <div class="movil-titulo">Movimientos pendientes</div>
+    <div class="movil-sub">OMCs Pendiente: stock en tránsito de una ubicación a otra.</div>
+    {% if omcs %}
+    <ul class="movil-lista">
+        {% for o in omcs %}
+        <li>
+            <a href="{{ url_for('movil.picking_detalle', id_omc=o.id_omc) }}" style="text-decoration:none; color:inherit;">
+                <div class="movil-row">
+                    <span class="movil-titulo">{{ o.numero }}</span>
+                    <span class="movil-badge badge-pendiente">{{ o.estado }}</span>
+                </div>
+                <div class="movil-sub">
+                    {% if o.pedido_numero %}Pedido {{ o.pedido_numero }}{% elif o.recepcion_numero %}Recepción {{ o.recepcion_numero }}{% else %}OMC manual{% endif %}
+                </div>
+                <div class="movil-sub">→ {{ o.destino_codigo }} · {{ o.contenedores }}</div>
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <div class="movil-empty">Sin movimientos pendientes.</div>
+    {% endif %}
+</div>
+{% endblock %}

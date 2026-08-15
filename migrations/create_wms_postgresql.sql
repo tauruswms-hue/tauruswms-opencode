@@ -256,6 +256,28 @@ CREATE INDEX "idx_tipo_stock" ON "stockcontable" ("TipoStock");
 CREATE INDEX "idx_contenedor" ON "stockcontable" ("IDContenedor");
 CREATE INDEX "idx_stockcontable_tenant" ON "stockcontable" ("tenant_id");
 
+-- --- stock_movimientos ---;
+CREATE TABLE "stock_movimientos" (
+    "id" BIGSERIAL,
+    "tenant_id" INTEGER,
+    "fecha" datetime NOT NULL,
+    "usuario" VARCHAR(100),
+    "accion" VARCHAR(60) NOT NULL,
+    "modulo" VARCHAR(50),
+    "id_ubicacion" INTEGER,
+    "id_material" INTEGER,
+    "id_contenedor" VARCHAR(10),
+    "lote" VARCHAR(100),
+    "tipo_stock" VARCHAR(50),
+    "cantidad" decimal(15,4),
+    "detalle" VARCHAR(500)
+);
+CREATE INDEX "idx_stockmov_tenant" ON "stock_movimientos" ("tenant_id");
+CREATE INDEX "idx_stockmov_fecha" ON "stock_movimientos" ("fecha");
+CREATE INDEX "idx_stockmov_material" ON "stock_movimientos" ("id_material");
+CREATE INDEX "idx_stockmov_ubicacion" ON "stock_movimientos" ("id_ubicacion");
+CREATE INDEX "idx_stockmov_contenedor" ON "stock_movimientos" ("id_contenedor");
+
 -- --- clases_pedido ---;
 CREATE TABLE "clases_pedido" (
     "id_clase" SERIAL,

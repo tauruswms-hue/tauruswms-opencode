@@ -1,0 +1,79 @@
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-Taurus_2001}
+      MYSQL_DATABASE: taurus_admin
+    command: --default-authentication-plugin=mysql_native_password
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${MYSQL_ROOT_PASSWORD:-Taurus_2001}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "3306:3306"
+
+  wms:
+    build: .
+    command: python app.py
+    environment:
+      APP_ENV: development
+      SECRET_KEY: ${SECRET_KEY:-dev-only-key-no-usar-en-produccion}
+      ADMIN_SECRET_KEY: ${ADMIN_SECRET_KEY:-dev-only-key-no-usar-en-produccion}
+      SECRET_SALT: ${SECRET_SALT:-dev-only-salt-no-usar-en-produccion}
+      DB_ADMIN_ENGINE: mysql
+      DB_ADMIN_HOST: mysql
+      DB_ADMIN_PORT: 3306
+      DB_ADMIN_NAME: taurus_admin
+      DB_ADMIN_USER: root
+      DB_ADMIN_PASSWORD: ${MYSQL_ROOT_PASSWORD:-Taurus_2001}
+      DB_ENGINE: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: taurus_wms
+      DB_USER: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:-Taurus_2001}
+      DB_INTERCAMBIO_ENGINE: mysql
+      DB_INTERCAMBIO_HOST: mysql
+      DB_INTERCAMBIO_PORT: 3306
+      DB_INTERCAMBIO_NAME: taurus_intercambio
+      DB_INTERCAMBIO_USER: root
+      DB_INTERCAMBIO_PASSWORD: ${MYSQL_ROOT_PASSWORD:-Taurus_2001}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./picking_docs:/app/picking_docs
+
+  admin:
+    build: .
+    command: python admin.py
+    environment:
+      APP_ENV: development
+      SECRET_KEY: ${SECRET_KEY:-dev-only-key-no-usar-en-produccion}
+      ADMIN_SECRET_KEY: ${ADMIN_SECRET_KEY:-dev-only-key-no-usar-en-produccion}
+      SECRET_SALT: ${SECRET_SALT:-dev-only-salt-no-usar-en-produccion}
+      DB_ADMIN_ENGINE: mysql
+      DB_ADMIN_HOST: mysql
+      DB_ADMIN_PORT: 3306
+      DB_ADMIN_NAME: taurus_admin
+      DB_ADMIN_USER: root
+      DB_ADMIN_PASSWORD: ${MYSQL_ROOT_PASSWORD:-Taurus_2001}
+      DB_ENGINE: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: taurus_wms
+      DB_USER: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:-Taurus_2001}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "5001:5001"
+
+volumes:
+  mysql_data:

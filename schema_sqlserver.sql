@@ -61,7 +61,8 @@ CREATE TABLE [tenants] (
     [prompt] NVARCHAR(MAX),
     [proveedor_api_ia] NVARCHAR(MAX),
     [modelo_api_ia] NVARCHAR(MAX),
-    [api_key] NVARCHAR(MAX)
+    [api_key] NVARCHAR(MAX),
+    [api_token] NVARCHAR(255)
 );
 CREATE INDEX [idx_codigo] ON [tenants] ([codigo]);
 CREATE INDEX [idx_activo] ON [tenants] ([activo]);
@@ -162,6 +163,7 @@ IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('OPERADOR', '/materiales/eliminar/*');
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('OPERADOR', '/ubicaciones');
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('OPERADOR', '/ubicaciones/guardar');
+IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('OPERADOR', '/ubicaciones/eliminar/*');
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('OPERADOR', '/ubicaciones/importar');
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('OPERADOR', '/ubicaciones/exportar/*');
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('OPERADOR', '/ubicaciones/plantilla/*');
@@ -179,6 +181,7 @@ IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('OPERADOR', '/proveedores/plantilla/*');
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('OPERADOR', '/clientes');
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('OPERADOR', '/clientes/guardar');
+IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('OPERADOR', '/clientes/eliminar/*');
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('OPERADOR', '/clientes/importar');
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('OPERADOR', '/clientes/exportar/*');
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('OPERADOR', '/clientes/plantilla/*');
@@ -193,6 +196,7 @@ IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('OPERADOR', '/unidades/plantilla/*');
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('OPERADOR', '/transportes');
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('OPERADOR', '/transportes/guardar');
+IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('OPERADOR', '/transportes/eliminar/*');
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('OPERADOR', '/transportes/importar');
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('OPERADOR', '/transportes/exportar/*');
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('OPERADOR', '/transportes/plantilla/*');
@@ -251,6 +255,8 @@ IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('OPERADOR', '/inventario/*');
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('OPERADOR', '/parametros');
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('OPERADOR', '/actualizar_parametros');
+IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('OPERADOR', '/movil');
+IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('OPERADOR', '/movil/*');
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('OPERADOR', '/sidebar-preferences');
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'CONSULTA') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('CONSULTA', '/materiales');
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'CONSULTA') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('CONSULTA', '/ubicaciones');
@@ -284,11 +290,8 @@ IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'CONSULTA') INSERT INTO
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'CONSULTA') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('CONSULTA', '/stock');
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'CONSULTA') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('CONSULTA', '/entradas');
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'CONSULTA') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('CONSULTA', '/salidas');
-IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'CONSULTA') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('CONSULTA', '/movimientos');
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'CONSULTA') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('CONSULTA', '/reportes');
-IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'CONSULTA') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('CONSULTA', '/rentradas');
-IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'CONSULTA') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('CONSULTA', '/rsalidas');
-IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'CONSULTA') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('CONSULTA', '/dashboard');
+IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'CONSULTA') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('CONSULTA', '/reportes/*');
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'CONSULTA') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('CONSULTA', '/sidebar-preferences');
 
 
@@ -557,6 +560,28 @@ CREATE INDEX [idx_lote] ON [stockcontable] ([Lote]);
 CREATE INDEX [idx_tipo_stock] ON [stockcontable] ([TipoStock]);
 CREATE INDEX [idx_contenedor] ON [stockcontable] ([IDContenedor]);
 CREATE INDEX [idx_stockcontable_tenant] ON [stockcontable] ([tenant_id]);
+
+-- --- stock_movimientos ---;
+CREATE TABLE [stock_movimientos] (
+    [id] BIGINT IDENTITY(1,1) PRIMARY KEY,
+    [tenant_id] INT,
+    [fecha] DATETIME2 NOT NULL,
+    [usuario] NVARCHAR(100),
+    [accion] NVARCHAR(60) NOT NULL,
+    [modulo] NVARCHAR(50),
+    [id_ubicacion] INT,
+    [id_material] INT,
+    [id_contenedor] NVARCHAR(10),
+    [lote] NVARCHAR(100),
+    [tipo_stock] NVARCHAR(50),
+    [cantidad] decimal(15,4),
+    [detalle] NVARCHAR(500)
+);
+CREATE INDEX [idx_stockmov_tenant] ON [stock_movimientos] ([tenant_id]);
+CREATE INDEX [idx_stockmov_fecha] ON [stock_movimientos] ([fecha]);
+CREATE INDEX [idx_stockmov_material] ON [stock_movimientos] ([id_material]);
+CREATE INDEX [idx_stockmov_ubicacion] ON [stock_movimientos] ([id_ubicacion]);
+CREATE INDEX [idx_stockmov_contenedor] ON [stock_movimientos] ([id_contenedor]);
 
 -- --- clases_pedido ---;
 CREATE TABLE [clases_pedido] (

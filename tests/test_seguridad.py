@@ -1,14 +1,13 @@
-# -*- coding: utf-8 -*-
 """Tests de seguridad de Fase 1: CSRF, rate limiting, sesión y secretos."""
 
 import datetime
+import logging
 
 import pytest
 
-import app as wms
 import admin as adm
-from app import _check_secretos as wms_check_secretos
-from admin import _check_secretos as adm_check_secretos
+import app as wms
+from modules.bootstrap import check_default_secrets
 
 
 # --------------------------------------------------------------------------
@@ -48,6 +47,7 @@ def test_csrf_header_en_login_admin(admin_client):
 def test_rate_limit_login_bloquea_tras_5(client):
     """6 intentos POST a /login deben dejar el 6to en 429."""
     wms.app.config['RATELIMIT_ENABLED'] = True
+    wms.limiter.enabled = True
     wms.limiter.reset()
     for _ in range(5):
         r = client.post('/login', data={'username': 'x', 'password': 'y'})
@@ -60,6 +60,7 @@ def test_rate_limit_login_bloquea_tras_5(client):
 def test_rate_limit_admin_login_bloquea_tras_5(admin_client):
     adm.app.config['RATELIMIT_ENABLED'] = True
     from modules.admin import admin_limiter
+    admin_limiter.enabled = True
     admin_limiter.reset()
     for _ in range(5):
         r = admin_client.post('/admin/login', data={'username': 'x', 'password': 'y'})
@@ -100,34 +101,37 @@ def test_cookie_http_only_y_samesite(client):
 # --------------------------------------------------------------------------
 # Secretos por defecto
 # --------------------------------------------------------------------------
-def test_check_secretos_lanza_en_production(monkeypatch):
+def test_check_secretos_lanza_en_production():
     """En producción, secretos por defecto deben bloquear el arranque."""
-    monkeypatch.setattr(wms, 'APP_ENV', 'production')
-    monkeypatch.setattr('app.os.getenv', lambda k, d='': {
-        'SECRET_KEY': 'taurus-wms-secret-2024-dev',
-        'ADMIN_SECRET_KEY': 'x', 'SECRET_SALT': 'x',
-        'DB_ADMIN_PASSWORD': 'x', 'DB_PASSWORD': 'x',
-        'DB_INTERCAMBIO_PASSWORD': 'x',
-    }.get(k, d))
+    secretos = [
+        ('SECRET_KEY', 'taurus-wms-secret-2024-dev'),
+        ('ADMIN_SECRET_KEY', 'x'),
+        ('SECRET_SALT', 'x'),
+        ('DB_ADMIN_PASSWORD', 'x'),
+    ]
     with pytest.raises(RuntimeError):
-        wms_check_secretos()
+        check_default_secrets('production', secretos, logging.getLogger('test'))
 
 
-def test_check_secretos_ok_en_dev(monkeypatch):
+def test_check_secretos_ok_en_dev():
     """En desarrollo no debe lanzar, solo advertir."""
-    monkeypatch.setattr(wms, 'APP_ENV', 'development')
-    wms_check_secretos()  # no debe lanzar
+    secretos = [
+        ('SECRET_KEY', 'taurus-wms-secret-2024-dev'),
+        ('SECRET_SALT', 'x'),
+        ('DB_ADMIN_PASSWORD', 'x'),
+    ]
+    check_default_secrets('development', secretos, logging.getLogger('test'))  # no debe lanzar
 
 
-def test_admin_check_secretos_lanza_en_production(monkeypatch):
-    monkeypatch.setattr(adm, 'APP_ENV', 'production')
-    monkeypatch.setattr('admin.os.getenv', lambda k, d='': {
-        'ADMIN_SECRET_KEY': 'taurus-admin-secret-2024-dev',
-        'SECRET_KEY': 'x', 'SECRET_SALT': 'x',
-        'DB_ADMIN_PASSWORD': 'x',
-    }.get(k, d))
+def test_admin_check_secretos_lanza_en_production():
+    secretos = [
+        ('ADMIN_SECRET_KEY', 'taurus-admin-secret-2024-dev'),
+        ('SECRET_KEY', 'x'),
+        ('SECRET_SALT', 'x'),
+        ('DB_ADMIN_PASSWORD', 'x'),
+    ]
     with pytest.raises(RuntimeError):
-        adm_check_secretos()
+        check_default_secrets('production', secretos, logging.getLogger('test'))
 
 
 # --------------------------------------------------------------------------
@@ -135,7 +139,6 @@ def test_admin_check_secretos_lanza_en_production(monkeypatch):
 # --------------------------------------------------------------------------
 def test_sql_placeholders_en_pedidos():
     """Los queries de pedidos usan %s, no interpolan strings de request."""
-    from modules.pedidos import pedidos_bp
     import re
     source = __import__('modules.pedidos', fromlist=['x']).__file__
     with open(source, encoding='utf-8') as f:

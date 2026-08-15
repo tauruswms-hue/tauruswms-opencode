@@ -1,0 +1,57 @@
+{% extends 'movil_base.html' %}
+{% block title %}OMC {{ omc.numero }}{% endblock %}
+{% block header %}OMC {{ omc.numero }}{% endblock %}
+{% block content %}
+<div class="movil-card">
+    <div class="movil-row">
+        <span class="movil-badge badge-pendiente">{{ omc.estado }}</span>
+        <span class="movil-sub">
+            {% if omc.pedido_numero %}Pedido {{ omc.pedido_numero }}
+            {% elif omc.recepcion_numero %}Recepción {{ omc.recepcion_numero }}
+            {% else %}OMC manual{% endif %}
+        </span>
+    </div>
+    <div class="movil-sub">Destino: <strong>{{ omc.destino_codigo }}</strong> ({{ omc.destino_nombre }})</div>
+</div>
+
+{% for cont in contenedores %}
+<div class="movil-card">
+    <div class="movil-titulo">Contenedor {{ cont.id_contenedor }}</div>
+    <div class="movil-sub">Origen: {{ cont.origen_codigo }} ({{ cont.origen_nombre }})</div>
+    {% set cont_stock = stock_origen | selectattr('contenedor_id', 'equalto', cont.id_contenedor) | list %}
+    {% if cont_stock %}
+    <table class="movil-table">
+        <thead><tr><th>Código</th><th>Material</th><th>Disp.</th><th>Lote</th></tr></thead>
+        <tbody>
+        {% for s in cont_stock %}
+        <tr>
+            <td>{{ s.mat_codigo }}</td>
+            <td>{{ s.mat_nombre }}</td>
+            <td>{{ s.StockSaliendo|int }}</td>
+            <td>{{ s.Lote }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="movil-sub">Sin stock en tránsito registrado.</div>
+    {% endif %}
+</div>
+{% endfor %}
+
+<div class="movil-card">
+    <div class="movil-titulo">Confirmar movimiento</div>
+    <div class="movil-sub">La confirmación libera el stock en el destino (requiere usuario administrador).</div>
+    <form method="POST" action="{{ url_for('movil.picking_confirmar', id_omc=omc.id_omc) }}"
+          onsubmit="return confirm('¿Confirmar la OMC y liberar el stock?');">
+        <label class="movil-label" for="password_admin">Contraseña de administrador</label>
+        <input id="password_admin" name="password_admin" type="password" class="movil-input" autocomplete="current-password" required>
+        <button type="submit" class="movil-btn movil-btn-success">
+            <i class="fas fa-check"></i> Confirmar OMC
+        </button>
+    </form>
+    <a href="{{ url_for('movil.picking_listar') }}" class="movil-btn movil-btn-light">
+        <i class="fas fa-arrow-left"></i> Volver
+    </a>
+</div>
+{% endblock %}

@@ -9,17 +9,17 @@ Abre http://localhost:5002 en el navegador.
 
 import os
 import sys
-import json
 import traceback
-from pathlib import Path
-from flask import Flask, render_template, request, jsonify, send_file
+
 from dotenv import load_dotenv
+from flask import Flask, jsonify, render_template, request, send_file
 
 load_dotenv()
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from modules.schema_generator import generate_schema, ENGINE_MAP
-from modules.db_config import _get_admin_connection
+import contextlib
+
+from modules.schema_generator import ENGINE_MAP, generate_schema
 
 app = Flask(__name__)
 app.secret_key = os.getenv('ADMIN_SECRET_KEY', 'dev-fallback')
@@ -109,13 +109,13 @@ def api_execute():
     try:
         data = request.json
         engine = data.get('engine', 'mysql')
-        target = data.get('target', 'admin')
+        data.get('target', 'admin')
         host = data.get('host', 'localhost')
         port = int(data.get('port') or 3306)
         database = data.get('database', '')
         user = data.get('user', '')
         password = data.get('password', '')
-        drop = data.get('drop', False)
+        data.get('drop', False)
 
         if engine not in ENGINE_MAP:
             return jsonify({'ok': False, 'error': f'Engine desconocido: {engine}'})
@@ -141,15 +141,11 @@ def api_execute():
                     continue
                 errors.append({'sql': stmt[:150], 'error': err[:200]})
 
-        try:
+        with contextlib.suppress(Exception):
             conn.commit()
-        except Exception:
-            pass
 
-        try:
+        with contextlib.suppress(Exception):
             conn.close()
-        except Exception:
-            pass
 
         return jsonify({
             'ok': len(errors) == 0,
@@ -186,7 +182,7 @@ def api_test_connection():
 
         row = cursor.fetchone()
         if isinstance(row, dict):
-            version_str = str(row.get('ver', row.get(list(row.keys())[0], '')))
+            version_str = str(row.get('ver', row.get(next(iter(row.keys())), '')))
         elif isinstance(row, (tuple, list)):
             version_str = str(row[0])
         else:
@@ -205,7 +201,7 @@ def api_test_connection():
         tables = []
         for row in raw:
             if isinstance(row, dict):
-                tables.append(list(row.values())[0])
+                tables.append(next(iter(row.values())))
             else:
                 tables.append(row[0])
 

@@ -1,4 +1,5 @@
 import pymysql
+
 password = input("Contraseña de root de MySQL (dejar vacío si no tiene): ")
 root_pass = password or ''
 try:

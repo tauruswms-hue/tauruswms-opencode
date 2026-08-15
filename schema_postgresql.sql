@@ -59,7 +59,8 @@ CREATE TABLE "tenants" (
     "prompt" text,
     "proveedor_api_ia" text,
     "modelo_api_ia" text,
-    "api_key" text
+    "api_key" text,
+    "api_token" VARCHAR(255)
 );
 CREATE INDEX "idx_codigo" ON "tenants" ("codigo");
 CREATE INDEX "idx_activo" ON "tenants" ("activo");
@@ -160,6 +161,7 @@ INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/materiales/plant
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/materiales/eliminar/*') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/ubicaciones') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/ubicaciones/guardar') ON CONFLICT DO NOTHING;
+INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/ubicaciones/eliminar/*') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/ubicaciones/importar') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/ubicaciones/exportar/*') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/ubicaciones/plantilla/*') ON CONFLICT DO NOTHING;
@@ -177,6 +179,7 @@ INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/proveedores/expo
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/proveedores/plantilla/*') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/clientes') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/clientes/guardar') ON CONFLICT DO NOTHING;
+INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/clientes/eliminar/*') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/clientes/importar') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/clientes/exportar/*') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/clientes/plantilla/*') ON CONFLICT DO NOTHING;
@@ -191,6 +194,7 @@ INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/unidades/exporta
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/unidades/plantilla/*') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/transportes') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/transportes/guardar') ON CONFLICT DO NOTHING;
+INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/transportes/eliminar/*') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/transportes/importar') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/transportes/exportar/*') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/transportes/plantilla/*') ON CONFLICT DO NOTHING;
@@ -249,6 +253,8 @@ INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/inventario/crear
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/inventario/*') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/parametros') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/actualizar_parametros') ON CONFLICT DO NOTHING;
+INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/movil') ON CONFLICT DO NOTHING;
+INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/movil/*') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/sidebar-preferences') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/materiales') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/ubicaciones') ON CONFLICT DO NOTHING;
@@ -282,11 +288,8 @@ INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/parametros') ON 
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/stock') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/entradas') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/salidas') ON CONFLICT DO NOTHING;
-INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/movimientos') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/reportes') ON CONFLICT DO NOTHING;
-INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/rentradas') ON CONFLICT DO NOTHING;
-INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/rsalidas') ON CONFLICT DO NOTHING;
-INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/dashboard') ON CONFLICT DO NOTHING;
+INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/reportes/*') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/sidebar-preferences') ON CONFLICT DO NOTHING;
 
 
@@ -553,6 +556,28 @@ CREATE INDEX "idx_lote" ON "stockcontable" ("Lote");
 CREATE INDEX "idx_tipo_stock" ON "stockcontable" ("TipoStock");
 CREATE INDEX "idx_contenedor" ON "stockcontable" ("IDContenedor");
 CREATE INDEX "idx_stockcontable_tenant" ON "stockcontable" ("tenant_id");
+
+-- --- stock_movimientos ---;
+CREATE TABLE "stock_movimientos" (
+    "id" BIGSERIAL,
+    "tenant_id" INTEGER,
+    "fecha" datetime NOT NULL,
+    "usuario" VARCHAR(100),
+    "accion" VARCHAR(60) NOT NULL,
+    "modulo" VARCHAR(50),
+    "id_ubicacion" INTEGER,
+    "id_material" INTEGER,
+    "id_contenedor" VARCHAR(10),
+    "lote" VARCHAR(100),
+    "tipo_stock" VARCHAR(50),
+    "cantidad" decimal(15,4),
+    "detalle" VARCHAR(500)
+);
+CREATE INDEX "idx_stockmov_tenant" ON "stock_movimientos" ("tenant_id");
+CREATE INDEX "idx_stockmov_fecha" ON "stock_movimientos" ("fecha");
+CREATE INDEX "idx_stockmov_material" ON "stock_movimientos" ("id_material");
+CREATE INDEX "idx_stockmov_ubicacion" ON "stock_movimientos" ("id_ubicacion");
+CREATE INDEX "idx_stockmov_contenedor" ON "stock_movimientos" ("id_contenedor");
 
 -- --- clases_pedido ---;
 CREATE TABLE "clases_pedido" (

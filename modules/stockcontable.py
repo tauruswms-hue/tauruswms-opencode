@@ -1,16 +1,24 @@
-﻿from flask import Blueprint, render_template, request, jsonify, session
+﻿import contextlib
 import datetime
-from modules.batch_utils import (parse_file, export_csv, export_json, export_xlsx,
-                                  plantilla_csv, plantilla_json, plantilla_xlsx,
-                                  int_or_none, float_or_zero)
+
+from flask import Blueprint, jsonify, render_template, request, session
+
+from modules.auditoria import registrar_movimiento
+from modules.batch_utils import (
+    export_csv,
+    export_json,
+    export_xlsx,
+    float_or_zero,
+    parse_file,
+    plantilla_csv,
+    plantilla_json,
+    plantilla_xlsx,
+)
+from modules.context import get_tenant_filter
 from modules.db_config import get_db_connection
 from modules.sql_dialect import upsert_coalesce_sql
 
 stockcontable_bp = Blueprint('stockcontable', __name__)
-
-
-def get_tenant_filter():
-    return session.get('tenant_id')
 
 
 @stockcontable_bp.route('/stockcontable')
@@ -133,6 +141,20 @@ def editar(stock_id):
                     UsuarioUltimoMov = %s
                 WHERE ID = %s AND (%s IS NULL OR tenant_id = %s)
             """, (tipo_stock, lote, fecha_venc, ahora, usuario, stock_id, tenant_id, tenant_id))
+
+            cursor.execute("""
+                SELECT Ubicacion, Material, IDContenedor FROM stockcontable
+                WHERE ID = %s AND (%s IS NULL OR tenant_id = %s)
+            """, (stock_id, tenant_id, tenant_id))
+            posicion = cursor.fetchone()
+            if posicion:
+                registrar_movimiento(
+                    conn, tenant_id=tenant_id, accion='AJUSTE', usuario=usuario,
+                    modulo='stockcontable', id_ubicacion=posicion['Ubicacion'],
+                    id_material=posicion['Material'], id_contenedor=posicion['IDContenedor'],
+                    lote=lote, tipo_stock=tipo_stock,
+                    detalle=f'Edición de posición (lote/tipo/vto) — fecha vencimiento: '
+                            f"{fecha_venc.strftime('%d/%m/%Y') if fecha_venc else '-'}")
         conn.commit()
         return jsonify({
             'ok': True,
@@ -199,7 +221,7 @@ def importar():
     try:
         rows = parse_file(file, request.form.get('hoja'))
     except Exception as e:
-        return jsonify({'error': f'Error al leer el archivo: {str(e)}'}), 400
+        return jsonify({'error': f'Error al leer el archivo: {e!s}'}), 400
 
     usuario = session.get('nombre', 'sistema')
     ahora = datetime.datetime.now()
@@ -251,10 +273,8 @@ def importar():
                     fecha_venc = None
                     fv_str = str(row.get('FechaVencimiento', '') or '').strip()
                     if fv_str:
-                        try:
+                        with contextlib.suppress(ValueError):
                             fecha_venc = datetime.datetime.strptime(fv_str[:10], '%Y-%m-%d').date()
-                        except ValueError:
-                            pass
 
                     cursor.execute("""
                         INSERT INTO stockcontable
@@ -264,6 +284,11 @@ def importar():
                         VALUES (%s, %s, %s, %s, %s, %s, %s, 0, 0, %s, %s, %s, %s, %s)
                     """, (ub_id, mat_id, contenedor, lote, tipo,
                           total, disp, ahora, ahora, usuario, fecha_venc, tenant_id))
+                    registrar_movimiento(
+                        conn, tenant_id=tenant_id, accion='IMPORTACION', usuario=usuario,
+                        modulo='stockcontable', id_ubicacion=ub_id, id_material=mat_id,
+                        id_contenedor=contenedor, lote=lote, tipo_stock=tipo,
+                        cantidad=disp, detalle=f'Carga inicial de stock ({ub_cod}/{mat_cod}/{contenedor})')
                     insertados += 1
             except Exception as e:
                 errores.append({'fila': i, 'codigo': f'{ub_cod}/{mat_cod}', 'razon': str(e)})

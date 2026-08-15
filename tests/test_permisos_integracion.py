@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Tests de integración de permisos por rol (Fase 2.5).
 
 Requisito: MySQL con taurus_admin + taurus_wms. Crea un rol y usuario
@@ -8,12 +7,11 @@ temporales en taurus_admin (prefijo TEST-PERM-) y los elimina al final.
 import uuid
 
 import pytest
+from conftest import DB_OK, requires_db
 from werkzeug.security import generate_password_hash
 
-from conftest import requires_db, DB_OK
-
+from app import _match_permiso, _ruta_en_catalogo
 from modules.db_config import _get_admin_connection
-from app import _match_permiso, _ruta_en_catalogo, ROUTE_CATALOG
 
 
 # --------------------------------------------------------------------------

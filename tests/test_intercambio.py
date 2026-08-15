@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Tests de integración del módulo de intercambio (conexiones inyectables).
 
 Requisito: MySQL con taurus_admin + taurus_wms + taurus_intercambio.
@@ -8,15 +7,16 @@ Se crean registros con codigo unico TEST-* y se limpian al final.
 import uuid
 
 import pytest
-
 from conftest import requires_db
 
+from modules.db_config import (
+    _get_admin_connection,
+    get_db_connection,
+    get_intercambio_connection,
+)
 from modules.intercambio import (
     procesar_intercambio_materiales,
     procesar_intercambio_rutas,
-)
-from modules.db_config import (
-    _get_admin_connection, get_db_connection, get_intercambio_connection,
 )
 
 
@@ -198,7 +198,7 @@ def test_material_falta_codigo_queda_error(conexiones, tenant_id):
         conn_int.commit()
         cur.close()
 
-        res = procesar_intercambio_materiales(
+        procesar_intercambio_materiales(
             tenant_id=tenant_id, conn_int=conn_int, conn_wms=conn_wms,
             conn_admin=conn_admin)
 

@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% block title %}Nueva OMC{% endblock %}
 
 {% block content %}
@@ -14,7 +14,7 @@
     <div style="background:white; border-radius:8px; padding:28px; box-shadow:0 4px 12px rgba(0,0,0,0.08);">
         <form method="POST" action="{{ url_for('omc.guardar') }}" id="formNuevaOmc">
 
-            <!-- ══ SECCIÓN: CONTENEDORES DE ORIGEN ══ -->
+            <!-- â•â• SECCIÓN: CONTENEDORES DE ORIGEN â•â• -->
             <div style="margin-bottom:24px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                     <label style="font-size:0.9rem; font-weight:bold;">
@@ -57,7 +57,7 @@
                 </div>
             </div>
 
-            <!-- ══ SECCIÓN: TIPO DE DESTINO ══ -->
+            <!-- â•â• SECCIÓN: TIPO DE DESTINO â•â• -->
             <div style="margin-bottom:14px; border-top:1px solid #eee; padding-top:20px;">
                 <label style="display:block; font-size:0.9rem; font-weight:bold; margin-bottom:8px;">
                     Tipo de Destino <span style="color:red;">*</span>
@@ -138,7 +138,6 @@
     </div>
 </div>
 
-<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script>
 let tipoDestino = 'ubicacion';
 let timerDestUbi = null, timerDestCont = null;
@@ -241,7 +240,7 @@ cargarZonasOmc();
 cargarTiposOmc();
 cargarUbicacionesOmc();
 
-// ══ CONTENEDORES DINÁMICOS ══
+// â•â• CONTENEDORES DINÁMICOS â•â•
 function crearFilaContenedor() {
     const $fila = $(`
         <div class="omc-cont-row"
@@ -303,7 +302,7 @@ function crearFilaContenedor() {
 
 $('#btn_agregar_cont').on('click', function() { crearFilaContenedor(); });
 
-// ══ TIPO DESTINO ══
+// â•â• TIPO DESTINO â•â•
 function setTipoDestino(tipo) {
     if (tipoDestino === tipo) return;
     tipoDestino = tipo;
@@ -315,7 +314,7 @@ function setTipoDestino(tipo) {
     actualizarBoton();
 }
 
-// ══ DESTINO UBICACIÓN ══
+// â•â• DESTINO UBICACIÓN â•â•
 $('#buscar_destino_ubi').on('input', function() {
     clearTimeout(timerDestUbi);
     const q = $(this).val().trim();
@@ -356,7 +355,7 @@ function limpiarDestinoUbi() {
     actualizarBoton();
 }
 
-// ══ DESTINO CONTENEDOR ══
+// â•â• DESTINO CONTENEDOR â•â•
 $('#buscar_destino_cont').on('input', function() {
     clearTimeout(timerDestCont);
     const q = $(this).val().trim();
@@ -402,7 +401,7 @@ function limpiarDestinoCont() {
     actualizarBoton();
 }
 
-// ══ HABILITAR BOTÓN ══
+// â•â• HABILITAR BOTÓN â•â•
 function actualizarBoton() {
     const tieneContenedor = $('.select-cont-omc').toArray().some(el => el.value.trim() !== '');
     const tieneDestino = tipoDestino === 'ubicacion'

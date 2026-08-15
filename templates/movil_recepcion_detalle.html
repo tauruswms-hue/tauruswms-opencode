@@ -1,0 +1,127 @@
+{% extends 'movil_base.html' %}
+{% block title %}Recepción {{ recepcion.numero }}{% endblock %}
+{% block header %}Recepción {{ recepcion.numero }}{% endblock %}
+{% block content %}
+<div class="movil-card">
+    <div class="movil-row">
+        <span class="movil-badge badge-{{ recepcion.estado|lower }}">{{ recepcion.estado }}</span>
+        <span class="movil-sub">Contenedor {{ recepcion.id_contenedor }}</span>
+    </div>
+    <div class="movil-sub">{{ recepcion.proveedor_nombre }}</div>
+    <div class="movil-sub">Ubicación: {{ recepcion.ubicacion_recep_codigo }} ({{ recepcion.ubicacion_recep_nombre }})</div>
+</div>
+
+{% if recepcion.estado|lower == 'abierta' %}
+<div class="movil-card">
+    <label class="movil-label" for="scan-barcode">Escanear código de barras</label>
+    <input id="scan-barcode" class="movil-input scan-input" placeholder="ESCANEE AQUÍ" autocomplete="off" autofocus>
+    <div id="scan-result" style="margin-top:10px;"></div>
+</div>
+
+<div class="movil-card" id="items-card" {% if not items %}style="display:none;"{% endif %}>
+    <div class="movil-titulo">Ítems agregados</div>
+    <ul class="movil-lista" id="items-list">
+        {% for i in items %}
+        <li id="item-{{ i.id_detalle }}">
+            <div class="movil-row">
+                <span class="movil-titulo">{{ i.cantidad_recibida|int }} × {{ i.material_codigo }}</span>
+                <form method="POST" action="{{ url_for('movil.recepcion_eliminar_item', id_recepcion=recepcion.id_recepcion, id_detalle=i.id_detalle) }}"
+                      onsubmit="return confirm('¿Eliminar este ítem?');" style="flex:0 0 auto; margin:0;">
+                    <button type="submit" class="movil-btn movil-btn-danger" style="padding:8px 14px; margin:0;">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </form>
+            </div>
+            <div class="movil-sub">{{ i.material_nombre }}</div>
+            <div class="movil-sub">Lote {{ i.lote }} · {{ i.tipo_stock }}</div>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+
+{% if ubicaciones_destino %}
+<div class="movil-card">
+    <div class="movil-titulo">Cerrar recepción</div>
+    <form method="POST" action="{{ url_for('movil.recepcion_cerrar', id_recepcion=recepcion.id_recepcion) }}"
+          onsubmit="return confirm('¿Cerrar la recepción y generar la OMC de traslado?');">
+        <label class="movil-label" for="id_ubicacion_destino">Ubicación destino</label>
+        <select id="id_ubicacion_destino" name="id_ubicacion_destino" class="movil-select" required>
+            <option value="">Seleccione...</option>
+            {% for u in ubicaciones_destino %}
+            <option value="{{ u.id }}">{{ u.codigo }} - {{ u.nombre }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="movil-btn movil-btn-success">
+            <i class="fas fa-check"></i> Cerrar recepción
+        </button>
+    </form>
+</div>
+{% endif %}
+{% else %}
+<a href="{{ url_for('movil.recepcion_listar') }}" class="movil-btn movil-btn-primary">
+    <i class="fas fa-arrow-left"></i> Volver
+</a>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script>
+function buscarBarcode() {
+    var input = document.getElementById('scan-barcode');
+    var barcode = input.value.trim();
+    if (!barcode) return;
+    var result = document.getElementById('scan-result');
+    result.innerHTML = '<div class="movil-sub">Buscando...</div>';
+
+    fetch('{{ url_for('movil.recepcion_buscar', id_recepcion=recepcion.id_recepcion) }}?barcode=' + encodeURIComponent(barcode))
+        .then(function(resp) { return resp.json(); })
+        .then(function(mat) {
+            if (!mat || mat.error || !mat.id) {
+                result.innerHTML = '<div class="movil-flash movil-flash-danger">Material no encontrado: ' + barcode + '</div>';
+                input.value = '';
+                input.focus();
+                return;
+            }
+            input.value = '';
+            result.innerHTML =
+                '<div class="movil-row" style="justify-content:space-between;">' +
+                    '<div><div class="movil-titulo">' + mat.codigo + ' - ' + mat.nombre + '</div>' +
+                    '<div class="movil-sub">' + (mat.unidad_nombre || '') + '</div></div>' +
+                    '<button type="button" class="movil-btn movil-btn-light" style="flex:0 0 auto; padding:8px 12px; margin:0;" onclick="this.closest(\'.movil-row\').parentNode.querySelector(\'.add-form\').style.display=\'block\'">Agregar</button>' +
+                '</div>' +
+                '<div class="add-form" style="display:none;">' +
+                    '<label class="movil-label" for="cantidad">Cantidad recibida</label>' +
+                    '<div class="movil-row">' +
+                        '<input id="cantidad" type="number" step="0.01" min="0" value="1" class="movil-input">' +
+                        '<input id="lote" type="text" class="movil-input" placeholder="Lote (UNICO)" value="UNICO" autocomplete="off">' +
+                    '</div>' +
+                    '<button type="button" class="movil-btn movil-btn-primary" onclick="agregarItem(' + mat.id + ', document.getElementById(\'cantidad\').value, document.getElementById(\'lote\').value)">Guardar ítem</button>' +
+                '</div>';
+        })
+        .catch(function() {
+            result.innerHTML = '<div class="movil-flash movil-flash-danger">Error de conexión.</div>';
+            input.focus();
+        });
+}
+
+function agregarItem(idMaterial, cantidad, lote) {
+    fetch('{{ url_for('movil.recepcion_agregar', id_recepcion=recepcion.id_recepcion) }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id_material: idMaterial, cantidad: cantidad, lote: lote, tipo_stock: 'Libre Venta' })
+    })
+    .then(function(resp) { return resp.json(); })
+    .then(function(data) {
+        if (!data.ok) {
+            alert(data.msg || 'Error al guardar.');
+            return;
+        }
+        window.location.reload();
+    })
+    .catch(function() { alert('Error de conexión.'); });
+}
+
+document.getElementById('scan-barcode').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); buscarBarcode(); }
+});
+</script>
+{% endblock %}

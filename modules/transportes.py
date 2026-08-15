@@ -1,16 +1,30 @@
-﻿from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session
-import re
+﻿import re
+
+from flask import (
+    Blueprint,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
+
+from modules.batch_utils import (
+    bool_col,
+    export_csv,
+    export_json,
+    export_xlsx,
+    parse_file,
+    plantilla_csv,
+    plantilla_json,
+    plantilla_xlsx,
+)
+from modules.context import get_tenant_filter
 from modules.db_config import get_db_connection
-from modules.batch_utils import (parse_file, export_csv, export_json, export_xlsx,
-                                  plantilla_csv, plantilla_json, plantilla_xlsx,
-                                  int_or_none, bool_col)
 from modules.sql_dialect import execute_insert
 
 transportes_bp = Blueprint('transportes', __name__)
-
-
-def get_tenant_filter():
-    return session.get('tenant_id')
 
 
 def validar_cuit(cuit):
@@ -75,11 +89,11 @@ def guardar():
             if t_id and t_id.strip():
                 sql = """UPDATE transportes SET codigo=%s, razonsocial=%s, cuit=%s,
                          telefono=%s, email=%s, activo=%s, id_muelle_salida=%s WHERE id_transporte=%s AND (%s IS NULL OR tenant_id = %s)"""
-                cursor.execute(sql, params + (t_id, tenant_id, tenant_id))
+                cursor.execute(sql, (*params, t_id, tenant_id, tenant_id))
                 current_id = t_id
             else:
                 current_id = execute_insert(cursor, """INSERT INTO transportes (codigo, razonsocial, cuit, telefono, email, activo, id_muelle_salida, tenant_id)
-                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""", params + (tenant_id,))
+                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""", (*params, tenant_id))
 
             cursor.execute("DELETE FROM transporte_rutas WHERE id_transporte = %s AND (%s IS NULL OR tenant_id = %s)", (current_id, tenant_id, tenant_id))
             for i in range(len(rutas_ids)):
@@ -93,7 +107,26 @@ def guardar():
             flash("Transporte guardado exitosamente.", "success")
     except Exception as e:
         conn.rollback()
-        flash(f"Error: {str(e)}", "danger")
+        flash(f"Error: {e!s}", "danger")
+    finally:
+        conn.close()
+    return redirect(url_for('transportes.listar'))
+
+
+@transportes_bp.route('/transportes/eliminar/<int:id_transporte>', methods=['POST'])
+def eliminar(id_transporte):
+    tenant_id = get_tenant_filter()
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "UPDATE transportes SET activo = 0 WHERE id_transporte = %s AND (%s IS NULL OR tenant_id = %s)",
+                (id_transporte, tenant_id, tenant_id))
+            conn.commit()
+            flash("Transporte inactivado", "success")
+    except Exception as e:
+        conn.rollback()
+        flash(f"Error: {e!s}", "danger")
     finally:
         conn.close()
     return redirect(url_for('transportes.listar'))
@@ -115,7 +148,7 @@ def importar():
     try:
         rows = parse_file(file, request.form.get('hoja'))
     except Exception as e:
-        return jsonify({'error': f'Error al leer el archivo: {str(e)}'}), 400
+        return jsonify({'error': f'Error al leer el archivo: {e!s}'}), 400
 
     insertados, omitidos, errores = 0, [], []
     conn = get_db_connection()
