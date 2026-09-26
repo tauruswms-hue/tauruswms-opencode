@@ -29,6 +29,9 @@ _ADMIN_SECRET_KEY = os.getenv('ADMIN_SECRET_KEY')
 if not _ADMIN_SECRET_KEY:
     raise RuntimeError("Falta ADMIN_SECRET_KEY en .env (ver .env.example)")
 app.secret_key = _ADMIN_SECRET_KEY
+# Cookie propia: el WMS (:5000) usa 'session' en el mismo host y la pisaría
+# (las cookies no distinguen puerto), invalidando la sesión y el token CSRF.
+app.config['SESSION_COOKIE_NAME'] = 'taurus_admin_session'
 app.register_blueprint(admin_bp)
 
 csrf = CSRFProtect(app)

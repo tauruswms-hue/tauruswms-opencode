@@ -53,6 +53,21 @@ def register_error_handlers(app, logger, template='error.html'):
         return render_error(template, 403, 'Acceso denegado',
                             'No tiene permisos para acceder a este recurso.')
 
+    from flask_wtf.csrf import CSRFError
+
+    @app.errorhandler(CSRFError)
+    def csrf_error(e):
+        # Token CSRF ausente/vencido: casi siempre la sesión expiró o la cookie
+        # fue reemplazada. Mantiene el 400 pero explica qué hacer.
+        logger.warning('%s CSRF rechazado en %s: %s', app_name, request_path(), e.description)
+        mensaje = 'La sesión expiró o el formulario quedó vencido'
+        detalle = ('Los cambios no se guardaron. Recargue la página (o vuelva a '
+                   'iniciar sesión) e intente nuevamente.')
+        if wants_json():
+            from flask import jsonify
+            return jsonify(success=False, error=f'{mensaje}. {detalle}'), 400
+        return render_error(template, 400, mensaje, detalle)
+
     @app.errorhandler(500)
     def internal_error(e):
         logger.error('%s 500 Error en %s: %s', app_name, request_path(), e, exc_info=True)
@@ -63,6 +78,15 @@ def register_error_handlers(app, logger, template='error.html'):
 def request_path():
     from flask import request
     return request.path
+
+
+def wants_json():
+    """True si el request es AJAX/JSON (fetch con JSON o X-Requested-With)."""
+    from flask import request
+    if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return True
+    best = request.accept_mimetypes.best_match(['application/json', 'text/html'])
+    return best == 'application/json' and request.accept_mimetypes[best] > request.accept_mimetypes['text/html']
 
 
 def render_error(template, codigo, mensaje, detalle):

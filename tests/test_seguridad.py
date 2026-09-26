@@ -41,6 +41,36 @@ def test_csrf_header_en_login_admin(admin_client):
     assert resp.status_code == 400
 
 
+def test_csrf_error_explica_que_no_se_guardo(admin_client):
+    """El 400 de CSRF muestra un mensaje claro en vez del genérico."""
+    adm.app.config['WTF_CSRF_ENABLED'] = True
+    resp = admin_client.post('/admin/login', data={'username': 'x', 'password': 'y'})
+    assert resp.status_code == 400
+    assert 'Los cambios no se guardaron' in resp.get_data(as_text=True)
+
+
+def test_csrf_error_json_para_ajax(client):
+    """Los requests AJAX reciben JSON en vez de HTML."""
+    wms.app.config['WTF_CSRF_ENABLED'] = True
+    resp = client.post('/login', json={'username': 'x'})
+    assert resp.status_code == 400
+    assert resp.get_json()['success'] is False
+
+
+def test_cookie_de_sesion_admin_no_colisiona_con_wms(admin_client):
+    """La cookie 'session' del WMS (mismo host) no invalida la sesión del admin."""
+    import re
+    adm.app.config['WTF_CSRF_ENABLED'] = True
+    assert adm.app.config['SESSION_COOKIE_NAME'] != wms.app.config['SESSION_COOKIE_NAME']
+    html = admin_client.get('/admin/login').get_data(as_text=True)
+    token = re.search(r'name="csrf_token" value="([^"]+)"', html).group(1)
+    admin_client.set_cookie('session', 'cookie-firmada-por-el-wms', domain='localhost')
+    resp = admin_client.post('/admin/login', data={
+        'username': 'x', 'password': 'y', 'csrf_token': token,
+    })
+    assert resp.status_code == 200
+
+
 # --------------------------------------------------------------------------
 # Rate limiting en login
 # --------------------------------------------------------------------------

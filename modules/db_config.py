@@ -1,4 +1,6 @@
+import logging
 import os
+import time
 from contextlib import suppress
 
 from dotenv import load_dotenv
@@ -7,10 +9,24 @@ from modules.sql_dialect import set_engine
 
 load_dotenv()
 
+logger = logging.getLogger(__name__)
+
 _cached_config = None
+_cached_config_ts = 0.0
 _db_engine = None
 _intercambio_config_cache = None
+_intercambio_config_ts = 0.0
 _pools = {}
+
+# La configuracion vive en taurus_admin.configuracion y la edita el panel admin,
+# que corre en otro proceso: clear_config_cache() alli no limpia la cache del WMS.
+# Por eso la cache expira y se relee cada CONFIG_CACHE_TTL segundos; si cambio,
+# se descartan engine y pools para reconectar con los valores nuevos.
+CONFIG_CACHE_TTL = float(os.getenv('CONFIG_CACHE_TTL', '30'))
+
+
+def _cache_vigente(ts):
+    return (time.monotonic() - ts) < CONFIG_CACHE_TTL
 
 _ENGINES = ('mysql', 'postgresql', 'sqlite', 'sqlserver')
 
@@ -153,10 +169,29 @@ def _get_driver_for_engine(engine):
 
 
 def get_db_config():
-    global _cached_config
-    if _cached_config is not None:
+    global _cached_config, _cached_config_ts
+    if _cached_config is not None and _cache_vigente(_cached_config_ts):
         return _cached_config.copy()
 
+    try:
+        config = _leer_db_config()
+    except Exception:
+        if _cached_config is None:
+            raise
+        # BD admin no disponible al refrescar: seguir con la config conocida.
+        logger.warning('No se pudo refrescar la configuracion WMS; se usa la cacheada', exc_info=True)
+        _cached_config_ts = time.monotonic()
+        return _cached_config.copy()
+
+    if _cached_config is not None and config != _cached_config:
+        logger.info('Configuracion WMS modificada en BD; se reinician engine y pools')
+        clear_config_cache()
+    _cached_config = config
+    _cached_config_ts = time.monotonic()
+    return config.copy()
+
+
+def _leer_db_config():
     conn = _get_admin_connection()
     try:
         cursor = conn.cursor()
@@ -178,8 +213,7 @@ def get_db_config():
         if 'DB_ENGINE' not in config:
             config['DB_ENGINE'] = 'mysql'
 
-        _cached_config = config
-        return config.copy()
+        return config
     finally:
         conn.close()
 
@@ -202,8 +236,8 @@ def get_intercambio_config():
     Lee las claves INTERCAMBIO_* de la tabla configuracion de taurus_admin;
     si faltan, usa el fallback de variables de entorno DB_INTERCAMBIO_*.
     """
-    global _intercambio_config_cache
-    if _intercambio_config_cache is not None:
+    global _intercambio_config_cache, _intercambio_config_ts
+    if _intercambio_config_cache is not None and _cache_vigente(_intercambio_config_ts):
         return _intercambio_config_cache.copy()
 
     config = {
@@ -231,15 +265,23 @@ def get_intercambio_config():
             if clave in config and valor is not None:
                 config[clave] = str(valor)
     except Exception:
-        pass
+        if _intercambio_config_cache is not None:
+            # No pisar la config conocida con el fallback de entorno.
+            logger.warning('No se pudo refrescar la configuracion de intercambio; se usa la cacheada', exc_info=True)
+            _intercambio_config_ts = time.monotonic()
+            return _intercambio_config_cache.copy()
 
+    if _intercambio_config_cache is not None and config != _intercambio_config_cache:
+        logger.info('Configuracion de intercambio modificada en BD; se reinician engine y pools')
+        clear_config_cache()
     _intercambio_config_cache = config
+    _intercambio_config_ts = time.monotonic()
     return config.copy()
 
 
 def get_intercambio_connection():
-    engine = get_intercambio_config().get('INTERCAMBIO_ENGINE', 'mysql').strip().lower()
     config = get_intercambio_config()
+    engine = config.get('INTERCAMBIO_ENGINE', 'mysql').strip().lower()
 
     connect_kwargs = _intercambio_connect_kwargs(engine, config)
 
@@ -282,8 +324,9 @@ def _intercambio_connect_kwargs(engine, config):
 
 
 def get_db_connection():
-    engine = get_db_engine()
+    # Primero la config: si expiro y cambio, resetea el engine cacheado.
     config = get_db_config()
+    engine = get_db_engine()
 
     connect_kwargs = _wms_connect_kwargs(engine, config)
 

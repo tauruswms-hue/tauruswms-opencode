@@ -34,7 +34,8 @@ Tests: `pytest` (tests/, sin suite por defecto). Lint: `ruff` (ruff.toml; reglas
   - Admin DB: env vars `DB_ADMIN_*` (`_get_admin_connection()`).
   - WMS DB: `configuracion` table inside `taurus_admin` (`get_db_config()`); env `DB_*` are only fallback.
   - Intercambio DB: `INTERCAMBIO_*` keys in `configuracion`, env `DB_INTERCAMBIO_*` fallback (`get_intercambio_config()`).
-  - Caches in `db_config.py`; changes from the UI need `clear_config_cache()` (or app restart).
+  - Caches in `db_config.py` expire every `CONFIG_CACHE_TTL` seconds (default 30) and are re-read from `configuracion`; if the values changed, engine and pools are reset. This is what propagates admin-panel edits to the WMS process (the admin's `clear_config_cache()` only clears its own process). If the admin DB is down on refresh, the last known config is kept.
+  - The admin panel uses its own session cookie (`taurus_admin_session`): WMS and admin share host, and cookies don't distinguish ports. A missing/expired CSRF token returns a 400 with an explanatory message (JSON for AJAX) via `register_error_handlers` in `modules/bootstrap.py`.
 - **Multi-engine identifier quoting**: never hardcode backticks in SQL. Quote identifiers through `modules/sql_dialect.py` — `sql_quote()` and `insert_ignore_sql()` (see `app.py:289`). Raw MySQL backticks break postgres/sqlite/sqlserver.
 - **App code uses pymysql `%s` placeholders and dict-style rows** (`DictCursor`). The sqlite3 driver does not accept `%s`, so `create_*_sqlite.sql` are reference/DLL only — sqlite is not a functional runtime for the app.
 
