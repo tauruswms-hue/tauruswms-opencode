@@ -62,7 +62,7 @@
                 <h5 class="mb-0"><i class="fas fa-sliders-h me-2"></i>Parámetros - {{ param.tenant_nombre }}</h5>
             </div>
             <div class="card-body">
-                <form method="POST" action="{{ url_for('admin.parametros_editar', tenant_id=tenant_id) }}">
+                <form id="form-parametros" method="POST" action="{{ url_for('admin.parametros_editar', tenant_id=tenant_id) }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     
                     <ul class="nav nav-tabs" role="tablist">
@@ -223,14 +223,12 @@
                                         {% else %}
                                             <span class="badge bg-secondary">Sin token generado</span>
                                         {% endif %}
-                                        <form method="POST" action="{{ url_for('admin.api_token_generar', tenant_id=tenant_id) }}">
-                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                            <button type="submit" class="btn btn-outline-primary btn-sm"
-                                                    onclick="return confirm('¿Generar un nuevo token API? El token actual dejará de funcionar.');">
-                                                <i class="fas fa-key me-1"></i>
-                                                {% if param.api_token_activo %}Regenerar{% else %}Generar{% endif %}
-                                            </button>
-                                        </form>
+                                        {# El form del token está fuera del form principal (no se pueden anidar); el botón se asocia vía form= #}
+                                        <button type="submit" form="form-api-token" class="btn btn-outline-primary btn-sm"
+                                                onclick="return confirm('¿Generar un nuevo token API? El token actual dejará de funcionar.');">
+                                            <i class="fas fa-key me-1"></i>
+                                            {% if param.api_token_activo %}Regenerar{% else %}Generar{% endif %}
+                                        </button>
                                     </div>
                                 </div>
                                 <div class="col-md-6 mb-3">
@@ -255,6 +253,9 @@ curl -X POST -H "Authorization: Bearer &lt;TOKEN&gt;" \
                             <i class="fas fa-arrow-left me-1"></i> Volver
                         </a>
                     </div>
+                </form>
+                <form id="form-api-token" method="POST" action="{{ url_for('admin.api_token_generar', tenant_id=tenant_id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 </form>
             </div>
         </div>
@@ -306,7 +307,7 @@ curl -X POST -H "Authorization: Bearer &lt;TOKEN&gt;" \
             formatCuit(this);
         });
 
-        document.querySelector('form').addEventListener('submit', function(e) {
+        document.getElementById('form-parametros').addEventListener('submit', function(e) {
             const cuit = document.getElementById('cuit').value.trim();
             const email = document.getElementById('email').value.trim();
 
