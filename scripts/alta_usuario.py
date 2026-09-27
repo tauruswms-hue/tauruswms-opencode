@@ -26,6 +26,7 @@ from werkzeug.security import generate_password_hash
 load_dotenv(dotenv_path=ROOT / '.env')
 
 from modules.db_config import _get_admin_connection
+from modules.passwords import validar_password
 
 
 class CrearUsuarioApp:
@@ -217,10 +218,9 @@ class CrearUsuarioApp:
         elif not self.validar_email(email):
             mensajes_advertencia.append("• Email inválido")
 
-        if not clave:
-            mensajes_advertencia.append("• Contraseña requerida")
-        elif len(clave) < 6:
-            mensajes_advertencia.append("• Mínimo 6 caracteres")
+        error_clave = validar_password(clave)
+        if error_clave:
+            mensajes_advertencia.append("• " + error_clave)
 
         if clave and clave2 and clave != clave2:
             mensajes_advertencia.append("• Contraseñas no coinciden")
@@ -302,13 +302,9 @@ class CrearUsuarioApp:
             self.email_entry.focus()
             return
 
-        if not clave:
-            messagebox.showerror("Error", "La contraseña es obligatoria")
-            self.clave_entry.focus()
-            return
-
-        if len(clave) < 6:
-            messagebox.showerror("Error", "La contraseña debe tener al menos 6 caracteres")
+        error_clave = validar_password(clave)
+        if error_clave:
+            messagebox.showerror("Error", error_clave)
             self.clave_entry.focus()
             return
 

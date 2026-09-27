@@ -180,6 +180,10 @@
                     <div class="modal-body">
                         <input type="hidden" name="id" id="tenantId" value="{{ tenant.id }}">
                         <div class="mb-2">
+                            <label class="form-label">Código</label>
+                            <input type="text" class="form-control" value="{{ tenant.codigo }}" disabled>
+                        </div>
+                        <div class="mb-2">
                             <label class="form-label">Nombre *</label>
                             <input type="text" name="nombre" id="tenantNombre" class="form-control" value="{{ tenant.nombre }}" required>
                         </div>

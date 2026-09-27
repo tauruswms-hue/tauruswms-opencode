@@ -97,6 +97,7 @@
                     <table class="table table-hover">
                         <thead>
                             <tr>
+                                <th>Código</th>
                                 <th>Nombre</th>
                                 <th>CUIT</th>
                                 <th>Usuarios</th>
@@ -107,6 +108,7 @@
                         <tbody>
                             {% for tenant in tenants %}
                             <tr>
+                                <td><code>{{ tenant.codigo }}</code></td>
                                 <td>{{ tenant.nombre }}</td>
                                 <td>{{ tenant.cuit or '-' }}</td>
                                 <td>
@@ -162,6 +164,13 @@
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="modal-body">
                         <input type="hidden" name="id" id="tenantId">
+                        <div class="mb-2">
+                            <label class="form-label">Código *</label>
+                            <input type="text" name="codigo" id="tenantCodigo" class="form-control text-uppercase"
+                                   maxlength="20" pattern="[A-Za-z0-9_\-]+" required
+                                   title="Letras, números, guion o guion bajo (sin espacios)">
+                            <div class="form-text">Identificador único del tenant (lo usa Intercambio como <code>tenant_codigo</code>). No se puede cambiar después.</div>
+                        </div>
                         <div class="mb-2">
                             <label class="form-label">Nombre *</label>
                             <input type="text" name="nombre" id="tenantNombre" class="form-control" required>

@@ -11,6 +11,7 @@ Uso:
     python migrate.py --db intercambio   # aplica a taurus_intercambio
     python migrate.py --dry-run          # muestra que se aplicaria sin ejecutar
     python migrate.py --engine mysql     # override del engine (lee .env por defecto)
+    python migrate.py --db admin --baseline   # BD nueva: marca pendientes como aplicadas
 
 Convencion de archivos:
     - Todo migrations/*.sql se aplica en todos los engines salvo que la primera
@@ -117,7 +118,10 @@ def _engine_objetivo(engine, db):
     return get_db_config().get('DB_ENGINE', 'mysql').strip().lower()
 
 
-def run(db='wms', engine=None, dry_run=False, verbose=False):
+def run(db='wms', engine=None, dry_run=False, verbose=False, baseline=False):
+    """Aplica las migraciones pendientes. Con baseline=True solo las registra
+    como aplicadas sin ejecutarlas (BD recién creada desde create_*.sql, que ya
+    trae el schema completo)."""
     engine = _engine_objetivo(engine, db)
     print(f"== Migraciones Taurus WMS ==  BD: {db}  engine: {engine}")
 
@@ -153,6 +157,19 @@ def run(db='wms', engine=None, dry_run=False, verbose=False):
                     print(f"  [SKIP] {nombre} (solo {solo_db})")
                 continue
 
+            if baseline:
+                print(f"  [BASELINE] {nombre}")
+                if not dry_run:
+                    cur = conn.cursor()
+                    cur.execute(
+                        "INSERT INTO schema_migrations (nombre, engine) VALUES (%s, %s)",
+                        (nombre, engine),
+                    )
+                    conn.commit()
+                    cur.close()
+                total += 1
+                continue
+
             print(f"  [APLICAR] {nombre}")
             stmts = split_statements(sql_text)
             if dry_run:
@@ -180,6 +197,10 @@ def run(db='wms', engine=None, dry_run=False, verbose=False):
                 print("  La migracion fallo. Corregi el archivo o aplicala a mano.")
                 return total, 1
 
+        if baseline:
+            accion = "a registrar" if dry_run else "registradas sin ejecutar"
+            print(f"[OK] {total} migraciones {accion} (baseline).")
+            return total, 0
         print(f"[OK] {total} migraciones aplicadas.")
         return total, 0
     finally:
@@ -194,9 +215,13 @@ def main():
                         help='Override del engine (default: lee de .env/config)')
     parser.add_argument('--dry-run', action='store_true', help='Muestra sin ejecutar')
     parser.add_argument('--verbose', '-v', action='store_true')
+    parser.add_argument('--baseline', action='store_true',
+                        help='Registra las pendientes como aplicadas sin ejecutarlas '
+                             '(usar tras crear la BD con create_*.sql / generar_schema.py --execute)')
     args = parser.parse_args()
 
-    _, errores = run(db=args.db, engine=args.engine, dry_run=args.dry_run, verbose=args.verbose)
+    _, errores = run(db=args.db, engine=args.engine, dry_run=args.dry_run, verbose=args.verbose,
+                     baseline=args.baseline)
     if errores:
         sys.exit(1)
 

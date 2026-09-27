@@ -109,8 +109,8 @@ def usuario_wms():
 def usuario_panel():
     """Usuario del panel admin temporal (admin_usuarios, credenciales propias).
 
-    Se crea con rol SUPERADMIN y se elimina al final, sin depender de los
-    passwords de los seeds.
+    Se crea con rol SUPERADMIN y se elimina al final junto con la auditoría
+    que generó (audit_logs), sin depender de los passwords de los seeds.
     """
     if not DB_OK:
         pytest.skip('MySQL no disponible')
@@ -128,6 +128,10 @@ def usuario_panel():
         yield {'username': username, 'password': 'Test@2024!'}
     finally:
         cur = conn.cursor()
+        cur.execute("""
+            DELETE FROM audit_logs
+            WHERE usuario_id IN (SELECT id FROM admin_usuarios WHERE username = %s)
+        """, (username,))
         cur.execute("DELETE FROM admin_usuarios WHERE username = %s", (username,))
         conn.commit()
         conn.close()

@@ -4,6 +4,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import secrets
 
 from dotenv import load_dotenv
@@ -23,6 +24,7 @@ from modules.intercambio import (
     procesar_intercambio,
     reintentar_todo,
 )
+from modules.passwords import validar_password
 from modules.permisos_cache import invalidar_permisos_cache
 from modules.schema_generator import ROUTE_CATALOG
 from modules.sql_dialect import date as date_func
@@ -261,7 +263,12 @@ def tenants_guardar():
     d = request.form
     tenant_id = d.get('id')
     nombre = d.get('nombre')
-    
+    # codigo solo se carga en el alta: Intercambio lo usa como clave (tenant_codigo)
+    codigo = (d.get('codigo') or '').strip().upper()
+    if not tenant_id and not re.fullmatch(r'[A-Z0-9_-]{1,20}', codigo):
+        flash('Código inválido: 1 a 20 caracteres entre letras, números, guion y guion bajo.', 'danger')
+        return redirect(url_for('admin.tenants'))
+
     conn = _get_admin_connection()
     try:
         cursor = conn.cursor()
@@ -280,21 +287,24 @@ def tenants_guardar():
             log_audit('UPDATE', 'tenants', {'id': tenant_id, 'nombre': nombre})
         else:
             tenant_id = execute_insert(cursor, """
-                INSERT INTO tenants (nombre, razon_social, cuit, direccion, telefono, email)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                INSERT INTO tenants (codigo, nombre, razon_social, cuit, direccion, telefono, email)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
             """, (
-                nombre, d.get('razon_social'),
+                codigo, nombre, d.get('razon_social'),
                 d.get('cuit'), d.get('direccion'), d.get('telefono'), d.get('email')
             ))
             msg = 'Tenant creado correctamente'
-            log_audit('CREATE', 'tenants', {'id': tenant_id, 'nombre': nombre})
-        
+            log_audit('CREATE', 'tenants', {'id': tenant_id, 'codigo': codigo, 'nombre': nombre})
+
         conn.commit()
         flash(msg, 'success')
         cursor.close()
     except Exception as e:
         conn.rollback()
-        flash(f'Error: {e!s}', 'danger')
+        if is_duplicate_key_error(e):
+            flash(f"Ya existe un tenant con el código '{codigo}'.", 'danger')
+        else:
+            flash(f'Error: {e!s}', 'danger')
         log_audit('ERROR', 'tenants', {'error': str(e)})
     finally:
         conn.close()
@@ -352,7 +362,14 @@ def usuarios_guardar():
     d = request.form
     usuario_id = d.get('id')
     tenant_id = d.get('tenant_id')
-    
+
+    # Alta: contraseña obligatoria. Edición: solo se valida si se cambia.
+    if d.get('password') or not usuario_id:
+        error_password = validar_password(d.get('password'))
+        if error_password:
+            flash(error_password, 'danger')
+            return redirect(url_for('admin.tenants_ver', encoded_id=encode_id(tenant_id)))
+
     conn = _get_admin_connection()
     try:
         cursor = conn.cursor()
@@ -381,10 +398,6 @@ def usuarios_guardar():
             msg = 'Usuario actualizado correctamente'
             log_audit('UPDATE', 'usuarios', {'id': usuario_id, 'username': d.get('username')})
         else:
-            if not d.get('password'):
-                flash('La contraseña es obligatoria para nuevos usuarios', 'danger')
-                return redirect(url_for('admin.tenants_ver', encoded_id=encode_id(tenant_id)))
-            
             cursor.execute("""
                 INSERT INTO usuarios (username, password_hash, nombre, email, rol, tenant_id)
                 VALUES (%s, %s, %s, %s, %s, %s)

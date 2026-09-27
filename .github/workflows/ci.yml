@@ -16,6 +16,11 @@ jobs:
           python-version: '3.12'
       - run: pip install ruff
       - run: ruff check .
+      - name: Schemas generados al día
+        # Si falla: correr `python modules/schema_generator.py --all` y commitear el resultado.
+        run: |
+          python modules/schema_generator.py --all
+          git diff --exit-code -- schema_*.sql migrations/create_*.sql
 
   test:
     name: Tests (pytest)

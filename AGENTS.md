@@ -5,7 +5,7 @@
 Flask-based Warehouse Management System. Two Flask apps sharing the same `.env` and `taurus_admin` DB, plus a dev tool:
 
 - **`app.py`** — main WMS app (port 5000)
-- **`admin.py`** — admin panel (port 5001, UI at `/admin`); registers the blueprint from `modules/admin.py` and seeds `admin_usuarios` with `admin`/`Admin@2024!` on start (`init_admin_db()`)
+- **`admin.py`** — admin panel (port 5001, UI at `/admin`); registers the blueprint from `modules/admin.py` and seeds `admin`/`Admin@2024!` on start (`init_admin_db()`) **only if `admin_usuarios` is empty and `APP_ENV` is not production** — in production the first SUPERADMIN is created with `superusuario-dist/superusuario.exe`
 - **`schema_app.py`** — schema generator GUI (port 5002), dev-only
 
 One-off/dev scripts (bootstrap, seed, alta de usuarios, fix MySQL) viven en `scripts/` — no forman parte de las apps.
@@ -51,7 +51,7 @@ When `tenant_id` is NULL (superadmin), all rows are returned. This pattern appea
 
 ## Schema changes / migrations
 
-- Pending DDL lives in `migrations/*.sql` (not in `procesados/`). Applied with the **migration runner `migrate.py`** (reads `migrations/*.sql` except `create_*` in alphabetical order, tracks applied ones in `schema_migrations`; `--db wms|admin|intercambio`, `--engine`, `--dry-run`, `--verbose`; a file can restrict to one engine with a leading `-- engine: <name>` comment line and/or to one target DB with `-- db: wms|admin|intercambio`). Check pending migrations before writing new schema SQL.
+- Pending DDL lives in `migrations/*.sql` (not in `procesados/`). Applied with the **migration runner `migrate.py`** (reads `migrations/*.sql` except `create_*` in alphabetical order, tracks applied ones in `schema_migrations`; `--db wms|admin|intercambio`, `--engine`, `--dry-run`, `--verbose`, `--baseline` (registra las pendientes sin ejecutarlas: usar tras crear una BD nueva desde `create_*.sql`); a file can restrict to one engine with a leading `-- engine: <name>` comment line and/or to one target DB with `-- db: wms|admin|intercambio`). Check pending migrations before writing new schema SQL.
 - Table/seed definitions live in `modules/schema_generator.py` (`ADMIN_TABLES`, `WMS_TABLES`, `INTERCAMBIO_TABLES`, `ADMIN_SEEDS`, `ROUTE_CATALOG`). **Any schema change must update these and regenerate:**
   ```bash
   python modules/schema_generator.py --all   # root schema_{engine}.sql + migrations/create_{admin,wms,intercambio}_{engine}.sql (4 engines)
@@ -99,7 +99,10 @@ Interfase con sistemas externos: el sistema de gestión inserta registros en `ta
 ## Gotchas
 
 - `ADMIN_DB_CONFIG` / default passwords (`Taurus_2001`), `Admin@2024!` seeds, and `'dev-fallback'` secret keys are hardcoded — intentional for dev, not secret leaks
-- `crear_tablas.py` is a one-time bootstrap script with hardcoded credentials — do not run in production. Other one-off/interactive scripts in `scripts/` (not part of the apps): `crear_datos_ejemplo.py`, `alta_usuario.py`, `admin_superusuario.py`, `_fix_mysql_user.py` (más docs y datos de ejemplo en `scripts/sample_data/`). `migrate.py` (migration runner) and `procesar_intercambio.py` (cron) ARE production tools — keep them working.
+- `crear_tablas.py` is a one-time bootstrap script with hardcoded credentials — do not run in production. Other one-off/interactive scripts in `scripts/` (not part of the apps): `crear_datos_ejemplo.py`, `alta_usuario.py` (GUI, usuarios WMS en `taurus_admin.usuarios`), `admin_superusuario.py` (consola, usuarios del panel en `admin_usuarios`), `_fix_mysql_user.py` (más docs y datos de ejemplo en `scripts/sample_data/`). `migrate.py` (migration runner), `procesar_intercambio.py` (cron) and `admin_superusuario.py` ARE production tools — keep them working.
+- **`superusuario-dist/`** — ejecutable portable (`superusuario.exe`, PyInstaller) de `scripts/admin_superusuario.py`; lee credenciales de `superusuario.json` junto al .exe o `--config <ruta>` (plantilla `superusuario.example.json`; el `.json` real está gitignored). Tras cambiar el script o sus dependencias (`modules/db_config.py`, `sql_dialect.py`, `passwords.py`) regenerarlo con `python scripts/build_superusuario.py` (`requirements-build.txt`).
+- Política de contraseñas única en `modules/passwords.py` (`validar_password`, mínimo 8): la usan el panel admin y los scripts de usuarios.
+- `schema_generator.py`: el flag `unique` de columna genera `UNIQUE` en los 4 engines; claves únicas por tenant van como índice compuesto (`uk_<tabla>_<col>_tenant`). CI falla si los `schema_*.sql` / `create_*.sql` commiteados no coinciden con `--all`.
 - Root `.gitignore` covers `.env`, `__pycache__/`, `.venv/`, `.idea/`, `picking_docs/`, `*.db` — `.env` won't show in `git status`
 - Template files in `templates/partials/` are Jinja2 includes (modals, sidebar), not standalone pages
 - `picking_docs/` contains generated PDF pick tickets — not source code

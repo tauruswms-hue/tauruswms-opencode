@@ -58,27 +58,36 @@ def home():
 
 
 def init_admin_db():
-    """Inicializa la BD admin con el usuario inicial si no existe"""
+    """Crea el usuario inicial 'admin' solo si admin_usuarios está vacía (primer arranque).
+
+    Si ya hay usuarios no hace nada: así un 'admin' renombrado o dado de baja no
+    reaparece con la contraseña por defecto. En production nunca siembra: el
+    primer superusuario se crea con superusuario-dist/superusuario.exe (o
+    scripts/admin_superusuario.py).
+    """
     try:
         conn = _get_admin_connection()
         cursor = conn.cursor()
 
-        # Chequeo explícito: el INSERT IGNORE solo evita duplicados si existe el
-        # UNIQUE de username (instalaciones viejas no lo tenían y cada arranque,
-        # incluido el reloader de Flask, sumaba otro 'admin').
-        cursor.execute("SELECT 1 FROM admin_usuarios WHERE username = %s", ('admin',))
-        if not cursor.fetchone():
-            cols = ['username', 'password_hash', 'nombre', 'email', 'rol']
-            sql = insert_ignore_sql('admin_usuarios', cols)
-            cursor.execute(sql, (
-                'admin', generate_password_hash('Admin@2024!'),
-                'Administrador', 'admin@taurus.local', 'SUPERADMIN'
-            ))
+        cursor.execute("SELECT COUNT(*) AS total FROM admin_usuarios")
+        if cursor.fetchone()['total'] == 0:
+            if APP_ENV == 'production':
+                logger.warning(
+                    "admin_usuarios está vacía y APP_ENV=production: no se crea el usuario "
+                    "por defecto. Cree un SUPERADMIN con superusuario-dist/superusuario.exe"
+                )
+            else:
+                cols = ['username', 'password_hash', 'nombre', 'email', 'rol']
+                sql = insert_ignore_sql('admin_usuarios', cols)
+                cursor.execute(sql, (
+                    'admin', generate_password_hash('Admin@2024!'),
+                    'Administrador', 'admin@taurus.local', 'SUPERADMIN'
+                ))
+                logger.info("Usuario inicial 'admin' creado (cambie la contraseña)")
 
         conn.commit()
         cursor.close()
         conn.close()
-        logger.info("Base de datos admin inicializada")
         return True
     except Exception as e:
         logger.error("Error al inicializar BD admin: %s", e)
