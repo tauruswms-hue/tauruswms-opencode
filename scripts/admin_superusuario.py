@@ -1,18 +1,70 @@
+"""
+admin_superusuario.py — Administración por consola de los usuarios del panel admin.
+
+Menú interactivo para gestionar la tabla `admin_usuarios` de `taurus_admin`
+(usuarios que ingresan a admin.py, puerto 5001). No toca los usuarios del WMS
+(`taurus_admin.usuarios`); para esos ver `scripts/alta_usuario.py` o el panel admin.
+
+Uso (desde cualquier directorio):
+    python scripts/admin_superusuario.py
+    python -m scripts.admin_superusuario      # equivalente, desde la raíz
+
+Conexión:
+    Usa `_get_admin_connection()` de modules/db_config.py, que lee las
+    variables DB_ADMIN_* del `.env` de la raíz del proyecto.
+
+Opciones del menú:
+    1 — Crear / Actualizar usuario
+        Si el username no existe lo crea (rol por defecto ADMIN). Si existe y
+        está activo, lo actualiza: cualquier campo dejado en blanco (incluida
+        la contraseña) mantiene su valor actual. Si existe y está inactivo,
+        pide reactivarlo primero con la opción 3.
+    2 — Dar de baja: baja lógica (`activo = FALSE`); no borra el registro.
+    3 — Activar: revierte la baja (`activo = TRUE`).
+    4 — Listar: todos los usuarios o filtrados por username/nombre/email (LIKE).
+    5 — Salir (también Ctrl+C).
+
+Validaciones:
+    - Rol: solo SUPERADMIN o ADMIN (SUPERADMIN habilita parámetros de tenants,
+      tokens de API e intercambio en el panel).
+    - No permite dar de baja ni degradar al último SUPERADMIN activo (quedaría
+      el panel sin nadie que pueda gestionar parámetros ni superusuarios).
+    - Email opcional, con formato validado.
+    - Contraseña de al menos PASSWORD_MIN_LEN caracteres, ingresada dos veces y
+      oculta (getpass) cuando hay TTY.
+    - Hash con werkzeug scrypt (salt de 32), igual que el login del panel.
+    - Toda escritura pide confirmación S/N y hace commit inmediato; si la BD
+      falla se hace rollback, se informa el error y el menú sigue.
+
+Nota: herramienta de desarrollo/soporte, no forma parte de las apps.
+"""
+import getpass
 import os
 import re
 import sys
 from pathlib import Path
 
+# Raíz del proyecto en sys.path para poder importar `modules` aunque el script
+# se ejecute como `python scripts/admin_superusuario.py`.
+ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash
 
+# El .env de la raíz se carga antes que db_config (que solo mira el cwd).
+load_dotenv(dotenv_path=ROOT / '.env')
+
 from modules.db_config import _get_admin_connection
 
-env_path = Path('.') / '.env'
-load_dotenv(dotenv_path=env_path)
+ROLES_VALIDOS = ('SUPERADMIN', 'ADMIN')
+PASSWORD_MIN_LEN = 8
+COLUMNAS_USUARIO = "id, username, nombre, email, rol, activo"
 
 
 class Color:
+    """Códigos ANSI para colorear la salida de consola."""
     RESET = "\033[0m"
     BOLD = "\033[1m"
     RED = "\033[91m"
@@ -22,6 +74,8 @@ class Color:
     DIM = "\033[2m"
 
 
+# --- Salida por consola ---
+
 def limpiar_pantalla():
     os.system('cls' if os.name == 'nt' else 'clear')
 
@@ -30,6 +84,12 @@ def mostrar_titulo():
     print(f"\n{Color.CYAN}{Color.BOLD}{'=' * 60}")
     print("  TAURUS WMS — Administración de Superusuarios")
     print(f"{'=' * 60}{Color.RESET}\n")
+
+
+def mostrar_encabezado(subtitulo):
+    limpiar_pantalla()
+    mostrar_titulo()
+    print(f"  {Color.BOLD}— {subtitulo}{Color.RESET}\n")
 
 
 def mostrar_menu():
@@ -57,48 +117,12 @@ def advertencia(msg):
     print(f"\n  {Color.YELLOW}[AVISO]{Color.RESET} {msg}")
 
 
-def confirmar(prompt="  Confirma la operación (S/N): "):
-    resp = input(prompt).strip().lower()
-    return resp == 's'
-
-
-def pedir_input(prompt, obligatorio=True):
-    try:
-        valor = input(prompt).strip()
-        if obligatorio and not valor:
-            error("Este campo es obligatorio.")
-            return None
-        return valor
-    except KeyboardInterrupt:
-        print()
-        return None
-
-
-def pedir_password(prompt="  Contraseña: "):
-    import getpass
-    try:
-        pw = getpass.getpass(prompt) if sys.stdin.isatty() else input(prompt)
-    except (KeyboardInterrupt, getpass.GetPassWarning, OSError):
-        print()
-        return None
-    if not pw:
-        error("La contraseña no puede estar vacía.")
-        return None
-    return pw
-
-
-def validar_email(email):
-    if not email:
-        return True
-    return bool(re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email))
-
-
-def truncar(texto, max_len):
-    texto = str(texto) if texto else ""
-    return texto[:max_len - 2] + ".." if len(texto) > max_len else texto
+def pausa():
+    input("\n  Enter para continuar...")
 
 
 def mostrar_usuario(usuario):
+    """Imprime la ficha de un registro de admin_usuarios (dict de DictCursor)."""
     estado = f"{Color.GREEN}Activo{Color.RESET}" if usuario['activo'] else f"{Color.RED}Inactivo{Color.RESET}"
     print(f"\n  {Color.DIM}ID:{Color.RESET}       {usuario['id']}")
     print(f"  {Color.DIM}Usuario:{Color.RESET}  {usuario['username']}")
@@ -108,261 +132,335 @@ def mostrar_usuario(usuario):
     print(f"  {Color.DIM}Estado:{Color.RESET}  {estado}")
 
 
-conn = _get_admin_connection()
-cursor = conn.cursor()
+def mostrar_resumen(username, nombre, email, rol, password):
+    print(f"\n  {Color.BOLD}Resumen:{Color.RESET}")
+    print(f"  Usuario:    {username}")
+    print(f"  Nombre:     {nombre}")
+    print(f"  Email:      {email or '—'}")
+    print(f"  Rol:        {rol}")
+    print(f"  Contraseña: {'(se cambia)' if password else '(sin cambios)'}")
 
-limpiar_pantalla()
 
-while True:
-    try:
-        mostrar_titulo()
-        mostrar_menu()
-        opcion = input(f"  {Color.BOLD}Opción:{Color.RESET} ").strip()
+def truncar(texto, max_len):
+    """Recorta el texto a max_len caracteres terminando en '..' (para las columnas del listado)."""
+    texto = str(texto) if texto else ""
+    return texto[:max_len - 2] + ".." if len(texto) > max_len else texto
 
-        if opcion == "5":
-            info("Hasta luego.")
-            break
 
-        elif opcion == "1":
-            limpiar_pantalla()
-            mostrar_titulo()
-            print(f"  {Color.BOLD}— Crear / Actualizar usuario{Color.RESET}\n")
+# --- Entrada por consola ---
 
-            username = pedir_input("  Username: ")
-            if username is None:
-                continue
+def confirmar(prompt="  Confirma la operación (S/N): "):
+    """Devuelve True solo si el usuario responde 's' (sin distinguir mayúsculas)."""
+    return input(prompt).strip().lower() == 's'
 
-            cursor.execute("SELECT id, username, nombre, email, rol, activo FROM admin_usuarios WHERE username = %s", (username,))
-            usuario = cursor.fetchone()
 
-            if usuario:
-                mostrar_usuario(usuario)
-                if not usuario['activo']:
-                    error(f"El usuario '{username}' está inactivo. Use la opción 3 para reactivarlo.")
-                    input("\n  Enter para continuar...")
-                    continue
+def pedir_input(prompt, obligatorio=True):
+    """Lee un valor de consola. Devuelve None si es obligatorio y está vacío."""
+    valor = input(prompt).strip()
+    if obligatorio and not valor:
+        error("Este campo es obligatorio.")
+        return None
+    return valor
 
-                print(f"\n  {Color.YELLOW}Modo: Actualizar usuario existente{Color.RESET}")
-                print("  (Dejar en blanco para mantener el valor actual)\n")
 
-                password = pedir_password("  Nueva contraseña: ")
-                if password is None:
-                    continue
-                password2 = pedir_password("  Confirmar contraseña: ")
-                if password2 is None:
-                    continue
-                if password != password2:
-                    error("Las contraseñas no coinciden.")
-                    input("\n  Enter para continuar...")
-                    continue
+def _leer_password(prompt):
+    return getpass.getpass(prompt) if sys.stdin.isatty() else input(prompt)
 
-                nombre = pedir_input(f"  Nombre [{usuario['nombre']}]: ", obligatorio=False) or usuario['nombre']
-                email = pedir_input(f"  Email [{usuario['email'] or ''}]: ", obligatorio=False) or usuario['email']
 
-                if email and not validar_email(email):
-                    error("Formato de email inválido.")
-                    input("\n  Enter para continuar...")
-                    continue
+def pedir_password_nueva(obligatoria=True):
+    """
+    Pide la contraseña dos veces y la valida.
 
-                rol = pedir_input(f"  Rol (SUPERADMIN/ADMIN) [{usuario['rol']}]: ", obligatorio=False) or usuario['rol']
-                rol = rol.upper()
-                if rol not in ('SUPERADMIN', 'ADMIN'):
-                    error("Rol inválido. Debe ser SUPERADMIN o ADMIN.")
-                    input("\n  Enter para continuar...")
-                    continue
+    Devuelve la contraseña, "" si no es obligatoria y se dejó en blanco
+    (mantener la actual), o None si no es válida.
+    """
+    etiqueta = "Contraseña" if obligatoria else "Nueva contraseña (Enter = mantener actual)"
+    password = _leer_password(f"  {etiqueta}: ")
+    if not password:
+        if obligatoria:
+            error("La contraseña no puede estar vacía.")
+            return None
+        return ""
+    if len(password) < PASSWORD_MIN_LEN:
+        error(f"La contraseña debe tener al menos {PASSWORD_MIN_LEN} caracteres.")
+        return None
+    if password != _leer_password("  Confirmar contraseña: "):
+        error("Las contraseñas no coinciden.")
+        return None
+    return password
 
-                print(f"\n  {Color.BOLD}Resumen:{Color.RESET}")
-                print(f"  Usuario:    {username}")
-                print(f"  Nombre:     {nombre}")
-                print(f"  Email:      {email or '—'}")
-                print(f"  Rol:        {rol}")
-                print(f"  Contraseña: {'*' * len(password)}")
 
-                if not confirmar():
-                    continue
+def pedir_email(actual=None):
+    """Pide un email opcional. Devuelve el valor (o el actual si se deja en blanco) o None si es inválido."""
+    sufijo = f" [{actual or ''}]" if actual is not None else ""
+    email = pedir_input(f"  Email{sufijo}: ", obligatorio=False) or (actual or "")
+    if email and not validar_email(email):
+        error("Formato de email inválido.")
+        return None
+    return email
 
-                password_hash = generate_password_hash(password, method="scrypt", salt_length=32)
-                cursor.execute("""
-                    UPDATE admin_usuarios SET password_hash = %s, nombre = %s, email = %s, rol = %s WHERE username = %s
-                """, (password_hash, nombre, email, rol, username))
-                conn.commit()
-                exito(f"Usuario '{username}' actualizado exitosamente")
-            else:
-                info(f"El usuario '{username}' no existe. Se creará uno nuevo.\n")
 
-                password = pedir_password("  Contraseña: ")
-                if password is None:
-                    continue
-                password2 = pedir_password("  Confirmar contraseña: ")
-                if password2 is None:
-                    continue
-                if password != password2:
-                    error("Las contraseñas no coinciden.")
-                    input("\n  Enter para continuar...")
-                    continue
+def pedir_rol(actual):
+    """Pide el rol (default: actual). Devuelve el rol normalizado o None si es inválido."""
+    rol = (pedir_input(f"  Rol ({'/'.join(ROLES_VALIDOS)}) [{actual}]: ", obligatorio=False) or actual).upper()
+    if rol not in ROLES_VALIDOS:
+        error(f"Rol inválido. Debe ser {' o '.join(ROLES_VALIDOS)}.")
+        return None
+    return rol
 
-                nombre = pedir_input("  Nombre completo: ")
-                if nombre is None:
-                    continue
 
-                email = pedir_input("  Email: ", obligatorio=False) or ""
-                if email and not validar_email(email):
-                    error("Formato de email inválido.")
-                    input("\n  Enter para continuar...")
-                    continue
+def validar_email(email):
+    """True si el email está vacío (es opcional) o tiene formato válido."""
+    if not email:
+        return True
+    return bool(re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email))
 
-                rol = pedir_input("  Rol (SUPERADMIN/ADMIN) [ADMIN]: ", obligatorio=False) or "ADMIN"
-                rol = rol.upper()
-                if rol not in ('SUPERADMIN', 'ADMIN'):
-                    error("Rol inválido. Debe ser SUPERADMIN o ADMIN.")
-                    input("\n  Enter para continuar...")
-                    continue
 
-                print(f"\n  {Color.BOLD}Resumen:{Color.RESET}")
-                print(f"  Usuario:    {username}")
-                print(f"  Nombre:     {nombre}")
-                print(f"  Email:      {email or '—'}")
-                print(f"  Rol:        {rol}")
-                print(f"  Contraseña: {'*' * len(password)}")
+# --- Acceso a datos ---
 
-                if not confirmar():
-                    continue
+def buscar_usuario(cursor, username):
+    cursor.execute(f"SELECT {COLUMNAS_USUARIO} FROM admin_usuarios WHERE username = %s", (username,))
+    return cursor.fetchone()
 
-                password_hash = generate_password_hash(password, method="scrypt", salt_length=32)
-                cursor.execute("""
-                    INSERT INTO admin_usuarios (username, password_hash, nombre, email, rol)
-                    VALUES (%s, %s, %s, %s, %s)
-                """, (username, password_hash, nombre, email, rol))
-                conn.commit()
-                exito(f"Usuario '{username}' creado exitosamente")
 
-            input("\n  Enter para continuar...")
-            limpiar_pantalla()
+def es_ultimo_superadmin(cursor, usuario):
+    """True si `usuario` es el único SUPERADMIN activo."""
+    if usuario['rol'] != 'SUPERADMIN' or not usuario['activo']:
+        return False
+    cursor.execute(
+        "SELECT COUNT(*) AS total FROM admin_usuarios WHERE rol = 'SUPERADMIN' AND activo = TRUE AND id <> %s",
+        (usuario['id'],)
+    )
+    return cursor.fetchone()['total'] == 0
 
-        elif opcion == "2":
-            limpiar_pantalla()
-            mostrar_titulo()
-            print(f"  {Color.BOLD}— Dar de baja usuario{Color.RESET}\n")
 
-            username = pedir_input("  Username a dar de baja: ")
-            if username is None:
-                continue
+def _hash(password):
+    return generate_password_hash(password, method="scrypt", salt_length=32)
 
-            cursor.execute("SELECT id, username, nombre, email, rol, activo FROM admin_usuarios WHERE username = %s", (username,))
-            usuario = cursor.fetchone()
 
-            if not usuario:
-                error(f"El usuario '{username}' no existe.")
-            elif not usuario['activo']:
-                advertencia(f"El usuario '{username}' ya está dado de baja.")
-            else:
-                mostrar_usuario(usuario)
-                print(f"\n  {Color.RED}Se desactivará el acceso de este usuario.{Color.RESET}")
-                if confirmar("  ¿Confirmar la baja? (S/N): "):
-                    cursor.execute("UPDATE admin_usuarios SET activo = FALSE WHERE username = %s", (username,))
-                    conn.commit()
-                    exito(f"Usuario '{username}' dado de baja exitosamente")
-                else:
-                    info("Operación cancelada.")
+# --- Opciones del menú ---
 
-            input("\n  Enter para continuar...")
-            limpiar_pantalla()
+def crear_o_actualizar(conn, cursor):
+    mostrar_encabezado("Crear / Actualizar usuario")
 
-        elif opcion == "3":
-            limpiar_pantalla()
-            mostrar_titulo()
-            print(f"  {Color.BOLD}— Activar usuario{Color.RESET}\n")
+    username = pedir_input("  Username: ")
+    if username is None:
+        return
 
-            username = pedir_input("  Username a activar: ")
-            if username is None:
-                continue
+    usuario = buscar_usuario(cursor, username)
+    if usuario:
+        _actualizar(conn, cursor, usuario)
+    else:
+        _crear(conn, cursor, username)
 
-            cursor.execute("SELECT id, username, nombre, email, rol, activo FROM admin_usuarios WHERE username = %s", (username,))
-            usuario = cursor.fetchone()
 
-            if not usuario:
-                error(f"El usuario '{username}' no existe.")
-            elif usuario['activo']:
-                advertencia(f"El usuario '{username}' ya está activo.")
-            else:
-                mostrar_usuario(usuario)
-                if confirmar("  ¿Confirmar la activación? (S/N): "):
-                    cursor.execute("UPDATE admin_usuarios SET activo = TRUE WHERE username = %s", (username,))
-                    conn.commit()
-                    exito(f"Usuario '{username}' activado exitosamente")
-                else:
-                    info("Operación cancelada.")
+def _actualizar(conn, cursor, usuario):
+    username = usuario['username']
+    mostrar_usuario(usuario)
+    if not usuario['activo']:
+        error(f"El usuario '{username}' está inactivo. Use la opción 3 para reactivarlo.")
+        return
 
-            input("\n  Enter para continuar...")
-            limpiar_pantalla()
+    print(f"\n  {Color.YELLOW}Modo: Actualizar usuario existente{Color.RESET}")
+    print("  (Dejar en blanco para mantener el valor actual)\n")
 
-        elif opcion == "4":
-            limpiar_pantalla()
-            mostrar_titulo()
-            print(f"  {Color.BOLD}— Listar usuarios{Color.RESET}\n")
+    password = pedir_password_nueva(obligatoria=False)
+    if password is None:
+        return
+    nombre = pedir_input(f"  Nombre [{usuario['nombre']}]: ", obligatorio=False) or usuario['nombre']
+    email = pedir_email(actual=usuario['email'])
+    if email is None:
+        return
+    rol = pedir_rol(usuario['rol'])
+    if rol is None:
+        return
 
-            filtro = pedir_input("  Buscar (nombre, email o username, Enter para todos): ", obligatorio=False)
+    if rol != 'SUPERADMIN' and es_ultimo_superadmin(cursor, usuario):
+        error(f"'{username}' es el último SUPERADMIN activo; no se puede cambiar su rol.")
+        return
 
-            if filtro:
-                like = f"%{filtro}%"
-                cursor.execute("""
-                    SELECT id, username, nombre, email, rol, activo, ultimo_acceso, created_at
-                    FROM admin_usuarios
-                    WHERE username LIKE %s OR nombre LIKE %s OR email LIKE %s
-                    ORDER BY id
-                """, (like, like, like))
-            else:
-                cursor.execute("""
-                    SELECT id, username, nombre, email, rol, activo, ultimo_acceso, created_at
-                    FROM admin_usuarios ORDER BY id
-                """)
-            usuarios = cursor.fetchall()
+    mostrar_resumen(username, nombre, email, rol, password)
+    if not confirmar():
+        info("Operación cancelada.")
+        return
 
-            if not usuarios:
-                advertencia("No se encontraron usuarios.")
-            else:
-                cols = [
-                    ("ID", 5), ("Username", 18), ("Nombre", 25), ("Email", 28),
-                    ("Rol", 14), ("Estado", 10), ("Últ. acceso", 18), ("Creado", 18)
-                ]
-                header = "".join(f"{Color.BOLD}{c[0]:<{c[1]}}{Color.RESET}" for c in cols)
-                print(f"\n  {header}")
-                print(f"  {'-' * sum(c[1] for c in cols)}")
+    if password:
+        cursor.execute(
+            "UPDATE admin_usuarios SET password_hash = %s, nombre = %s, email = %s, rol = %s WHERE id = %s",
+            (_hash(password), nombre, email, rol, usuario['id'])
+        )
+    else:
+        cursor.execute(
+            "UPDATE admin_usuarios SET nombre = %s, email = %s, rol = %s WHERE id = %s",
+            (nombre, email, rol, usuario['id'])
+        )
+    conn.commit()
+    exito(f"Usuario '{username}' actualizado exitosamente")
 
-                for u in usuarios:
-                    if u['activo']:
-                        estado = f"{Color.GREEN}{'Activo':<10}{Color.RESET}"
-                    else:
-                        estado = f"{Color.RED}{'Inactivo':<10}{Color.RESET}"
-                    ultimo = str(u['ultimo_acceso'])[:16] if u['ultimo_acceso'] else "Nunca"
-                    creado = str(u['created_at'])[:16] if u['created_at'] else "N/A"
-                    row = (
-                        f"{u['id']:<5}"
-                        f"{truncar(u['username'], 18):<18}"
-                        f"{truncar(u['nombre'], 25):<25}"
-                        f"{truncar(u['email'], 28):<28}"
-                        f"{u['rol']:<14}"
-                        f"{estado}"
-                        f"{ultimo:<18}"
-                        f"{creado:<18}"
-                    )
-                    print(f"  {row}")
 
-                activos = sum(1 for u in usuarios if u['activo'])
-                inactivos = len(usuarios) - activos
-                print(f"\n  {Color.DIM}Total: {len(usuarios)} usuario(s) — {Color.GREEN}{activos} activo(s){Color.RESET}{Color.DIM}, {Color.RED}{inactivos} inactivo(s){Color.RESET}{Color.DIM}{Color.RESET}")
+def _crear(conn, cursor, username):
+    info(f"El usuario '{username}' no existe. Se creará uno nuevo.\n")
 
-            input("\n  Enter para continuar...")
-            limpiar_pantalla()
+    password = pedir_password_nueva(obligatoria=True)
+    if password is None:
+        return
+    nombre = pedir_input("  Nombre completo: ")
+    if nombre is None:
+        return
+    email = pedir_email()
+    if email is None:
+        return
+    rol = pedir_rol('ADMIN')
+    if rol is None:
+        return
 
+    mostrar_resumen(username, nombre, email, rol, password)
+    if not confirmar():
+        info("Operación cancelada.")
+        return
+
+    cursor.execute(
+        "INSERT INTO admin_usuarios (username, password_hash, nombre, email, rol) VALUES (%s, %s, %s, %s, %s)",
+        (username, _hash(password), nombre, email, rol)
+    )
+    conn.commit()
+    exito(f"Usuario '{username}' creado exitosamente")
+
+
+def cambiar_estado(conn, cursor, activar):
+    accion = "Activar" if activar else "Dar de baja"
+    mostrar_encabezado(f"{accion} usuario")
+
+    username = pedir_input(f"  Username a {'activar' if activar else 'dar de baja'}: ")
+    if username is None:
+        return
+
+    usuario = buscar_usuario(cursor, username)
+    if not usuario:
+        error(f"El usuario '{username}' no existe.")
+        return
+    if bool(usuario['activo']) == activar:
+        advertencia(f"El usuario '{username}' ya está {'activo' if activar else 'dado de baja'}.")
+        return
+
+    mostrar_usuario(usuario)
+    if not activar:
+        if es_ultimo_superadmin(cursor, usuario):
+            error(f"'{username}' es el último SUPERADMIN activo; no se puede dar de baja.")
+            return
+        print(f"\n  {Color.RED}Se desactivará el acceso de este usuario.{Color.RESET}")
+
+    if not confirmar(f"  ¿Confirmar {'la activación' if activar else 'la baja'}? (S/N): "):
+        info("Operación cancelada.")
+        return
+
+    cursor.execute("UPDATE admin_usuarios SET activo = %s WHERE id = %s", (activar, usuario['id']))
+    conn.commit()
+    exito(f"Usuario '{username}' {'activado' if activar else 'dado de baja'} exitosamente")
+
+
+def listar(cursor):
+    mostrar_encabezado("Listar usuarios")
+
+    filtro = pedir_input("  Buscar (nombre, email o username, Enter para todos): ", obligatorio=False)
+
+    sql = f"SELECT {COLUMNAS_USUARIO}, ultimo_acceso, created_at FROM admin_usuarios"
+    params = ()
+    if filtro:
+        like = f"%{filtro}%"
+        sql += " WHERE username LIKE %s OR nombre LIKE %s OR email LIKE %s"
+        params = (like, like, like)
+    cursor.execute(sql + " ORDER BY id", params)
+    usuarios = cursor.fetchall()
+
+    if not usuarios:
+        advertencia("No se encontraron usuarios.")
+        return
+
+    cols = [
+        ("ID", 5), ("Username", 18), ("Nombre", 25), ("Email", 28),
+        ("Rol", 14), ("Estado", 10), ("Últ. acceso", 18), ("Creado", 18)
+    ]
+    header = "".join(f"{Color.BOLD}{c[0]:<{c[1]}}{Color.RESET}" for c in cols)
+    print(f"\n  {header}")
+    print(f"  {'-' * sum(c[1] for c in cols)}")
+
+    for u in usuarios:
+        if u['activo']:
+            estado = f"{Color.GREEN}{'Activo':<10}{Color.RESET}"
         else:
-            error("Opción inválida. Intente de nuevo.")
-            input("\n  Enter para continuar...")
+            estado = f"{Color.RED}{'Inactivo':<10}{Color.RESET}"
+        ultimo = str(u['ultimo_acceso'])[:16] if u['ultimo_acceso'] else "Nunca"
+        creado = str(u['created_at'])[:16] if u['created_at'] else "N/A"
+        row = (
+            f"{u['id']:<5}"
+            f"{truncar(u['username'], 18):<18}"
+            f"{truncar(u['nombre'], 25):<25}"
+            f"{truncar(u['email'], 28):<28}"
+            f"{u['rol']:<14}"
+            f"{estado}"
+            f"{ultimo:<18}"
+            f"{creado:<18}"
+        )
+        print(f"  {row}")
 
-    except KeyboardInterrupt:
+    activos = sum(1 for u in usuarios if u['activo'])
+    inactivos = len(usuarios) - activos
+    print(f"\n  {Color.DIM}Total: {len(usuarios)} usuario(s) — {Color.GREEN}{activos} activo(s){Color.RESET}"
+          f"{Color.DIM}, {Color.RED}{inactivos} inactivo(s){Color.RESET}")
+
+
+# --- Bucle principal: una sola conexión a taurus_admin para toda la sesión ---
+
+def main():
+    try:
+        conn = _get_admin_connection()
+    except Exception as e:
+        error(f"No se pudo conectar a taurus_admin (revisar DB_ADMIN_* en .env): {e}")
+        return 1
+    cursor = conn.cursor()
+
+    acciones = {
+        "1": lambda: crear_o_actualizar(conn, cursor),
+        "2": lambda: cambiar_estado(conn, cursor, activar=False),
+        "3": lambda: cambiar_estado(conn, cursor, activar=True),
+        "4": lambda: listar(cursor),
+    }
+
+    limpiar_pantalla()
+    try:
+        while True:
+            mostrar_titulo()
+            mostrar_menu()
+            opcion = input(f"  {Color.BOLD}Opción:{Color.RESET} ").strip()
+
+            if opcion == "5":
+                info("Hasta luego.")
+                break
+            accion = acciones.get(opcion)
+            if accion is None:
+                error("Opción inválida. Intente de nuevo.")
+                pausa()
+                continue
+
+            try:
+                accion()
+            except KeyboardInterrupt:
+                print()
+                info("Operación cancelada.")
+            except Exception as e:
+                conn.rollback()
+                error(f"Error de base de datos: {e}")
+            pausa()
+            limpiar_pantalla()
+    except (KeyboardInterrupt, EOFError):
         print()
         info("Hasta luego.")
-        break
+    finally:
+        cursor.close()
+        conn.close()
+    return 0
 
-cursor.close()
-conn.close()
+
+if __name__ == "__main__":
+    sys.exit(main())

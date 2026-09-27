@@ -1,19 +1,38 @@
+"""
+alta_usuario.py — GUI (tkinter) para dar de alta usuarios del WMS.
+
+Inserta en `taurus_admin.usuarios`, la tabla que usa el login del WMS (app.py),
+asignando tenant y rol (roles activos de `taurus_admin.roles`). Para usuarios
+del panel admin ver `scripts/admin_superusuario.py`.
+
+Uso: python scripts/alta_usuario.py   (lee DB_ADMIN_* del .env de la raíz)
+"""
 import re
+import sys
 import tkinter as tk
 from pathlib import Path
 from tkinter import StringVar, messagebox, ttk
 
+# Raíz del proyecto en sys.path para poder importar `modules` aunque el script
+# se ejecute como `python scripts/alta_usuario.py`.
+ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash
 
-from modules.db_config import get_db_connection
+# El .env de la raíz se carga antes que db_config (que solo mira el cwd).
+load_dotenv(dotenv_path=ROOT / '.env')
+
+from modules.db_config import _get_admin_connection
 
 
 class CrearUsuarioApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Crear Nuevo Usuario")
-        self.root.geometry("500x600")
+        self.root.geometry("500x650")
         self.root.resizable(False, False)
 
         # Configurar estilos
@@ -23,7 +42,8 @@ class CrearUsuarioApp:
         self.usuario_var = StringVar()
         self.email_var = StringVar()
         self.nombre_var = StringVar()
-        self.rol_var = StringVar(value="USER")
+        self.rol_var = StringVar()
+        self.tenant_var = StringVar()
         self.clave_var = StringVar()
         self.clave2_var = StringVar()
 
@@ -50,9 +70,22 @@ class CrearUsuarioApp:
         self.root.configure(bg=self.bg_color)
 
     def cargar_config_bd(self):
-        """Cargar configuración de base de datos"""
-        env_path = Path('.') / '.env'
-        load_dotenv(dotenv_path=env_path)
+        """Cargar tenants y roles activos desde taurus_admin"""
+        self.tenants = {}
+        self.roles = []
+        try:
+            conn = _get_admin_connection()
+            try:
+                cursor = conn.cursor()
+                cursor.execute("SELECT id, codigo, nombre FROM tenants WHERE activo = 1 ORDER BY nombre")
+                self.tenants = {f"{t['nombre']} ({t['codigo']})": t['id'] for t in cursor.fetchall()}
+                cursor.execute("SELECT nombre FROM roles WHERE activo = 1 ORDER BY nombre")
+                self.roles = [r['nombre'] for r in cursor.fetchall()]
+                cursor.close()
+            finally:
+                conn.close()
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo leer tenants/roles de taurus_admin:\n{e!s}")
 
     def crear_interfaz(self):
         """Crear todos los elementos de la interfaz"""
@@ -106,17 +139,24 @@ class CrearUsuarioApp:
         rol_frame = ttk.Frame(main_frame)
         rol_frame.grid(row=7, column=1, sticky=tk.W, pady=5, padx=(10, 0))
 
-        roles = [("Admin", "admin"), ("Supervisor", "supervisor"), ("Operador", "operador")]
-        for i, (text, value) in enumerate(roles):
-            ttk.Radiobutton(rol_frame, text=text, value=value,
-                            variable=self.rol_var).grid(row=0, column=i, padx=5)
+        # Roles de taurus_admin.roles (los mismos que asigna el panel admin)
+        self.rol_combo = ttk.Combobox(rol_frame, textvariable=self.rol_var, values=self.roles,
+                                      state='readonly', width=27)
+        self.rol_combo.grid(row=0, column=0)
+
+        # Fila 8: Tenant
+        ttk.Label(main_frame, text="🏢 Tenant:", font=('Helvetica', 10)).grid(row=8, column=0, sticky=tk.W, pady=5)
+        self.tenant_combo = ttk.Combobox(main_frame, textvariable=self.tenant_var, values=list(self.tenants),
+                                         state='readonly', width=27)
+        self.tenant_combo.grid(row=8, column=1, sticky=tk.W, pady=5, padx=(10, 0))
+        self.seleccionar_defaults()
 
         # Separador
-        ttk.Separator(main_frame, orient='horizontal').grid(row=8, column=0, columnspan=2, sticky='ew', pady=20)
+        ttk.Separator(main_frame, orient='horizontal').grid(row=9, column=0, columnspan=2, sticky='ew', pady=20)
 
-        # Fila 8: Botones
+        # Fila 10: Botones
         botones_frame = ttk.Frame(main_frame)
-        botones_frame.grid(row=9, column=0, columnspan=2, pady=10)
+        botones_frame.grid(row=10, column=0, columnspan=2, pady=10)
 
         self.crear_btn = ttk.Button(botones_frame, text="✅ Crear Usuario",
                                     command=self.crear_usuario, width=20)
@@ -130,7 +170,7 @@ class CrearUsuarioApp:
 
         # Fila 9: Estado
         self.estado_label = ttk.Label(main_frame, text="", font=('Helvetica', 9))
-        self.estado_label.grid(row=10, column=0, columnspan=2, pady=(20, 0))
+        self.estado_label.grid(row=11, column=0, columnspan=2, pady=(20, 0))
 
         # Configurar grid weights
         self.root.columnconfigure(0, weight=1)
@@ -147,6 +187,11 @@ class CrearUsuarioApp:
         self.email_var.trace('w', lambda *args: self.mostrar_advertencias())
         self.clave_var.trace('w', lambda *args: self.mostrar_advertencias())
         self.clave2_var.trace('w', lambda *args: self.mostrar_advertencias())
+
+    def seleccionar_defaults(self):
+        """Preselecciona OPERADOR (o el primer rol) y el tenant si hay uno solo"""
+        self.rol_var.set('OPERADOR' if 'OPERADOR' in self.roles else (self.roles[0] if self.roles else ''))
+        self.tenant_var.set(next(iter(self.tenants)) if len(self.tenants) == 1 else '')
 
     def validar_email(self, email):
         """Validar formato de email"""
@@ -194,7 +239,7 @@ class CrearUsuarioApp:
         self.usuario_var.set("")
         self.email_var.set("")
         self.nombre_var.set("")
-        self.rol_var.set("USER")
+        self.seleccionar_defaults()
         self.clave_var.set("")
         self.clave2_var.set("")
         self.usuario_entry.focus()
@@ -202,28 +247,28 @@ class CrearUsuarioApp:
         # Mantener el botón habilitado
         self.crear_btn.config(state='normal')
 
-    def crear_usuario_bd(self, usuario, clave, mail, nombre, rol):
-        """Crear usuario en la base de datos"""
+    def crear_usuario_bd(self, usuario, clave, mail, nombre, rol, tenant_id):
+        """Crear usuario en taurus_admin.usuarios (tabla del login del WMS)"""
         try:
-            from modules.sql_dialect import insert_ignore_sql, is_duplicate_key_error
-            conn = get_db_connection()
-            cursor = conn.cursor()
+            conn = _get_admin_connection()
+            try:
+                cursor = conn.cursor()
+                cursor.execute("SELECT id FROM usuarios WHERE username = %s", (usuario,))
+                if cursor.fetchone():
+                    return False, f"El nombre de usuario '{usuario}' ya existe"
 
-            password_hash = generate_password_hash(clave)
-
-            cols = ['username', 'email', 'password_hash', 'nombre', 'rol']
-            sql = insert_ignore_sql('usuarios', cols)
-            cursor.execute(sql, (usuario, mail, password_hash, nombre, rol))
-
-            conn.commit()
-            cursor.close()
-            conn.close()
+                cursor.execute("""
+                    INSERT INTO usuarios (username, password_hash, nombre, email, rol, tenant_id)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """, (usuario, generate_password_hash(clave), nombre, mail, rol, tenant_id))
+                conn.commit()
+                cursor.close()
+            finally:
+                conn.close()
 
             return True, "Usuario creado exitosamente"
 
         except Exception as e:
-            if is_duplicate_key_error(e):
-                return False, f"El nombre de usuario '{usuario}' o email '{mail}' ya existe"
             return False, f"Error al crear usuario: {e!s}"
 
     def crear_usuario(self):
@@ -238,6 +283,8 @@ class CrearUsuarioApp:
         clave = self.clave_var.get()
         clave2 = self.clave2_var.get()
         rol = self.rol_var.get()
+        tenant_nombre = self.tenant_var.get()
+        tenant_id = self.tenants.get(tenant_nombre)
 
         # Validaciones CON MENSAJES DE ERROR
         if not usuario:
@@ -270,6 +317,14 @@ class CrearUsuarioApp:
             self.clave2_entry.focus()
             return
 
+        if not rol:
+            messagebox.showerror("Error", "Debe seleccionar un rol")
+            return
+
+        if not tenant_id:
+            messagebox.showerror("Error", "Debe seleccionar un tenant")
+            return
+
         # Confirmar creación
         confirmar = messagebox.askyesno(
             "Confirmar",
@@ -277,7 +332,8 @@ class CrearUsuarioApp:
             f"Usuario: {usuario}\n"
             f"Email: {mail}\n"
             f"Nombre: {nombre}\n"
-            f"Rol: {rol}"
+            f"Rol: {rol}\n"
+            f"Tenant: {tenant_nombre}"
         )
 
         if confirmar:
@@ -287,7 +343,7 @@ class CrearUsuarioApp:
             self.root.update()
 
             # Crear usuario
-            success, mensaje = self.crear_usuario_bd(usuario, clave, mail, nombre, rol)
+            success, mensaje = self.crear_usuario_bd(usuario, clave, mail, nombre, rol, tenant_id)
 
             if success:
                 self.estado_label.config(text="✅ " + mensaje, foreground="green")
