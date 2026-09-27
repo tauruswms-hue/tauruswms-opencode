@@ -1,0 +1,46 @@
+TAURUS WMS - Administración de Superusuarios (ejecutable portable)
+===================================================================
+
+superusuario.exe gestiona los usuarios del panel admin (tabla admin_usuarios
+de taurus_admin): crear/actualizar, dar de baja, activar y listar.
+No necesita Python instalado.
+
+CONFIGURACIÓN
+-------------
+1. Copiar superusuario.example.json como superusuario.json (en esta carpeta,
+   junto al .exe).
+2. Completar las credenciales de la base taurus_admin:
+
+   {
+     "engine": "mysql",          mysql | postgresql | sqlserver (default mysql)
+     "host": "localhost",
+     "port": 3306,               opcional (default 3306)
+     "user": "taurus",
+     "password": "...",
+     "database": "taurus_admin",
+     "charset": "utf8mb4"        opcional
+   }
+
+   host, user, password y database son obligatorios.
+
+3. Ejecutar superusuario.exe (doble clic o desde una consola).
+
+Para usar otro archivo de credenciales:
+    superusuario.exe --config C:\ruta\produccion.json
+
+SEGURIDAD
+---------
+- superusuario.json contiene la contraseña de la BD en texto plano: no lo
+  comparta ni lo suba al repositorio (está en .gitignore). Restrinja los
+  permisos del archivo al usuario que opera el sistema.
+- Las contraseñas de los usuarios se guardan con hash scrypt; deben tener al
+  menos 8 caracteres.
+- El programa no permite dar de baja ni degradar al último SUPERADMIN activo.
+- Con APP_ENV=production el panel no crea el usuario 'admin' por defecto: el
+  primer SUPERADMIN se crea con este ejecutable.
+
+REGENERAR EL EJECUTABLE
+-----------------------
+Desde la raíz del proyecto, con el .venv activo:
+    pip install -r requirements-build.txt
+    python scripts/build_superusuario.py

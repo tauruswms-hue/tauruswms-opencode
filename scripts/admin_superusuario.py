@@ -6,12 +6,19 @@ Menú interactivo para gestionar la tabla `admin_usuarios` de `taurus_admin`
 (`taurus_admin.usuarios`); para esos ver `scripts/alta_usuario.py` o el panel admin.
 
 Uso (desde cualquier directorio):
-    python scripts/admin_superusuario.py
+    python scripts/admin_superusuario.py [--config ruta.json]
     python -m scripts.admin_superusuario      # equivalente, desde la raíz
+    superusuario-dist/superusuario.exe [--config ruta.json]   # ejecutable portable
 
-Conexión:
-    Usa `_get_admin_connection()` de modules/db_config.py, que lee las
-    variables DB_ADMIN_* del `.env` de la raíz del proyecto.
+Conexión (primera que aplique):
+    1. --config <ruta.json>
+    2. superusuario.json junto al ejecutable (o junto a este script)
+    3. Solo ejecutando con Python: variables DB_ADMIN_* del .env de la raíz.
+    El JSON tiene las claves engine (mysql|postgresql|sqlserver, default mysql),
+    host, port, user, password, database y opcional charset; ver
+    superusuario-dist/superusuario.example.json. Se conecta con
+    `_get_admin_connection()` de modules/db_config.py.
+    El ejecutable se construye con `python scripts/build_superusuario.py`.
 
 Opciones del menú:
     1 — Crear / Actualizar usuario
@@ -30,37 +37,50 @@ Validaciones:
     - No permite dar de baja ni degradar al último SUPERADMIN activo (quedaría
       el panel sin nadie que pueda gestionar parámetros ni superusuarios).
     - Email opcional, con formato validado.
-    - Contraseña de al menos PASSWORD_MIN_LEN caracteres, ingresada dos veces y
-      oculta (getpass) cuando hay TTY.
+    - Contraseña según modules/passwords.py (mínimo PASSWORD_MIN_LEN), ingresada
+      dos veces y oculta (getpass) cuando hay TTY.
     - Hash con werkzeug scrypt (salt de 32), igual que el login del panel.
     - Toda escritura pide confirmación S/N y hace commit inmediato; si la BD
       falla se hace rollback, se informa el error y el menú sigue.
 
 Nota: herramienta de desarrollo/soporte, no forma parte de las apps.
 """
+import argparse
 import getpass
+import json
 import os
 import re
 import sys
 from pathlib import Path
 
-# Raíz del proyecto en sys.path para poder importar `modules` aunque el script
-# se ejecute como `python scripts/admin_superusuario.py`.
+# Empaquetado con PyInstaller (superusuario.exe) los módulos vienen dentro del
+# ejecutable; con Python se agrega la raíz del proyecto a sys.path para poder
+# importar `modules` aunque se ejecute como `python scripts/admin_superusuario.py`.
+CONGELADO = getattr(sys, 'frozen', False)
 ROOT = Path(__file__).resolve().parent.parent
-if str(ROOT) not in sys.path:
+if not CONGELADO and str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash
 
-# El .env de la raíz se carga antes que db_config (que solo mira el cwd).
-load_dotenv(dotenv_path=ROOT / '.env')
-
 from modules.db_config import _get_admin_connection
+from modules.passwords import PASSWORD_MIN_LEN, validar_password
 
 ROLES_VALIDOS = ('SUPERADMIN', 'ADMIN')
-PASSWORD_MIN_LEN = 8
 COLUMNAS_USUARIO = "id, username, nombre, email, rol, activo"
+CONFIG_NOMBRE = 'superusuario.json'
+# Clave del JSON -> variable que lee modules/db_config.py
+CONFIG_A_ENV = {
+    'engine': 'DB_ADMIN_ENGINE',
+    'host': 'DB_ADMIN_HOST',
+    'port': 'DB_ADMIN_PORT',
+    'user': 'DB_ADMIN_USER',
+    'password': 'DB_ADMIN_PASSWORD',
+    'database': 'DB_ADMIN_NAME',
+    'charset': 'DB_CHAR_SET',
+}
+CONFIG_OBLIGATORIAS = ('host', 'user', 'password', 'database')
+ENGINES_SOPORTADOS = ('mysql', 'postgresql', 'sqlserver')
 
 
 class Color:
@@ -80,10 +100,16 @@ def limpiar_pantalla():
     os.system('cls' if os.name == 'nt' else 'clear')
 
 
+CONEXION_DESC = ""  # destino de la conexión, lo completa main()
+
+
 def mostrar_titulo():
     print(f"\n{Color.CYAN}{Color.BOLD}{'=' * 60}")
     print("  TAURUS WMS — Administración de Superusuarios")
-    print(f"{'=' * 60}{Color.RESET}\n")
+    print(f"{'=' * 60}{Color.RESET}")
+    if CONEXION_DESC:
+        print(f"  {Color.DIM}BD: {CONEXION_DESC}{Color.RESET}")
+    print()
 
 
 def mostrar_encabezado(subtitulo):
@@ -175,14 +201,12 @@ def pedir_password_nueva(obligatoria=True):
     (mantener la actual), o None si no es válida.
     """
     etiqueta = "Contraseña" if obligatoria else "Nueva contraseña (Enter = mantener actual)"
-    password = _leer_password(f"  {etiqueta}: ")
-    if not password:
-        if obligatoria:
-            error("La contraseña no puede estar vacía.")
-            return None
+    password = _leer_password(f"  {etiqueta} (mín. {PASSWORD_MIN_LEN}): ")
+    if not password and not obligatoria:
         return ""
-    if len(password) < PASSWORD_MIN_LEN:
-        error(f"La contraseña debe tener al menos {PASSWORD_MIN_LEN} caracteres.")
+    mensaje = validar_password(password)
+    if mensaje:
+        error(mensaje)
         return None
     if password != _leer_password("  Confirmar contraseña: "):
         error("Las contraseñas no coinciden.")
@@ -410,15 +434,89 @@ def listar(cursor):
           f"{Color.DIM}, {Color.RED}{inactivos} inactivo(s){Color.RESET}")
 
 
+# --- Configuración de conexión ---
+
+class ConfigError(Exception):
+    pass
+
+
+def _directorio_base():
+    """Carpeta donde se busca superusuario.json: la del .exe o la de este script."""
+    return Path(sys.executable).resolve().parent if CONGELADO else Path(__file__).resolve().parent
+
+
+def cargar_config_json(ruta):
+    """Valida el JSON de conexión y lo vuelca a las variables DB_ADMIN_* (pisa el .env)."""
+    try:
+        with open(ruta, encoding='utf-8-sig') as fh:
+            datos = json.load(fh)
+    except json.JSONDecodeError as e:
+        raise ConfigError(f"{ruta} no es un JSON válido (línea {e.lineno}, columna {e.colno}): {e.msg}") from None
+    except OSError as e:
+        raise ConfigError(f"No se pudo leer {ruta}: {e.strerror}") from None
+
+    if not isinstance(datos, dict):
+        raise ConfigError(f"{ruta} debe contener un objeto JSON {{...}}")
+    desconocidas = sorted(set(datos) - set(CONFIG_A_ENV))
+    if desconocidas:
+        raise ConfigError(f"Claves desconocidas en {ruta}: {', '.join(desconocidas)} "
+                          f"(válidas: {', '.join(CONFIG_A_ENV)})")
+    faltantes = [k for k in CONFIG_OBLIGATORIAS if datos.get(k) in (None, '')]
+    if faltantes:
+        raise ConfigError(f"Faltan claves obligatorias en {ruta}: {', '.join(faltantes)}")
+    engine = str(datos.get('engine', 'mysql')).strip().lower()
+    if engine not in ENGINES_SOPORTADOS:
+        raise ConfigError(f"engine '{engine}' no soportado (usar: {', '.join(ENGINES_SOPORTADOS)})")
+    if 'port' in datos and not str(datos['port']).isdigit():
+        raise ConfigError(f"port debe ser numérico: {datos['port']!r}")
+
+    datos['engine'] = engine
+    # El JSON es la única fuente: se descartan DB_ADMIN_* que db_config haya
+    # tomado de algún .env, para no mezclar (p. ej. un port de otro entorno).
+    for var in CONFIG_A_ENV.values():
+        os.environ.pop(var, None)
+    for clave, valor in datos.items():
+        os.environ[CONFIG_A_ENV[clave]] = str(valor)
+    return datos
+
+
+def resolver_config(ruta_cli=None):
+    """Aplica la configuración de conexión y devuelve una descripción (sin password)."""
+    ruta = Path(ruta_cli) if ruta_cli else _directorio_base() / CONFIG_NOMBRE
+    if ruta_cli or ruta.exists():
+        datos = cargar_config_json(ruta)
+        return f"{datos['engine']}://{datos['user']}@{datos['host']}:{datos.get('port', 'default')}/{datos['database']} ({ruta.name})"
+    if CONGELADO:
+        raise ConfigError(
+            f"No se encontró {CONFIG_NOMBRE} junto al ejecutable ({ruta.parent}).\n"
+            f"  Copie superusuario.example.json como {CONFIG_NOMBRE} y complete las credenciales,\n"
+            f"  o indique otro archivo con --config <ruta.json>."
+        )
+    from dotenv import load_dotenv
+    load_dotenv(dotenv_path=ROOT / '.env')
+    return (f"{os.getenv('DB_ADMIN_ENGINE', 'mysql')}://{os.getenv('DB_ADMIN_USER', '')}@"
+            f"{os.getenv('DB_ADMIN_HOST', 'localhost')}/{os.getenv('DB_ADMIN_NAME', 'taurus_admin')} (.env)")
+
+
 # --- Bucle principal: una sola conexión a taurus_admin para toda la sesión ---
 
-def main():
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="Administración de usuarios del panel admin de Taurus WMS")
+    parser.add_argument('--config', help=f"JSON de conexión (default: {CONFIG_NOMBRE} junto al ejecutable)")
+    args = parser.parse_args(argv)
+
     try:
+        destino = resolver_config(args.config)
         conn = _get_admin_connection()
+    except ConfigError as e:
+        error(str(e))
+        return 1
     except Exception as e:
-        error(f"No se pudo conectar a taurus_admin (revisar DB_ADMIN_* en .env): {e}")
+        error(f"No se pudo conectar a la BD admin: {e}")
         return 1
     cursor = conn.cursor()
+    global CONEXION_DESC
+    CONEXION_DESC = destino
 
     acciones = {
         "1": lambda: crear_o_actualizar(conn, cursor),
@@ -463,4 +561,8 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    codigo = main()
+    if CONGELADO and codigo:
+        # Abierto con doble clic: que la consola no se cierre sin mostrar el error
+        input("\n  Enter para salir...")
+    sys.exit(codigo)
