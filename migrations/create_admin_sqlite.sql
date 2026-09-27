@@ -11,7 +11,7 @@ PRAGMA foreign_keys = ON;
 -- --- admin_usuarios ---;
 CREATE TABLE IF NOT EXISTS "admin_usuarios" (
     "id" INTEGER PRIMARY KEY AUTOINCREMENT,
-    "username" TEXT NOT NULL,
+    "username" TEXT NOT NULL UNIQUE,
     "password_hash" TEXT NOT NULL,
     "nombre" TEXT NOT NULL,
     "email" TEXT,
@@ -39,7 +39,7 @@ CREATE INDEX IF NOT EXISTS "idx_roles_activo" ON "roles" ("activo");
 -- --- tenants ---;
 CREATE TABLE IF NOT EXISTS "tenants" (
     "id" INTEGER PRIMARY KEY AUTOINCREMENT,
-    "codigo" TEXT NOT NULL,
+    "codigo" TEXT NOT NULL UNIQUE,
     "nombre" TEXT NOT NULL,
     "razon_social" TEXT,
     "cuit" TEXT,
@@ -67,7 +67,7 @@ CREATE INDEX IF NOT EXISTS "idx_activo" ON "tenants" ("activo");
 -- --- usuarios ---;
 CREATE TABLE IF NOT EXISTS "usuarios" (
     "id" INTEGER PRIMARY KEY AUTOINCREMENT,
-    "username" TEXT NOT NULL,
+    "username" TEXT NOT NULL UNIQUE,
     "password_hash" TEXT NOT NULL,
     "nombre" TEXT NOT NULL,
     "email" TEXT,
@@ -86,7 +86,7 @@ CREATE INDEX IF NOT EXISTS "idx_rol" ON "usuarios" ("rol");
 -- --- configuracion ---;
 CREATE TABLE IF NOT EXISTS "configuracion" (
     "id" INTEGER PRIMARY KEY AUTOINCREMENT,
-    "clave" TEXT NOT NULL,
+    "clave" TEXT NOT NULL UNIQUE,
     "valor" text,
     "descripcion" TEXT,
     "updated_at" TEXT DEFAULT (datetime('now'))
@@ -284,9 +284,6 @@ INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/stockc
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/inventario');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/inventario/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/parametros');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/stock');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/entradas');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/salidas');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/reportes');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/reportes/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/sidebar-preferences');

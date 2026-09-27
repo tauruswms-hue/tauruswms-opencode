@@ -444,7 +444,8 @@ CREATE TABLE IF NOT EXISTS "inventarios_cabecera" (
     "usuario_cierre" TEXT,
     "fecha_anulacion" TEXT,
     "usuario_anulacion" TEXT,
-    "tenant_id" INTEGER
+    "tenant_id" INTEGER,
+    UNIQUE ("numero", "tenant_id")
 );
 CREATE INDEX IF NOT EXISTS "idx_inventarios_cab_tenant" ON "inventarios_cabecera" ("tenant_id");
 

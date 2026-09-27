@@ -450,6 +450,7 @@ CREATE TABLE [inventarios_cabecera] (
     [tenant_id] INT
 );
 CREATE INDEX [idx_inventarios_cab_tenant] ON [inventarios_cabecera] ([tenant_id]);
+CREATE UNIQUE INDEX [uk_inventarios_numero_tenant] ON [inventarios_cabecera] ([numero], [tenant_id]);
 
 -- --- inventarios_detalle ---;
 CREATE TABLE [inventarios_detalle] (

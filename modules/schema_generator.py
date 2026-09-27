@@ -62,7 +62,7 @@ ADMIN_TABLES = [
         "comment": "Catalogo de roles de aplicacion",
         "columns": [
             {"name": "id",          "type": "int",          "pk": True, "autoincrement": True},
-            {"name": "nombre",      "type": "varchar(50)",  "not_null": True, "unique": True},
+            {"name": "nombre",      "type": "varchar(50)",  "not_null": True},
             {"name": "descripcion", "type": "varchar(255)"},
             {"name": "activo",      "type": "boolean", "default": True},
             {"name": "created_at",  "type": "datetime", "default": "CURRENT_TIMESTAMP"},
@@ -724,7 +724,7 @@ WMS_TABLES = [
         "name": "inventarios_cabecera",
         "columns": [
             {"name": "id",               "type": "int",          "pk": True, "autoincrement": True},
-            {"name": "numero",           "type": "varchar(20)",  "not_null": True, "unique": True},
+            {"name": "numero",           "type": "varchar(20)",  "not_null": True},
             {"name": "descripcion",      "type": "varchar(200)"},
             {"name": "estado",           "type": "enum('Abierto','Cerrado','Anulado')", "default": "'Abierto'"},
             {"name": "fecha_creacion",   "type": "datetime",     "default": "CURRENT_TIMESTAMP"},
@@ -737,6 +737,8 @@ WMS_TABLES = [
         ],
         "indexes": [
             {"columns": ["tenant_id"], "name": "idx_inventarios_cab_tenant"},
+            # numero es correlativo por tenant (INV-<año>-<n>, modules/inventario.py)
+            {"columns": ["numero", "tenant_id"], "name": "uk_inventarios_numero_tenant", "unique": True},
         ],
     },
     {
@@ -1261,6 +1263,8 @@ class DDLEngine:
             parts.append("NOT NULL")
         if "default" in col:
             parts.append(self.default_clause(col["default"]))
+        if col.get("unique") and not col.get("pk"):
+            parts.append("UNIQUE")
         return " ".join(parts)
 
     def autoincrement_clause(self):
@@ -1494,6 +1498,8 @@ class PostgreSQLEngine(DDLEngine):
             enum_vals = col["type"][5:-1]  # extract values from enum('a','b','c')
             parts.append(f"CHECK ({self.quote_identifier(col['name'])} IN ({enum_vals}))")
 
+        if col.get("unique") and not col.get("pk"):
+            parts.append("UNIQUE")
         return " ".join(parts)
 
     def create_table(self, table_def):
@@ -1622,6 +1628,8 @@ class SQLiteEngine(DDLEngine):
         if "default" in col:
             parts.append(self.default_clause(col["default"]))
 
+        if col.get("unique") and not col.get("pk"):
+            parts.append("UNIQUE")
         return " ".join(parts)
 
     def create_table(self, table_def):
@@ -1774,6 +1782,8 @@ class SQLServerEngine(DDLEngine):
         if "default" in col:
             parts.append(self.default_clause(col["default"]))
 
+        if col.get("unique") and not col.get("pk"):
+            parts.append("UNIQUE")
         return " ".join(parts)
 
     def create_table(self, table_def):

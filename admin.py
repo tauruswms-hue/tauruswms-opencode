@@ -63,12 +63,17 @@ def init_admin_db():
         conn = _get_admin_connection()
         cursor = conn.cursor()
 
-        cols = ['username', 'password_hash', 'nombre', 'email', 'rol']
-        sql = insert_ignore_sql('admin_usuarios', cols)
-        cursor.execute(sql, (
-            'admin', generate_password_hash('Admin@2024!'),
-            'Administrador', 'admin@taurus.local', 'SUPERADMIN'
-        ))
+        # Chequeo explícito: el INSERT IGNORE solo evita duplicados si existe el
+        # UNIQUE de username (instalaciones viejas no lo tenían y cada arranque,
+        # incluido el reloader de Flask, sumaba otro 'admin').
+        cursor.execute("SELECT 1 FROM admin_usuarios WHERE username = %s", ('admin',))
+        if not cursor.fetchone():
+            cols = ['username', 'password_hash', 'nombre', 'email', 'rol']
+            sql = insert_ignore_sql('admin_usuarios', cols)
+            cursor.execute(sql, (
+                'admin', generate_password_hash('Admin@2024!'),
+                'Administrador', 'admin@taurus.local', 'SUPERADMIN'
+            ))
 
         conn.commit()
         cursor.close()

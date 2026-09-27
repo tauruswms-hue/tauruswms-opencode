@@ -14,7 +14,7 @@ USE [taurus_admin];
 -- --- admin_usuarios ---;
 CREATE TABLE [admin_usuarios] (
     [id] INT IDENTITY(1,1) PRIMARY KEY,
-    [username] NVARCHAR(50) NOT NULL,
+    [username] NVARCHAR(50) NOT NULL UNIQUE,
     [password_hash] NVARCHAR(255) NOT NULL,
     [nombre] NVARCHAR(100) NOT NULL,
     [email] NVARCHAR(100),
@@ -42,7 +42,7 @@ CREATE INDEX [idx_roles_activo] ON [roles] ([activo]);
 -- --- tenants ---;
 CREATE TABLE [tenants] (
     [id] INT IDENTITY(1,1) PRIMARY KEY,
-    [codigo] NVARCHAR(20) NOT NULL,
+    [codigo] NVARCHAR(20) NOT NULL UNIQUE,
     [nombre] NVARCHAR(100) NOT NULL,
     [razon_social] NVARCHAR(200),
     [cuit] NVARCHAR(50),
@@ -70,7 +70,7 @@ CREATE INDEX [idx_activo] ON [tenants] ([activo]);
 -- --- usuarios ---;
 CREATE TABLE [usuarios] (
     [id] INT IDENTITY(1,1) PRIMARY KEY,
-    [username] NVARCHAR(50) NOT NULL,
+    [username] NVARCHAR(50) NOT NULL UNIQUE,
     [password_hash] NVARCHAR(255) NOT NULL,
     [nombre] NVARCHAR(100) NOT NULL,
     [email] NVARCHAR(100),
@@ -89,7 +89,7 @@ CREATE INDEX [idx_rol] ON [usuarios] ([rol]);
 -- --- configuracion ---;
 CREATE TABLE [configuracion] (
     [id] INT IDENTITY(1,1) PRIMARY KEY,
-    [clave] NVARCHAR(100) NOT NULL,
+    [clave] NVARCHAR(100) NOT NULL UNIQUE,
     [valor] NVARCHAR(MAX),
     [descripcion] NVARCHAR(255),
     [updated_at] DATETIME2 DEFAULT GETDATE()
@@ -287,9 +287,6 @@ IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'CONSULTA') INSERT INTO
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'CONSULTA') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('CONSULTA', '/inventario');
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'CONSULTA') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('CONSULTA', '/inventario/*');
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'CONSULTA') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('CONSULTA', '/parametros');
-IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'CONSULTA') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('CONSULTA', '/stock');
-IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'CONSULTA') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('CONSULTA', '/entradas');
-IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'CONSULTA') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('CONSULTA', '/salidas');
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'CONSULTA') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('CONSULTA', '/reportes');
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'CONSULTA') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('CONSULTA', '/reportes/*');
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'CONSULTA') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('CONSULTA', '/sidebar-preferences');

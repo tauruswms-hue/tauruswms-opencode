@@ -445,7 +445,8 @@ CREATE TABLE `inventarios_cabecera` (
     `usuario_cierre` varchar(100),
     `fecha_anulacion` datetime,
     `usuario_anulacion` varchar(100),
-    `tenant_id` int
+    `tenant_id` int,
+    UNIQUE KEY `uk_inventarios_numero_tenant` (`numero`, `tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE INDEX `idx_inventarios_cab_tenant` ON `inventarios_cabecera` (`tenant_id`);
 

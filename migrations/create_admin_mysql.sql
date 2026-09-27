@@ -12,7 +12,7 @@ USE taurus_admin;
 -- --- admin_usuarios ---;
 CREATE TABLE `admin_usuarios` (
     `id` int AUTO_INCREMENT PRIMARY KEY,
-    `username` varchar(50) NOT NULL,
+    `username` varchar(50) NOT NULL UNIQUE,
     `password_hash` varchar(255) NOT NULL,
     `nombre` varchar(100) NOT NULL,
     `email` varchar(100),
@@ -40,7 +40,7 @@ CREATE INDEX `idx_roles_activo` ON `roles` (`activo`);
 -- --- tenants ---;
 CREATE TABLE `tenants` (
     `id` int AUTO_INCREMENT PRIMARY KEY,
-    `codigo` varchar(20) NOT NULL,
+    `codigo` varchar(20) NOT NULL UNIQUE,
     `nombre` varchar(100) NOT NULL,
     `razon_social` varchar(200),
     `cuit` varchar(50),
@@ -68,7 +68,7 @@ CREATE INDEX `idx_activo` ON `tenants` (`activo`);
 -- --- usuarios ---;
 CREATE TABLE `usuarios` (
     `id` int AUTO_INCREMENT PRIMARY KEY,
-    `username` varchar(50) NOT NULL,
+    `username` varchar(50) NOT NULL UNIQUE,
     `password_hash` varchar(255) NOT NULL,
     `nombre` varchar(100) NOT NULL,
     `email` varchar(100),
@@ -87,7 +87,7 @@ CREATE INDEX `idx_rol` ON `usuarios` (`rol`);
 -- --- configuracion ---;
 CREATE TABLE `configuracion` (
     `id` int AUTO_INCREMENT PRIMARY KEY,
-    `clave` varchar(100) NOT NULL,
+    `clave` varchar(100) NOT NULL UNIQUE,
     `valor` text,
     `descripcion` varchar(255),
     `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -285,9 +285,6 @@ INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('CONSULTA', '/stockcont
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('CONSULTA', '/inventario');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('CONSULTA', '/inventario/*');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('CONSULTA', '/parametros');
-INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('CONSULTA', '/stock');
-INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('CONSULTA', '/entradas');
-INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('CONSULTA', '/salidas');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('CONSULTA', '/reportes');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('CONSULTA', '/reportes/*');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('CONSULTA', '/sidebar-preferences');

@@ -12,7 +12,7 @@ CREATE DATABASE taurus_admin;
 -- --- admin_usuarios ---;
 CREATE TABLE "admin_usuarios" (
     "id" SERIAL,
-    "username" VARCHAR(50) NOT NULL,
+    "username" VARCHAR(50) NOT NULL UNIQUE,
     "password_hash" VARCHAR(255) NOT NULL,
     "nombre" VARCHAR(100) NOT NULL,
     "email" VARCHAR(100),
@@ -40,7 +40,7 @@ CREATE INDEX "idx_roles_activo" ON "roles" ("activo");
 -- --- tenants ---;
 CREATE TABLE "tenants" (
     "id" SERIAL,
-    "codigo" VARCHAR(20) NOT NULL,
+    "codigo" VARCHAR(20) NOT NULL UNIQUE,
     "nombre" VARCHAR(100) NOT NULL,
     "razon_social" VARCHAR(200),
     "cuit" VARCHAR(50),
@@ -68,7 +68,7 @@ CREATE INDEX "idx_activo" ON "tenants" ("activo");
 -- --- usuarios ---;
 CREATE TABLE "usuarios" (
     "id" SERIAL,
-    "username" VARCHAR(50) NOT NULL,
+    "username" VARCHAR(50) NOT NULL UNIQUE,
     "password_hash" VARCHAR(255) NOT NULL,
     "nombre" VARCHAR(100) NOT NULL,
     "email" VARCHAR(100),
@@ -87,7 +87,7 @@ CREATE INDEX "idx_rol" ON "usuarios" ("rol");
 -- --- configuracion ---;
 CREATE TABLE "configuracion" (
     "id" SERIAL,
-    "clave" VARCHAR(100) NOT NULL,
+    "clave" VARCHAR(100) NOT NULL UNIQUE,
     "valor" text,
     "descripcion" VARCHAR(255),
     "updated_at" datetime DEFAULT CURRENT_TIMESTAMP
@@ -285,9 +285,6 @@ INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/stockcontable/pl
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/inventario') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/inventario/*') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/parametros') ON CONFLICT DO NOTHING;
-INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/stock') ON CONFLICT DO NOTHING;
-INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/entradas') ON CONFLICT DO NOTHING;
-INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/salidas') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/reportes') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/reportes/*') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/sidebar-preferences') ON CONFLICT DO NOTHING;
