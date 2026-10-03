@@ -11,9 +11,9 @@ Uso (desde cualquier directorio, con el .venv del proyecto):
     python scripts/build_superusuario.py
 
 Salida:
-    superusuario-dist/superusuario.exe            (versionado)
-    superusuario-dist/superusuario.example.json   (plantilla, versionada)
-    superusuario-dist/superusuario.json           (credenciales reales, gitignored)
+    superusuario-dist/superusuario.exe    (versionado)
+    superusuario-dist/superusuario.json   (credenciales; versionado con valores de
+                                           plantilla, no commitear las reales)
 Los archivos intermedios quedan en build/ (gitignored).
 """
 import sys

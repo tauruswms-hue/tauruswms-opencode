@@ -16,7 +16,7 @@ Conexión (primera que aplique):
     3. Solo ejecutando con Python: variables DB_ADMIN_* del .env de la raíz.
     El JSON tiene las claves engine (mysql|postgresql|sqlserver, default mysql),
     host, port, user, password, database y opcional charset; ver
-    superusuario-dist/superusuario.example.json. Se conecta con
+    superusuario-dist/superusuario.json. Se conecta con
     `_get_admin_connection()` de modules/db_config.py.
     El ejecutable se construye con `python scripts/build_superusuario.py`.
 
@@ -489,7 +489,7 @@ def resolver_config(ruta_cli=None):
     if CONGELADO:
         raise ConfigError(
             f"No se encontró {CONFIG_NOMBRE} junto al ejecutable ({ruta.parent}).\n"
-            f"  Copie superusuario.example.json como {CONFIG_NOMBRE} y complete las credenciales,\n"
+            f"  Cree {CONFIG_NOMBRE} con las credenciales de taurus_admin (ver LEEME.txt),\n"
             f"  o indique otro archivo con --config <ruta.json>."
         )
     from dotenv import load_dotenv

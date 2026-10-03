@@ -7,6 +7,5 @@ picking_docs/
 *.db
 .DS_Store
 
-# Ejecutable portable de superusuarios: credenciales reales y archivos intermedios
-superusuario-dist/superusuario.json
+# Ejecutable portable de superusuarios: archivos intermedios
 build/
