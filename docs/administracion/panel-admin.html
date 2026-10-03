@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Panel admin — Taurus WMS</title>
+    <link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body data-root="../" data-page="administracion/panel-admin.html">
+<div class="layout">
+    <nav id="sidebar"></nav>
+    <main class="content">
+        <p class="migas">Administración</p>
+        <h1>Panel admin</h1>
+        <p class="bajada">Aplicación de administración de la instalación: <code>python admin.py</code>,
+        en <code>http://localhost:5001/admin</code>.</p>
+
+        <h2>Lo básico</h2>
+        <ul>
+            <li>Sus usuarios están en <code>taurus_admin.admin_usuarios</code>, separados de los usuarios del WMS
+                (<code>taurus_admin.usuarios</code>).</li>
+            <li>Roles del panel: <code>SUPERADMIN</code> y <code>ADMIN</code>. Los parámetros de tenants, los tokens
+                de API y la sección de intercambio son solo para <code>SUPERADMIN</code>.</li>
+            <li>Usa su propia cookie de sesión, <code>taurus_admin_session</code>.</li>
+            <li>El primer usuario se crea con el <a href="superusuario.html">ejecutable de superusuario</a>.</li>
+        </ul>
+
+        <div class="aviso pendiente">
+            <p><strong>Pendiente.</strong> Falta documentar cada sección del panel:</p>
+            <ul>
+                <li>Tenants: alta con código, activación y baja.</li>
+                <li>Usuarios del WMS: alta, rol y tenant.</li>
+                <li>Roles y asignación de rutas.</li>
+                <li>Parámetros por tenant.</li>
+                <li>Configuración de conexión a las bases WMS e intercambio.</li>
+                <li>Tokens de API.</li>
+                <li>Intercambio: ejecución y reintentos.</li>
+            </ul>
+        </div>
+
+        <div id="pager"></div>
+    </main>
+</div>
+<script src="../assets/docs.js"></script>
+</body>
+</html>

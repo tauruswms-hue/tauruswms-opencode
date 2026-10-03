@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Roles y permisos — Taurus WMS</title>
+    <link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body data-root="../" data-page="arquitectura/roles-permisos.html">
+<div class="layout">
+    <nav id="sidebar"></nav>
+    <main class="content">
+        <p class="migas">Arquitectura</p>
+        <h1>Roles y permisos</h1>
+        <p class="bajada">El acceso se define por ruta: cada rol tiene habilitado un conjunto de rutas del WMS.</p>
+
+        <h2>Modelo</h2>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Elemento</th><th>Dónde</th><th>Qué es</th></tr></thead>
+                <tbody>
+                    <tr><td>Roles</td><td>Tabla <code>roles</code> (<code>taurus_admin</code>)</td><td>Catálogo de roles.</td></tr>
+                    <tr><td>Permisos</td><td>Tabla <code>roles_rutas</code></td><td>Pares (rol, ruta) habilitados.</td></tr>
+                    <tr><td>Rutas asignables</td><td><code>ROUTE_CATALOG</code> en <code>modules/schema_generator.py</code></td>
+                        <td>Rutas agrupadas por módulo. Admite comodines <code>/*</code> y <code>*</code>.</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p>La asignación se hace desde el panel admin y vale para todos los tenants.</p>
+
+        <h2>Verificación en cada request</h2>
+        <ol>
+            <li>El middleware <code>verificar_autenticacion_y_permisos</code> (<code>app.py</code>) exige sesión
+                válida.</li>
+            <li>Recalcula las rutas permitidas del rol y las deja en <code>session['rutas_permitidas']</code>, por
+                lo que un cambio hecho en el panel se aplica sin volver a iniciar sesión.</li>
+            <li>Si la ruta pedida está en el catálogo y el rol no la tiene, se bloquea.</li>
+        </ol>
+        <p>La consulta a <code>taurus_admin</code> se cachea por rol (<code>modules/permisos_cache.py</code>,
+        <code>PERMISOS_CACHE_TTL</code>, 30 s por defecto). El panel admin invalida la caché de su proceso al
+        modificar roles o rutas.</p>
+
+        <h2>Casos especiales</h2>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Caso</th><th>Comportamiento</th></tr></thead>
+                <tbody>
+                    <tr><td>Rol <code>SUPERADMIN</code></td><td>Sin verificación de rutas.</td></tr>
+                    <tr><td>Permiso <code>*</code> ("Acceso total")</td><td>Sin verificación de rutas.</td></tr>
+                    <tr><td>Rutas fuera del catálogo</td><td>Solo exigen login: <code>/</code>, <code>/logout</code>,
+                        <code>/estado</code>, <code>/api/xlsx_sheetnames</code>.</td></tr>
+                    <tr><td><code>/login</code></td><td>Pública.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>En las plantillas</h2>
+        <p>El helper <code>tiene_permiso_ruta</code> está disponible en Jinja para mostrar u ocultar elementos
+        según el rol:</p>
+<pre><code>{% if tiene_permiso_ruta('/pedidos/nuevo') %}
+    ...
+{% endif %}</code></pre>
+
+        <h2>Al agregar un módulo o una ruta</h2>
+        <div class="aviso atencion">
+            <p>Agregar la ruta a <code>ROUTE_CATALOG</code>. Una ruta que no está en el catálogo queda accesible
+            para cualquier usuario con sesión.</p>
+        </div>
+
+        <div id="pager"></div>
+    </main>
+</div>
+<script src="../assets/docs.js"></script>
+</body>
+</html>

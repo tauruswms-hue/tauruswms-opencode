@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Base de datos — Taurus WMS</title>
+    <link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body data-root="../" data-page="arquitectura/base-de-datos.html">
+<div class="layout">
+    <nav id="sidebar"></nav>
+    <main class="content">
+        <p class="migas">Arquitectura</p>
+        <h1>Base de datos</h1>
+        <p class="bajada">Motores soportados, las tres bases del sistema y cómo se resuelven las conexiones.</p>
+
+        <h2>Motores</h2>
+        <p>No hay ORM: el código escribe SQL y lo adapta a cada motor con <code>modules/sql_dialect.py</code>.
+        El motor se elige con <code>DB_ENGINE</code> (o <code>DB_&lt;BASE&gt;_ENGINE</code> por base).</p>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Motor</th><th><code>DB_ENGINE</code></th><th>Driver</th><th>Puerto</th><th>Uso</th></tr></thead>
+                <tbody>
+                    <tr><td>MySQL</td><td><code>mysql</code></td><td><code>pymysql</code></td><td>3306</td><td>Default y recomendado.</td></tr>
+                    <tr><td>PostgreSQL</td><td><code>postgresql</code></td><td><code>psycopg2</code></td><td>5432</td><td>Soportado.</td></tr>
+                    <tr><td>SQL Server</td><td><code>sqlserver</code></td><td><code>pymssql</code></td><td>1433</td><td>Soportado.</td></tr>
+                    <tr><td>SQLite</td><td><code>sqlite</code></td><td><code>sqlite3</code></td><td>—</td>
+                        <td>Solo referencia: se genera el DDL, pero la aplicación no funciona sobre SQLite.</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="aviso">
+            <p><strong>Por qué SQLite no es un runtime.</strong> El código usa marcadores <code>%s</code> y filas
+            tipo diccionario; el driver <code>sqlite3</code> no acepta <code>%s</code>.</p>
+        </div>
+
+        <h2>Las tres bases</h2>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Base</th><th>Contenido</th><th>De dónde sale la conexión</th></tr></thead>
+                <tbody>
+                    <tr><td><code>taurus_admin</code></td><td>Usuarios, tenants, roles, configuración.</td>
+                        <td>Variables <code>DB_ADMIN_*</code> del entorno.</td></tr>
+                    <tr><td><code>taurus_wms</code></td><td>Datos operativos: maestros, stock, pedidos, recepciones.</td>
+                        <td>Tabla <code>configuracion</code> de <code>taurus_admin</code>; <code>DB_*</code> como respaldo.</td></tr>
+                    <tr><td><code>taurus_intercambio</code></td><td>Interfase con sistemas externos.</td>
+                        <td>Claves <code>INTERCAMBIO_*</code> de <code>configuracion</code>; <code>DB_INTERCAMBIO_*</code> como respaldo.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Conexiones</h2>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Función (<code>modules/db_config.py</code>)</th><th>Base</th></tr></thead>
+                <tbody>
+                    <tr><td><code>get_db_connection()</code></td><td>WMS</td></tr>
+                    <tr><td><code>_get_admin_connection()</code></td><td>Admin</td></tr>
+                    <tr><td><code>get_intercambio_connection()</code></td><td>Intercambio</td></tr>
+                    <tr><td><code>probar_conexion()</code></td><td>Prueba una conexión con parámetros sueltos, sin tocar el pool.</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p>Las tres usan un pool <code>PooledDB</code> (DBUtils), uno por combinación de motor y configuración,
+        con hasta 20 conexiones.</p>
+        <div class="aviso">
+            <p><strong><code>conn.close()</code> no cierra.</strong> Devuelve la conexión al pool (con rollback).
+            Los pools se desarman con <code>clear_config_cache()</code> o cuando cambia la configuración.</p>
+        </div>
+
+        <h2>Propagación de cambios de configuración</h2>
+        <p>La configuración leída de la tabla <code>configuracion</code> se cachea y se relee cada
+        <code>CONFIG_CACHE_TTL</code> segundos (30 por defecto). Si los valores cambiaron, se reinician el motor y
+        los pools. Así llegan al proceso del WMS los cambios hechos desde el panel admin, que corre en otro
+        proceso. Si la base admin está caída al refrescar, se conserva la última configuración conocida.</p>
+
+        <h2>Reglas al escribir SQL</h2>
+        <ul>
+            <li><strong>Nunca escribir backticks a mano.</strong> Los identificadores se entrecomillan con
+                <code>sql_quote()</code>; los backticks de MySQL rompen el resto de los motores.</li>
+            <li>Usar los helpers de <code>sql_dialect.py</code> para lo que difiere entre motores:
+                <code>insert_ignore_sql()</code>, <code>upsert_sql()</code>, <code>limit_sql()</code>,
+                <code>concat()</code>, <code>group_concat()</code>, entre otros.</li>
+            <li>Marcadores <code>%s</code> y filas como diccionario.</li>
+            <li>Toda consulta operativa lleva el filtro de tenant. Ver <a href="multi-tenancy.html">Multi-tenancy</a>.</li>
+        </ul>
+
+        <div class="aviso pendiente">
+            <p><strong>Pendiente.</strong> Diagrama de tablas y relaciones por base.</p>
+        </div>
+
+        <div id="pager"></div>
+    </main>
+</div>
+<script src="../assets/docs.js"></script>
+</body>
+</html>

@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Intercambio — Taurus WMS</title>
+    <link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body data-root="../" data-page="integraciones/intercambio.html">
+<div class="layout">
+    <nav id="sidebar"></nav>
+    <main class="content">
+        <p class="migas">Integraciones</p>
+        <h1>Intercambio</h1>
+        <p class="bajada">Interfase por tablas: el sistema de gestión externo inserta registros en
+        <code>taurus_intercambio</code> y el WMS los aplica sobre sus datos.</p>
+
+        <h2>Flujo</h2>
+        <ol>
+            <li>El sistema externo inserta una fila por operación, con <code>estado = 'pendiente'</code>,
+                <code>accion</code> (<code>alta</code>, <code>modificacion</code> o <code>baja</code>) y
+                <code>tenant_codigo</code>.</li>
+            <li>El proceso lee las pendientes y aplica cada una sobre el WMS, con un commit por registro.</li>
+            <li>Si un registro falla, queda con <code>estado = 'error'</code> y el motivo en
+                <code>error_mensaje</code> (hasta 2000 caracteres). El resto continúa.</li>
+            <li>La columna <code>id_&lt;entidad&gt;_wms</code> guarda el ID resultante en el WMS.</li>
+            <li>Cada ejecución queda registrada en <code>intercambio_log</code>.</li>
+        </ol>
+
+        <h2>Módulos</h2>
+        <p>Se procesan en este orden, por sus dependencias:</p>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>#</th><th>Tabla</th><th>Destino en el WMS</th><th>Clave</th><th>Baja</th></tr></thead>
+                <tbody>
+                    <tr><td>1</td><td><code>intercambio_rutas</code></td><td><code>rutas</code></td><td><code>nombre_ruta</code></td><td>Borra la ruta.</td></tr>
+                    <tr><td>2</td><td><code>intercambio_transportes</code></td><td><code>transportes</code></td><td><code>codigo</code></td><td>Desactiva.</td></tr>
+                    <tr><td>3</td><td><code>intercambio_transporte_rutas</code></td><td><code>transporte_rutas</code></td>
+                        <td><code>transporte_codigo</code> + <code>ruta_nombre</code></td><td>Elimina la asignación.</td></tr>
+                    <tr><td>4</td><td><code>intercambio_clientes</code></td><td><code>clientes</code></td><td><code>codigo</code></td><td>Desactiva.</td></tr>
+                    <tr><td>5</td><td><code>intercambio_materiales</code></td><td><code>materiales</code></td><td><code>codigo</code></td><td>Desactiva.</td></tr>
+                    <tr><td>6</td><td><code>intercambio_pedidos</code></td><td><code>pedidos_cabecera</code> + <code>pedidos_detalle</code></td>
+                        <td><code>nro_pedido</code></td><td>Borra el pedido solo si sigue <code>Pendiente</code>.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h3>Referencias entre módulos</h3>
+        <ul>
+            <li>Clientes: <code>ruta_nombre</code> y <code>transporte_codigo</code>.</li>
+            <li>Pedidos: <code>cliente_codigo</code>, <code>ruta_nombre</code>, <code>transporte_codigo</code> y
+                <code>clase_nombre</code>.</li>
+        </ul>
+
+        <h3>Ítems de un pedido</h3>
+        <p>La cabecera va en columnas y los ítems en <code>items_json</code>, como una lista:</p>
+<pre><code>[
+  { "material_codigo": "MAT001", "cantidad": 10, "tipo_stock": "Libre Venta" }
+]</code></pre>
+
+        <h2>Cómo se dispara</h2>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Medio</th><th>Dónde</th></tr></thead>
+                <tbody>
+                    <tr><td>WMS</td><td>Pantalla <code>/intercambio</code>: procesar y reintentar.</td></tr>
+                    <tr><td>Panel admin</td><td><code>/admin/intercambio</code>, solo <code>SUPERADMIN</code>.</td></tr>
+                    <tr><td>Tarea programada</td><td><code>python procesar_intercambio.py [--tenant &lt;id&gt;]</code>, para cron o el
+                        Programador de tareas.</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p>Si se indica un tenant, solo se procesan sus registros.</p>
+
+        <h2>Permisos</h2>
+        <p>Las rutas <code>/intercambio*</code> están en el catálogo, en el grupo "Intercambio", y se asignan por
+        rol. Ver <a href="../arquitectura/roles-permisos.html">Roles y permisos</a>.</p>
+
+        <h2>Código</h2>
+        <p>Todo vive en <code>modules/intercambio.py</code>:</p>
+        <ul>
+            <li><code>_procesar_tabla_intercambio()</code>: núcleo genérico.</li>
+            <li><code>MODULOS</code>: catálogo de módulo → tabla, columna de ID y función que aplica el registro.</li>
+            <li><code>procesar_intercambio()</code>: corre todos los módulos en orden;
+                <code>procesar_intercambio_&lt;modulo&gt;()</code> corre uno.</li>
+            <li><code>reintentar_intercambio()</code> y <code>reintentar_todo()</code>: vuelven a procesar los
+                registros con error.</li>
+        </ul>
+
+        <h3>Agregar un módulo</h3>
+        <ol>
+            <li>Definir la tabla en <code>INTERCAMBIO_TABLES</code> (<code>modules/schema_generator.py</code>) y
+                regenerar el schema.</li>
+            <li>Escribir la función que aplica un registro sobre el WMS.</li>
+            <li>Registrarlo en <code>MODULOS</code>, respetando el orden de dependencias.</li>
+        </ol>
+
+        <div class="aviso pendiente">
+            <p><strong>Pendiente.</strong> Columnas de cada tabla de intercambio, con ejemplos de inserción.</p>
+        </div>
+
+        <div id="pager"></div>
+    </main>
+</div>
+<script src="../assets/docs.js"></script>
+</body>
+</html>

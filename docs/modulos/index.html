@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Catálogo de módulos — Taurus WMS</title>
+    <link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body data-root="../" data-page="modulos/index.html">
+<div class="layout">
+    <nav id="sidebar"></nav>
+    <main class="content">
+        <p class="migas">Módulos del WMS</p>
+        <h1>Catálogo de módulos</h1>
+        <p class="bajada">Los módulos funcionales del WMS y el estado de su documentación. Cada uno tendrá su
+        propia página en esta carpeta.</p>
+
+        <p>La lista sigue los grupos de <code>ROUTE_CATALOG</code>, que son también las unidades de permiso que se
+        asignan a cada rol.</p>
+
+        <h2>Maestros</h2>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Módulo</th><th>Ruta</th><th>Código</th><th>Documentación</th></tr></thead>
+                <tbody>
+                    <tr><td>Materiales</td><td><code>/materiales</code></td><td><code>modules/materiales.py</code></td><td><span class="estado pendiente">Pendiente</span></td></tr>
+                    <tr><td>Categorías</td><td><code>/categorias</code></td><td><code>modules/categorias.py</code></td><td><span class="estado pendiente">Pendiente</span></td></tr>
+                    <tr><td>Unidades</td><td><code>/unidades</code></td><td><code>modules/unidades.py</code></td><td><span class="estado pendiente">Pendiente</span></td></tr>
+                    <tr><td>Ubicaciones</td><td><code>/ubicaciones</code></td><td><code>modules/ubicaciones.py</code></td><td><span class="estado pendiente">Pendiente</span></td></tr>
+                    <tr><td>Tipos de ubicación</td><td><code>/tipoubicacion</code></td><td><code>modules/tipoubicacion.py</code></td><td><span class="estado pendiente">Pendiente</span></td></tr>
+                    <tr><td>Zonas</td><td><code>/zonas</code></td><td><code>modules/zonas.py</code></td><td><span class="estado pendiente">Pendiente</span></td></tr>
+                    <tr><td>Proveedores</td><td><code>/proveedores</code></td><td><code>modules/proveedores.py</code></td><td><span class="estado pendiente">Pendiente</span></td></tr>
+                    <tr><td>Clientes</td><td><code>/clientes</code></td><td><code>modules/clientes.py</code></td><td><span class="estado pendiente">Pendiente</span></td></tr>
+                    <tr><td>Transportes</td><td><code>/transportes</code></td><td><code>modules/transportes.py</code></td><td><span class="estado pendiente">Pendiente</span></td></tr>
+                    <tr><td>Rutas de reparto</td><td><code>/rutas</code></td><td><code>modules/rutas.py</code></td><td><span class="estado pendiente">Pendiente</span></td></tr>
+                    <tr><td>Clases de pedido</td><td><code>/clases-pedido</code></td><td><code>modules/clases_pedido.py</code></td><td><span class="estado pendiente">Pendiente</span></td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p>Los maestros comparten la misma forma: listado, guardar, eliminar, importar, exportar y plantilla de
+        importación (CSV / JSON / XLSX, vía <code>modules/batch_utils.py</code>).</p>
+
+        <h2>Operación</h2>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Módulo</th><th>Ruta</th><th>Código</th><th>Documentación</th></tr></thead>
+                <tbody>
+                    <tr><td>Recepciones</td><td><code>/recepciones</code></td><td><code>modules/recepciones.py</code></td><td><span class="estado pendiente">Pendiente</span></td></tr>
+                    <tr><td>OMC (órdenes de movimiento)</td><td><code>/omc</code></td><td><code>modules/omc.py</code></td><td><span class="estado pendiente">Pendiente</span></td></tr>
+                    <tr><td>Pedidos</td><td><code>/pedidos</code></td><td><code>modules/pedidos.py</code></td><td><span class="estado pendiente">Pendiente</span></td></tr>
+                    <tr><td>Despacho</td><td><code>/despacho</code></td><td><code>modules/despacho.py</code></td><td><span class="estado pendiente">Pendiente</span></td></tr>
+                    <tr><td>Móvil</td><td><code>/movil</code></td><td><code>modules/movil.py</code></td><td><span class="estado pendiente">Pendiente</span></td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Stock y control</h2>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Módulo</th><th>Ruta</th><th>Código</th><th>Documentación</th></tr></thead>
+                <tbody>
+                    <tr><td>Stock contable</td><td><code>/stockcontable</code></td><td><code>modules/stockcontable.py</code></td><td><span class="estado pendiente">Pendiente</span></td></tr>
+                    <tr><td>Inventario</td><td><code>/inventario</code></td><td><code>modules/inventario.py</code></td><td><span class="estado pendiente">Pendiente</span></td></tr>
+                    <tr><td>Reportes</td><td><code>/reportes</code></td><td><code>modules/reportes.py</code></td><td><span class="estado pendiente">Pendiente</span></td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p>Los reportes (stock, valorizado, auditoría, recepciones, pedidos) se exportan en CSV, XLSX o JSON desde
+        <code>/reportes/exportar/&lt;tipo&gt;/&lt;formato&gt;</code>. Todo movimiento de stock queda registrado en
+        <code>stock_movimientos</code>.</p>
+
+        <h2>Sistema</h2>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Módulo</th><th>Ruta</th><th>Código</th><th>Documentación</th></tr></thead>
+                <tbody>
+                    <tr><td>Parámetros</td><td><code>/parametros</code></td><td><code>modules/parametros.py</code></td><td><span class="estado pendiente">Pendiente</span></td></tr>
+                    <tr><td>Configuración de base</td><td><code>/configuracion-db</code></td><td><code>app.py</code></td><td><span class="estado pendiente">Pendiente</span></td></tr>
+                    <tr><td>Intercambio</td><td><code>/intercambio</code></td><td><code>modules/intercambio.py</code></td>
+                        <td><a href="../integraciones/intercambio.html">Intercambio</a></td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Ficha de cada módulo</h2>
+        <p>Para que las páginas sean parejas, cada módulo se documenta con estas secciones:</p>
+        <ol>
+            <li><strong>Para qué sirve</strong>: el proceso del depósito que resuelve.</li>
+            <li><strong>Pantallas</strong>: qué se puede hacer en cada una.</li>
+            <li><strong>Estados y reglas</strong>: ciclo de vida del documento y validaciones.</li>
+            <li><strong>Efecto sobre el stock</strong>: qué movimientos genera.</li>
+            <li><strong>Importación y exportación</strong>: columnas de la plantilla.</li>
+            <li><strong>Rutas y permisos</strong>: rutas del catálogo.</li>
+            <li><strong>Tablas</strong>: tablas que lee y escribe.</li>
+        </ol>
+
+        <div id="pager"></div>
+    </main>
+</div>
+<script src="../assets/docs.js"></script>
+</body>
+</html>

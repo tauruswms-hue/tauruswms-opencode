@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Puesta en producción — Taurus WMS</title>
+    <link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body data-root="../" data-page="operacion/produccion.html">
+<div class="layout">
+    <nav id="sidebar"></nav>
+    <main class="content">
+        <p class="migas">Operación</p>
+        <h1>Puesta en producción</h1>
+        <p class="bajada">Lista de verificación antes de exponer el sistema a usuarios reales.</p>
+
+        <div class="aviso peligro">
+            <p><strong>Pendiente en el código: servidor y modo debug.</strong> Hoy <code>app.py</code> y
+            <code>admin.py</code> arrancan con el servidor de desarrollo de Flask y <code>debug=True</code>, y el
+            <code>Dockerfile</code> los ejecuta así. El depurador expuesto por red permite ejecutar código en el
+            servidor. Antes de producción hay que servir las apps con un servidor WSGI (waitress o gunicorn) y
+            desactivar el modo debug.</p>
+        </div>
+
+        <h2>Configuración</h2>
+        <ul>
+            <li><code>APP_ENV=production</code> en el <code>.env</code>.</li>
+            <li>Secretos propios y aleatorios: <code>SECRET_KEY</code>, <code>ADMIN_SECRET_KEY</code>,
+                <code>SECRET_SALT</code>. Con valores por defecto, las apps no arrancan en producción.</li>
+            <li>Contraseñas de base propias en <code>DB_ADMIN_PASSWORD</code>, <code>DB_PASSWORD</code> y
+                <code>DB_INTERCAMBIO_PASSWORD</code>.</li>
+            <li>HTTPS delante de las dos apps: en producción la cookie de sesión es <code>Secure</code> y no viaja
+                por HTTP.</li>
+        </ul>
+
+        <h2>Base de datos</h2>
+        <ul>
+            <li>Crear las bases desde los <code>create_*.sql</code> y registrar las migraciones con
+                <code>migrate.py --baseline</code>. Ver <a href="../administracion/migraciones.html">Schema y migraciones</a>.</li>
+            <li>No cargar los seeds de desarrollo ni ejecutar <code>scripts/crear_tablas.py</code>.</li>
+            <li>Usuario de base con los permisos mínimos necesarios, no <code>root</code>.</li>
+        </ul>
+
+        <h2>Usuarios</h2>
+        <ul>
+            <li>Crear el primer <code>SUPERADMIN</code> del panel con el
+                <a href="../administracion/superusuario.html">ejecutable de superusuario</a>. En producción el panel
+                no crea el usuario <code>admin</code> por defecto.</li>
+            <li>Dar de alta tenants y usuarios del WMS desde el panel admin.</li>
+        </ul>
+
+        <h2>Tareas programadas</h2>
+        <ul>
+            <li>Si se usa <a href="../integraciones/intercambio.html">Intercambio</a>, programar
+                <code>python procesar_intercambio.py</code> en cron o en el Programador de tareas.</li>
+        </ul>
+
+        <div class="aviso pendiente">
+            <p><strong>Pendiente.</strong> Procedimiento de despliegue (servidor WSGI, proxy inverso, servicio del
+            sistema), copias de seguridad, logs y actualización de versiones.</p>
+        </div>
+
+        <div id="pager"></div>
+    </main>
+</div>
+<script src="../assets/docs.js"></script>
+</body>
+</html>

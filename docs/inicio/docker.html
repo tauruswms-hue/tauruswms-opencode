@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Docker — Taurus WMS</title>
+    <link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body data-root="../" data-page="inicio/docker.html">
+<div class="layout">
+    <nav id="sidebar"></nav>
+    <main class="content">
+        <p class="migas">Primeros pasos</p>
+        <h1>Docker</h1>
+        <p class="bajada">Levantar MySQL y las dos aplicaciones con un solo comando, para desarrollo.</p>
+
+<pre><code>docker compose up --build</code></pre>
+
+        <h2>Servicios</h2>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Servicio</th><th>Puerto</th><th>Qué corre</th></tr></thead>
+                <tbody>
+                    <tr><td><code>mysql</code></td><td>3306</td><td>MySQL 8.0 con volumen <code>mysql_data</code>.</td></tr>
+                    <tr><td><code>wms</code></td><td>5000</td><td><code>python app.py</code>. Monta <code>./picking_docs</code>.</td></tr>
+                    <tr><td><code>admin</code></td><td>5001</td><td><code>python admin.py</code>.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Crear el schema</h2>
+        <p>El compose no crea las tablas. La primera vez hay que generar el schema y registrar las migraciones,
+        dentro del contenedor o desde la máquina local contra el MySQL del compose (ver
+        <a href="../administracion/migraciones.html">Schema y migraciones</a>).</p>
+
+        <div class="aviso atencion">
+            <p><strong>Es un compose de desarrollo.</strong> Fija <code>APP_ENV=development</code>, conecta con el
+            usuario <code>root</code> de MySQL y usa secretos por defecto si no se definen
+            <code>SECRET_KEY</code>, <code>ADMIN_SECRET_KEY</code>, <code>SECRET_SALT</code> y
+            <code>MYSQL_ROOT_PASSWORD</code>. No usarlo tal cual en producción; ver
+            <a href="../operacion/produccion.html">Puesta en producción</a>.</p>
+        </div>
+
+        <div class="aviso pendiente">
+            <p><strong>Pendiente.</strong> Comandos exactos para crear el schema dentro del contenedor y un
+            compose orientado a producción.</p>
+        </div>
+
+        <div id="pager"></div>
+    </main>
+</div>
+<script src="../assets/docs.js"></script>
+</body>
+</html>

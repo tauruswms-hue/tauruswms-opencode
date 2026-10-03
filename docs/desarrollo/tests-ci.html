@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Tests, lint y CI — Taurus WMS</title>
+    <link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body data-root="../" data-page="desarrollo/tests-ci.html">
+<div class="layout">
+    <nav id="sidebar"></nav>
+    <main class="content">
+        <p class="migas">Desarrollo</p>
+        <h1>Tests, lint y CI</h1>
+        <p class="bajada">Cómo verificar un cambio antes de subirlo.</p>
+
+        <h2>Tests</h2>
+<pre><code>pytest -q</code></pre>
+        <ul>
+            <li>Los tests están en <code>tests/</code>: unitarios y de integración.</li>
+            <li>Los de integración necesitan MySQL con el <code>.env</code> configurado; si no hay conexión, se
+                omiten solos.</li>
+            <li>No dependen de los usuarios del seed. <code>tests/conftest.py</code> ofrece los fixtures
+                <code>usuario_wms</code> (en <code>taurus_admin.usuarios</code>) y <code>usuario_panel</code> (en
+                <code>taurus_admin.admin_usuarios</code>), que crean usuarios temporales y los eliminan al terminar.</li>
+        </ul>
+
+        <h2>Lint</h2>
+<pre><code>ruff check .</code></pre>
+        <p>La configuración está en <code>ruff.toml</code>, con excepciones para patrones heredados de la app.</p>
+
+        <h2>Integración continua</h2>
+        <p><code>.github/workflows/ci.yml</code> corre en GitHub Actions:</p>
+        <ol>
+            <li>Lint con <code>ruff</code>.</li>
+            <li><code>pytest</code> contra un MySQL en contenedor.</li>
+            <li>Build de la imagen Docker.</li>
+            <li>Control de que los <code>schema_*.sql</code> y <code>create_*.sql</code> versionados coinciden con lo
+                que genera <code>python modules/schema_generator.py --all</code>.</li>
+        </ol>
+
+        <h2>Antes de subir un cambio</h2>
+        <ul>
+            <li>¿Cambió el schema? Actualizar <code>schema_generator.py</code>, regenerar y escribir la migración.
+                Ver <a href="../administracion/migraciones.html">Schema y migraciones</a>.</li>
+            <li>¿Hay rutas nuevas? Agregarlas a <code>ROUTE_CATALOG</code>.
+                Ver <a href="../arquitectura/roles-permisos.html">Roles y permisos</a>.</li>
+            <li>¿Hay consultas nuevas? Filtro de tenant y sin backticks.
+                Ver <a href="../arquitectura/base-de-datos.html">Base de datos</a>.</li>
+            <li>¿Cambió el script de superusuario o sus dependencias? Regenerar el ejecutable.
+                Ver <a href="../administracion/superusuario.html">Superusuario</a>.</li>
+            <li>¿Cambió algo documentado acá? Actualizar la página correspondiente en <code>docs/</code>.</li>
+        </ul>
+
+        <div id="pager"></div>
+    </main>
+</div>
+<script src="../assets/docs.js"></script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Título de la página — Taurus WMS</title>
+    <link rel="stylesheet" href="../assets/docs.css">
+</head>
+<!--
+    Plantilla para páginas nuevas. Copiarla a la carpeta de la sección y:
+      - data-root: ruta relativa hasta docs/ ("../" para una subcarpeta, "" en la raíz)
+      - data-page: ruta de la página desde docs/ (igual al href de assets/docs.js)
+      - ajustar los href de docs.css y docs.js según data-root
+      - registrar la página en NAV (assets/docs.js)
+-->
+<body data-root="../" data-page="seccion/pagina.html">
+<div class="layout">
+    <nav id="sidebar"></nav>
+    <main class="content">
+        <p class="migas">Sección</p>
+        <h1>Título de la página</h1>
+        <p class="bajada">Una frase que diga qué resuelve esta página y para quién.</p>
+
+        <h2>Sección</h2>
+        <p>Texto.</p>
+
+        <div class="aviso">
+            <p><strong>Nota.</strong> Aviso informativo. Variantes: <code>aviso atencion</code>,
+            <code>aviso peligro</code> y <code>aviso pendiente</code> (contenido por escribir).</p>
+        </div>
+
+        <pre><code>comando --de-ejemplo</code></pre>
+
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Columna</th><th>Descripción</th></tr></thead>
+                <tbody><tr><td><code>valor</code></td><td>Texto</td></tr></tbody>
+            </table>
+        </div>
+
+        <div id="pager"></div>
+    </main>
+</div>
+<script src="../assets/docs.js"></script>
+</body>
+</html>

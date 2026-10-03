@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Configuración (.env) — Taurus WMS</title>
+    <link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body data-root="../" data-page="inicio/configuracion.html">
+<div class="layout">
+    <nav id="sidebar"></nav>
+    <main class="content">
+        <p class="migas">Primeros pasos</p>
+        <h1>Configuración (.env)</h1>
+        <p class="bajada">Variables de entorno que leen el WMS y el panel admin. La referencia versionada es
+        <code>.env.example</code>; el <code>.env</code> real no se sube al repositorio.</p>
+
+        <h2>Entorno</h2>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Variable</th><th>Valores</th><th>Efecto</th></tr></thead>
+                <tbody>
+                    <tr><td><code>APP_ENV</code></td><td><code>development</code> | <code>production</code></td>
+                        <td>En <code>production</code> las apps no arrancan si detectan contraseñas o secretos por
+                            defecto, la cookie de sesión se marca <code>Secure</code> y el panel no crea el usuario
+                            <code>admin</code> inicial.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Base administrativa (<code>taurus_admin</code>)</h2>
+        <p>Usuarios, tenants, roles y la tabla <code>configuracion</code>. Es la única conexión que se toma
+        siempre del entorno.</p>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Variable</th><th>Ejemplo</th></tr></thead>
+                <tbody>
+                    <tr><td><code>DB_ADMIN_ENGINE</code></td><td><code>mysql</code> | <code>postgresql</code> | <code>sqlserver</code></td></tr>
+                    <tr><td><code>DB_ADMIN_HOST</code></td><td><code>localhost</code></td></tr>
+                    <tr><td><code>DB_ADMIN_PORT</code></td><td><code>3306</code></td></tr>
+                    <tr><td><code>DB_ADMIN_NAME</code></td><td><code>taurus_admin</code></td></tr>
+                    <tr><td><code>DB_ADMIN_USER</code></td><td><code>taurus_admin</code></td></tr>
+                    <tr><td><code>DB_ADMIN_PASSWORD</code></td><td>—</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Base operativa (<code>taurus_wms</code>) e intercambio</h2>
+        <div class="aviso">
+            <p><strong>Son solo valores de respaldo.</strong> La conexión real del WMS y de intercambio se lee de la
+            tabla <code>configuracion</code> de <code>taurus_admin</code> (se edita desde el panel admin). Las
+            variables de entorno se usan únicamente si la tabla no tiene valores.</p>
+        </div>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Base</th><th>Variables</th></tr></thead>
+                <tbody>
+                    <tr><td>WMS</td><td><code>DB_ENGINE</code>, <code>DB_HOST</code>, <code>DB_PORT</code>, <code>DB_NAME</code>,
+                        <code>DB_USER</code>, <code>DB_PASSWORD</code>, <code>DB_CHARSET</code></td></tr>
+                    <tr><td>Intercambio</td><td><code>DB_INTERCAMBIO_ENGINE</code>, <code>DB_INTERCAMBIO_HOST</code>,
+                        <code>DB_INTERCAMBIO_PORT</code>, <code>DB_INTERCAMBIO_NAME</code>, <code>DB_INTERCAMBIO_USER</code>,
+                        <code>DB_INTERCAMBIO_PASSWORD</code>, <code>DB_INTERCAMBIO_CHAR_SET</code></td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Secretos de sesión</h2>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Variable</th><th>Uso</th></tr></thead>
+                <tbody>
+                    <tr><td><code>SECRET_KEY</code></td><td>Firma de la sesión del WMS.</td></tr>
+                    <tr><td><code>ADMIN_SECRET_KEY</code></td><td>Firma de la sesión del panel admin.</td></tr>
+                    <tr><td><code>SECRET_SALT</code></td><td>Salt de la aplicación.</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p>Para producción, generar valores aleatorios largos:</p>
+<pre><code>python -c "import secrets; print(secrets.token_hex(32))"</code></pre>
+
+        <h2>Cachés</h2>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Variable</th><th>Default</th><th>Qué controla</th></tr></thead>
+                <tbody>
+                    <tr><td><code>CONFIG_CACHE_TTL</code></td><td>30 s</td>
+                        <td>Cada cuánto se relee la tabla <code>configuracion</code>. Es lo que propaga al WMS los cambios
+                            hechos en el panel admin; si los valores cambiaron, se reinician el engine y los pools.</td></tr>
+                    <tr><td><code>PERMISOS_CACHE_TTL</code></td><td>30 s</td>
+                        <td>Cuánto se cachean las rutas permitidas de cada rol.</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p>Si la base admin no responde al refrescar, se mantiene la última configuración conocida.</p>
+
+        <div id="pager"></div>
+    </main>
+</div>
+<script src="../assets/docs.js"></script>
+</body>
+</html>

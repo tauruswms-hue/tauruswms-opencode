@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Schema y migraciones — Taurus WMS</title>
+    <link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body data-root="../" data-page="administracion/migraciones.html">
+<div class="layout">
+    <nav id="sidebar"></nav>
+    <main class="content">
+        <p class="migas">Administración</p>
+        <h1>Schema y migraciones</h1>
+        <p class="bajada">Dónde se definen las tablas, cómo se genera el DDL y cómo se aplican los cambios sobre
+        una base existente.</p>
+
+        <h2>Fuente de verdad</h2>
+        <p>Las tablas y los datos iniciales se definen en <code>modules/schema_generator.py</code>:</p>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Estructura</th><th>Contenido</th></tr></thead>
+                <tbody>
+                    <tr><td><code>ADMIN_TABLES</code></td><td>Tablas de <code>taurus_admin</code>.</td></tr>
+                    <tr><td><code>WMS_TABLES</code></td><td>Tablas de <code>taurus_wms</code>.</td></tr>
+                    <tr><td><code>INTERCAMBIO_TABLES</code></td><td>Tablas de <code>taurus_intercambio</code>.</td></tr>
+                    <tr><td><code>ADMIN_SEEDS</code></td><td>Datos iniciales (usuarios, roles).</td></tr>
+                    <tr><td><code>ROUTE_CATALOG</code></td><td>Rutas asignables a roles.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Herramientas</h2>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Herramienta</th><th>Para qué</th></tr></thead>
+                <tbody>
+                    <tr><td><code>python modules/schema_generator.py --all</code></td>
+                        <td>Regenera los archivos SQL para los 4 motores: <code>schema_{motor}.sql</code> en la raíz y
+                            <code>migrations/create_{admin,wms,intercambio}_{motor}.sql</code>. No toca ninguna base.</td></tr>
+                    <tr><td><code>python generar_schema.py</code></td>
+                        <td>Genera y ejecuta el schema contra las bases del <code>.env</code>. Opciones:
+                            <code>--execute</code>, <code>--drop</code>, <code>--seed</code>, <code>--dry-run</code>,
+                            <code>--admin-only</code>, <code>--wms-only</code>.</td></tr>
+                    <tr><td><code>python migrate.py</code></td>
+                        <td>Aplica las migraciones pendientes sobre una base existente.</td></tr>
+                    <tr><td><code>python schema_app.py</code></td>
+                        <td>Interfaz gráfica del generador (puerto 5002). Solo desarrollo.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Migration runner (<code>migrate.py</code>)</h2>
+        <p>Lee <code>migrations/*.sql</code> en orden alfabético, salteando los <code>create_*</code>, y registra
+        las aplicadas en la tabla <code>schema_migrations</code>.</p>
+<pre><code>python migrate.py                # pendientes sobre el WMS
+python migrate.py --db admin     # sobre taurus_admin
+python migrate.py --dry-run      # muestra qué aplicaría, sin ejecutar</code></pre>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Opción</th><th>Efecto</th></tr></thead>
+                <tbody>
+                    <tr><td><code>--db wms|admin|intercambio</code></td><td>Base destino. Por defecto, WMS.</td></tr>
+                    <tr><td><code>--engine</code></td><td>Fuerza el motor.</td></tr>
+                    <tr><td><code>--dry-run</code></td><td>Lista las pendientes sin ejecutarlas.</td></tr>
+                    <tr><td><code>--verbose</code></td><td>Más detalle en la salida.</td></tr>
+                    <tr><td><code>--baseline</code></td><td>Registra las pendientes como aplicadas sin ejecutarlas. Se usa
+                        después de crear una base nueva desde los <code>create_*.sql</code>.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h3>Restringir una migración</h3>
+        <p>Un archivo puede limitarse a un motor o a una base con comentarios en sus primeras líneas:</p>
+<pre><code>-- engine: mysql
+-- db: admin
+ALTER TABLE ...</code></pre>
+
+        <h2>Procedimiento para un cambio de schema</h2>
+        <ol>
+            <li>Revisar las migraciones pendientes en <code>migrations/</code>.</li>
+            <li>Actualizar la definición en <code>modules/schema_generator.py</code>.</li>
+            <li>Regenerar los SQL: <code>python modules/schema_generator.py --all</code>.</li>
+            <li>Escribir la migración incremental en <code>migrations/</code> para las bases que ya existen.</li>
+            <li>Probarla con <code>python migrate.py --dry-run</code> y luego aplicarla.</li>
+        </ol>
+        <div class="aviso atencion">
+            <p><strong>El CI lo controla.</strong> La integración continua falla si los <code>schema_*.sql</code> o
+            <code>create_*.sql</code> versionados no coinciden con lo que genera <code>--all</code>.</p>
+        </div>
+
+        <div id="pager"></div>
+    </main>
+</div>
+<script src="../assets/docs.js"></script>
+</body>
+</html>

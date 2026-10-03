@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Visión general — Taurus WMS</title>
+    <link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body data-root="../" data-page="arquitectura/vision-general.html">
+<div class="layout">
+    <nav id="sidebar"></nav>
+    <main class="content">
+        <p class="migas">Arquitectura</p>
+        <h1>Visión general</h1>
+        <p class="bajada">Cómo está organizado el código y qué pieza se ocupa de cada cosa.</p>
+
+        <h2>Aplicaciones</h2>
+        <p>Dos aplicaciones Flask independientes comparten el <code>.env</code> y la base
+        <code>taurus_admin</code>:</p>
+        <ul>
+            <li><strong><code>app.py</code></strong> (puerto 5000): el WMS. Registra un blueprint por dominio y
+                aplica autenticación y permisos en cada request.</li>
+            <li><strong><code>admin.py</code></strong> (puerto 5001): el panel de administración. Registra el
+                blueprint de <code>modules/admin.py</code> y usa su propia cookie de sesión
+                (<code>taurus_admin_session</code>), porque ambas apps comparten host y las cookies no
+                distinguen puertos.</li>
+        </ul>
+        <p>Las páginas se renderizan en el servidor con plantillas Jinja2. Hay endpoints JSON para acciones
+        AJAX puntuales (guardar, eliminar, probar conexión) y una <a href="../integraciones/api.html">API REST</a>
+        para integraciones.</p>
+
+        <h2>Estructura del repositorio</h2>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Ruta</th><th>Contenido</th></tr></thead>
+                <tbody>
+                    <tr><td><code>app.py</code>, <code>admin.py</code></td><td>Puntos de entrada de las dos aplicaciones.</td></tr>
+                    <tr><td><code>modules/</code></td><td>Un blueprint por dominio (<code>&lt;nombre&gt;_bp</code>) más los módulos transversales.</td></tr>
+                    <tr><td><code>templates/</code></td><td>Plantillas Jinja2. <code>templates/partials/</code> son includes (modales, menú), no páginas.</td></tr>
+                    <tr><td><code>static/</code></td><td>CSS, JavaScript e imágenes.</td></tr>
+                    <tr><td><code>migrations/</code></td><td>DDL: <code>create_*.sql</code> por base y motor, y migraciones incrementales.</td></tr>
+                    <tr><td><code>scripts/</code></td><td>Scripts puntuales (bootstrap, datos de ejemplo, alta de usuarios). No forman parte de las apps.</td></tr>
+                    <tr><td><code>superusuario-dist/</code></td><td>Ejecutable portable para los usuarios del panel admin.</td></tr>
+                    <tr><td><code>tests/</code></td><td>Suite de pytest.</td></tr>
+                    <tr><td><code>docs/</code></td><td>Esta documentación.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Módulos transversales</h2>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Módulo</th><th>Responsabilidad</th></tr></thead>
+                <tbody>
+                    <tr><td><code>modules/db_config.py</code></td><td>Conexiones a las tres bases, pool, cachés de configuración.
+                        Ver <a href="base-de-datos.html">Base de datos</a>.</td></tr>
+                    <tr><td><code>modules/sql_dialect.py</code></td><td>SQL portable entre motores: comillas de identificadores,
+                        upserts, límites, fechas.</td></tr>
+                    <tr><td><code>modules/context.py</code></td><td><code>get_tenant_filter()</code> y constantes de sesión.
+                        Ver <a href="multi-tenancy.html">Multi-tenancy</a>.</td></tr>
+                    <tr><td><code>modules/bootstrap.py</code></td><td>Arranque compartido: control de secretos por defecto,
+                        endurecimiento de la cookie de sesión y manejadores de error 403/404/500.</td></tr>
+                    <tr><td><code>modules/permisos_cache.py</code></td><td>Caché de rutas permitidas por rol.
+                        Ver <a href="roles-permisos.html">Roles y permisos</a>.</td></tr>
+                    <tr><td><code>modules/batch_utils.py</code></td><td>Importación y exportación CSV / JSON / XLSX compartida por los maestros.</td></tr>
+                    <tr><td><code>modules/auditoria.py</code></td><td><code>registrar_movimiento()</code>: historial de stock en
+                        <code>stock_movimientos</code> (cantidad con signo: positivo ingreso, negativo egreso).</td></tr>
+                    <tr><td><code>modules/passwords.py</code></td><td>Política de contraseñas única (mínimo 8 caracteres).</td></tr>
+                    <tr><td><code>modules/schema_generator.py</code></td><td>Definición de tablas, seeds y catálogo de rutas.
+                        Ver <a href="../administracion/migraciones.html">Schema y migraciones</a>.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Autenticación y sesión</h2>
+        <ul>
+            <li>Sesión basada en cookie. El login lee <code>taurus_admin.usuarios</code> junto con su tenant.</li>
+            <li>La sesión vence a las 8 horas (<code>SESSION_MAX_AGE_SECONDS</code>).</li>
+            <li>La pantalla de login descarta sesiones inactivas por más de 5 minutos
+                (<code>LOGIN_IDLE_TIMEOUT_SECONDS</code>).</li>
+            <li>La cookie es <code>HttpOnly</code>, <code>SameSite=Lax</code> y, en producción, <code>Secure</code>.</li>
+            <li>Los formularios llevan token CSRF; si falta o venció, la respuesta es un 400 con un mensaje
+                explicativo (JSON en pedidos AJAX).</li>
+        </ul>
+
+        <h2>Convenciones</h2>
+        <ul>
+            <li>El idioma del sistema es español: rutas, variables, mensajes y columnas.</li>
+            <li>Los nombres de las columnas de ID no son uniformes (<code>id</code>, <code>id_pedido</code>,
+                <code>id_cliente</code>…): consultar la tabla real en <code>modules/schema_generator.py</code> antes
+                de escribir una consulta.</li>
+            <li>Las contraseñas se guardan con hash <code>scrypt</code> (<code>werkzeug.security</code>).</li>
+        </ul>
+
+        <div id="pager"></div>
+    </main>
+</div>
+<script src="../assets/docs.js"></script>
+</body>
+</html>

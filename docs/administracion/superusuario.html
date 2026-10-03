@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Superusuario (exe) — Taurus WMS</title>
+    <link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body data-root="../" data-page="administracion/superusuario.html">
+<div class="layout">
+    <nav id="sidebar"></nav>
+    <main class="content">
+        <p class="migas">Administración</p>
+        <h1>Superusuario (exe)</h1>
+        <p class="bajada"><code>superusuario.exe</code> gestiona por consola los usuarios del panel admin. No
+        necesita Python instalado y es la forma de crear el primer SUPERADMIN en producción.</p>
+
+        <p>Trabaja sobre la tabla <code>admin_usuarios</code> de <code>taurus_admin</code>. No toca los usuarios
+        del WMS (<code>taurus_admin.usuarios</code>), que se administran desde el panel.</p>
+
+        <h2>Archivos</h2>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Archivo (<code>superusuario-dist/</code>)</th><th>Qué es</th></tr></thead>
+                <tbody>
+                    <tr><td><code>superusuario.exe</code></td><td>El ejecutable.</td></tr>
+                    <tr><td><code>superusuario.json</code></td><td>Credenciales de la base. Viene con valores de ejemplo.</td></tr>
+                    <tr><td><code>LEEME.txt</code></td><td>Instrucciones resumidas para quien recibe la carpeta.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Configurar la conexión</h2>
+        <p>Editar <code>superusuario.json</code>, que debe estar en la misma carpeta que el <code>.exe</code>:</p>
+<pre><code>{
+  "engine": "mysql",
+  "host": "localhost",
+  "port": 3306,
+  "user": "taurus",
+  "password": "CAMBIAR",
+  "database": "taurus_admin"
+}</code></pre>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Clave</th><th>Obligatoria</th><th>Valores</th></tr></thead>
+                <tbody>
+                    <tr><td><code>engine</code></td><td>No</td><td><code>mysql</code> (default) | <code>postgresql</code> | <code>sqlserver</code></td></tr>
+                    <tr><td><code>host</code></td><td>Sí</td><td>Servidor de la base.</td></tr>
+                    <tr><td><code>port</code></td><td>No</td><td>Numérico. Si falta, el del motor.</td></tr>
+                    <tr><td><code>user</code></td><td>Sí</td><td>Usuario de la base.</td></tr>
+                    <tr><td><code>password</code></td><td>Sí</td><td>Contraseña de la base.</td></tr>
+                    <tr><td><code>database</code></td><td>Sí</td><td>Normalmente <code>taurus_admin</code>.</td></tr>
+                    <tr><td><code>charset</code></td><td>No</td><td>Por ejemplo <code>utf8mb4</code>.</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p>Una clave desconocida, una obligatoria vacía o un JSON mal formado detienen el programa con un mensaje
+        que indica el problema.</p>
+        <p>Para usar otro archivo de credenciales:</p>
+<pre><code>superusuario.exe --config C:\ruta\produccion.json</code></pre>
+
+        <h3>Orden en que se busca la conexión</h3>
+        <ol>
+            <li>El archivo indicado con <code>--config</code>.</li>
+            <li><code>superusuario.json</code> junto al ejecutable.</li>
+            <li>Solo al ejecutar el script con Python: las variables <code>DB_ADMIN_*</code> del <code>.env</code>.</li>
+        </ol>
+
+        <h2>Menú</h2>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Opción</th><th>Qué hace</th></tr></thead>
+                <tbody>
+                    <tr><td>1 — Crear / Actualizar</td><td>Si el usuario no existe, lo crea (rol por defecto <code>ADMIN</code>).
+                        Si existe y está activo, lo actualiza: lo que se deja en blanco, incluida la contraseña, conserva su valor.
+                        Si está inactivo, hay que reactivarlo antes con la opción 3.</td></tr>
+                    <tr><td>2 — Dar de baja</td><td>Baja lógica: el usuario queda inactivo, no se borra.</td></tr>
+                    <tr><td>3 — Activar</td><td>Revierte la baja.</td></tr>
+                    <tr><td>4 — Listar</td><td>Todos los usuarios, o filtrados por usuario, nombre o email.</td></tr>
+                    <tr><td>5 — Salir</td><td>También con Ctrl+C.</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p>Toda escritura pide confirmación (S/N) y se guarda en el momento. Si la base falla, se deshace la
+        operación, se informa el error y el menú sigue disponible.</p>
+
+        <h2>Validaciones</h2>
+        <ul>
+            <li>Rol: solo <code>SUPERADMIN</code> o <code>ADMIN</code>.</li>
+            <li>No permite dar de baja ni degradar al último <code>SUPERADMIN</code> activo.</li>
+            <li>Contraseña: mínimo 8 caracteres, se ingresa dos veces y no se muestra en pantalla.</li>
+            <li>Email opcional, con formato validado.</li>
+        </ul>
+
+        <h2>Seguridad</h2>
+        <div class="aviso peligro">
+            <p><strong><code>superusuario.json</code> guarda la contraseña de la base en texto plano.</strong> El
+            repositorio lo versiona solo con valores de ejemplo: no subir la versión con credenciales reales. En el
+            servidor, conviene una copia fuera del repositorio usada con <code>--config</code> y con permisos
+            restringidos al usuario que opera el sistema.</p>
+        </div>
+        <p>Las contraseñas de los usuarios se guardan con hash <code>scrypt</code>, igual que en el login del panel.</p>
+
+        <h2>Regenerar el ejecutable</h2>
+        <p>Hay que regenerarlo al cambiar <code>scripts/admin_superusuario.py</code> o los módulos de los que
+        depende (<code>modules/db_config.py</code>, <code>sql_dialect.py</code>, <code>passwords.py</code>):</p>
+<pre><code>pip install -r requirements-build.txt
+python scripts/build_superusuario.py</code></pre>
+        <p>Los archivos intermedios quedan en <code>build/</code>, que no se versiona.</p>
+
+        <div class="aviso">
+            <p><strong>Alcance de las pruebas.</strong> El ejecutable está verificado contra MySQL. PostgreSQL y
+            SQL Server están soportados por el código, pero falta probarlos con el ejecutable.</p>
+        </div>
+
+        <div id="pager"></div>
+    </main>
+</div>
+<script src="../assets/docs.js"></script>
+</body>
+</html>

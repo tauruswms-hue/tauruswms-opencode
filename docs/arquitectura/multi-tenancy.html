@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Multi-tenancy — Taurus WMS</title>
+    <link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body data-root="../" data-page="arquitectura/multi-tenancy.html">
+<div class="layout">
+    <nav id="sidebar"></nav>
+    <main class="content">
+        <p class="migas">Arquitectura</p>
+        <h1>Multi-tenancy</h1>
+        <p class="bajada">Varias empresas (tenants) comparten la misma instalación; cada una ve solo sus datos.</p>
+
+        <h2>El patrón</h2>
+        <p>Las tablas operativas llevan una columna <code>tenant_id</code>. Toda consulta filtra por el tenant
+        de la sesión con este patrón:</p>
+<pre><code>WHERE (%s IS NULL OR tenant_id = %s)</code></pre>
+        <p>El valor sale de <code>get_tenant_filter()</code> (<code>modules/context.py</code>), que lee
+        <code>tenant_id</code> de la sesión de Flask, y se pasa dos veces como parámetro.</p>
+
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th><code>tenant_id</code> en sesión</th><th>Quién</th><th>Resultado</th></tr></thead>
+                <tbody>
+                    <tr><td>Un ID</td><td>Usuario de un tenant</td><td>Solo las filas de ese tenant.</td></tr>
+                    <tr><td><code>NULL</code></td><td>Superadmin</td><td>Todas las filas.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="aviso peligro">
+            <p><strong>No omitir el filtro.</strong> Una consulta operativa sin este patrón expone datos de otros
+            tenants. Aplica a lecturas, actualizaciones y borrados.</p>
+        </div>
+
+        <h2>Claves únicas</h2>
+        <p>Los códigos de negocio son únicos dentro de cada tenant, no en toda la base: se definen como índice
+        compuesto con nombre <code>uk_&lt;tabla&gt;_&lt;columna&gt;_tenant</code> en
+        <code>modules/schema_generator.py</code>.</p>
+
+        <h2>Qué no depende del tenant</h2>
+        <ul>
+            <li>La asignación de rutas a roles vale para todos los tenants. Ver
+                <a href="roles-permisos.html">Roles y permisos</a>.</li>
+            <li>La conexión a la base operativa es una sola por instalación.</li>
+        </ul>
+
+        <h2>En integraciones</h2>
+        <ul>
+            <li><a href="../integraciones/intercambio.html">Intercambio</a>: cada registro lleva
+                <code>tenant_codigo</code>, que se resuelve contra <code>tenants.codigo</code>.</li>
+            <li><a href="../integraciones/api.html">API REST</a>: cada token pertenece a un tenant y todos los
+                endpoints quedan acotados a él.</li>
+            <li>En las URLs del panel admin los IDs de tenant van codificados en base64
+                (<code>encode_id</code> / <code>decode_id</code>), no como enteros.</li>
+        </ul>
+
+        <div id="pager"></div>
+    </main>
+</div>
+<script src="../assets/docs.js"></script>
+</body>
+</html>

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Documentación — Taurus WMS</title>
+    <link rel="stylesheet" href="assets/docs.css">
+</head>
+<body data-root="" data-page="index.html">
+<div class="layout">
+    <nav id="sidebar"></nav>
+    <main class="content">
+        <h1>Taurus WMS</h1>
+        <p class="bajada">Sistema de gestión de almacenes (Warehouse Management System) multi-tenant,
+        desarrollado en Flask.</p>
+
+        <p>Taurus WMS cubre el ciclo operativo de un depósito: maestros (materiales, ubicaciones,
+        clientes, proveedores), recepciones, movimientos internos, pedidos, picking y despacho, con
+        control de stock, auditoría de movimientos y reportes. Cada empresa (<em>tenant</em>) trabaja
+        sobre sus propios datos.</p>
+
+        <h2>Aplicaciones</h2>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Aplicación</th><th>Puerto</th><th>Para qué</th></tr></thead>
+                <tbody>
+                    <tr><td><code>app.py</code></td><td>5000</td><td>WMS: la aplicación operativa.</td></tr>
+                    <tr><td><code>admin.py</code></td><td>5001</td><td>Panel de administración, en <code>/admin</code>:
+                        tenants, usuarios, roles y parámetros.</td></tr>
+                    <tr><td><code>schema_app.py</code></td><td>5002</td><td>Generador de schema con interfaz gráfica.
+                        Solo desarrollo.</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p>Las tres comparten el mismo <code>.env</code> y la base administrativa <code>taurus_admin</code>.</p>
+
+        <h2>Mapa de la documentación</h2>
+        <p>Cada página lleva su estado: <span class="estado completa">Completa</span>,
+        <span class="estado borrador">Borrador</span> (contenido parcial) o
+        <span class="estado pendiente">Pendiente</span> (solo el esquema).</p>
+        <div id="mapa" class="mapa ancho"></div>
+
+        <h2>Cómo ampliar esta documentación</h2>
+        <ol>
+            <li>Copiar <code>docs/_plantilla.html</code> a la carpeta de la sección que corresponda.</li>
+            <li>Ajustar <code>data-root</code> y <code>data-page</code> en el <code>&lt;body&gt;</code>.</li>
+            <li>Registrar la página en <code>NAV</code>, dentro de <code>docs/assets/docs.js</code>, con su
+                estado. El menú lateral, este mapa y los enlaces anterior/siguiente se generan desde ahí.</li>
+        </ol>
+        <p>Son páginas HTML estáticas: se abren directamente desde el disco, sin servidor ni paso de
+        compilación.</p>
+
+        <div id="pager"></div>
+    </main>
+</div>
+<script src="assets/docs.js"></script>
+</body>
+</html>
