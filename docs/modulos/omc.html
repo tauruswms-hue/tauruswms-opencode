@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>OMC — Taurus WMS</title>
+    <link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body data-root="../" data-page="modulos/omc.html">
+<div class="layout">
+    <nav id="sidebar"></nav>
+    <main class="content">
+        <p class="migas">Módulos del WMS</p>
+        <h1>OMC — Órdenes de movimiento</h1>
+        <p class="bajada">Traslado de contenedores entre ubicaciones. Todo movimiento de stock dentro del
+        depósito pasa por una OMC.</p>
+
+        <h2>Para qué sirve</h2>
+        <p>Una OMC mueve uno o más contenedores hacia una ubicación de destino. Se crea de tres maneras:</p>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Origen</th><th>Cuándo</th><th>Movimiento</th></tr></thead>
+                <tbody>
+                    <tr><td>Recepción</td><td>Al cerrar una <a href="recepciones.html">recepción</a>.</td><td>De la ubicación de recepción al destino.</td></tr>
+                    <tr><td>Pedido</td><td>Al guardar un <a href="pedidos.html">pedido</a> nuevo con contenedores.</td><td>De la ubicación de picking al muelle de salida.</td></tr>
+                    <tr><td>Manual</td><td>Desde <code>/omc/nueva</code>.</td><td>Entre las ubicaciones que se elijan.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Estados</h2>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Estado</th><th>Significado</th></tr></thead>
+                <tbody>
+                    <tr><td><code>Pendiente</code></td><td>Creada. El stock está en tránsito: saliendo del origen y entrando al destino.</td></tr>
+                    <tr><td><code>Confirmada</code></td><td>El traslado se hizo. El stock está disponible en el destino.</td></tr>
+                    <tr><td><code>Anulada</code></td><td>El traslado se canceló. El stock volvió a estar disponible en el origen.</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p>Solo una OMC Pendiente se puede confirmar, modificar o anular.</p>
+
+        <h2>Pantallas</h2>
+        <ul>
+            <li><strong>Listado</strong> (<code>/omc</code>): todas las OMC con destino, contenedores, origen y la
+                recepción o el pedido relacionado.</li>
+            <li><strong>Nueva</strong> (<code>/omc/nueva</code>): alta manual.</li>
+            <li><strong>Detalle</strong> (<code>/omc/ver/&lt;id&gt;</code>): contenedores, stock en origen y en destino, y las
+                acciones de confirmar, modificar y anular.</li>
+        </ul>
+
+        <h2>Alta manual</h2>
+        <p>Se indican la ubicación de destino, uno o más contenedores con su ubicación de origen y,
+        opcionalmente, un contenedor de destino para unificar la mercadería en él.</p>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Validación</th><th>Mensaje si no se cumple</th></tr></thead>
+                <tbody>
+                    <tr><td>El contenedor tiene stock disponible en el origen.</td><td>Sin stock disponible en la ubicación seleccionada.</td></tr>
+                    <tr><td>El contenedor no tiene stock entrando ni saliendo.</td><td>Tiene movimientos pendientes.</td></tr>
+                    <tr><td>No hay otra OMC Pendiente para ese contenedor y origen.</td><td>Ya existe la OMC pendiente.</td></tr>
+                    <tr><td>Origen y destino son distintos, salvo que haya contenedor de destino.</td><td>Origen y destino no pueden ser la misma ubicación.</td></tr>
+                    <tr><td>El contenedor de destino no tiene movimientos pendientes.</td><td>El contenedor destino tiene movimientos pendientes.</td></tr>
+                    <tr><td>Cada contenedor figura una sola vez.</td><td>El contenedor está duplicado.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Confirmar</h2>
+        <div class="aviso atencion">
+            <p><strong>Requiere rol ADMIN y contraseña.</strong> Solo un usuario con rol <code>ADMIN</code> puede
+            confirmar, y debe volver a ingresar su contraseña. La verificación compara el rol exacto: otros
+            roles, incluso con acceso total, no pueden confirmar.</p>
+        </div>
+        <p>Al confirmar:</p>
+        <ol>
+            <li>En el origen se elimina la fila del contenedor.</li>
+            <li>En el destino, el stock entrante pasa a total y disponible.</li>
+            <li>La OMC queda Confirmada, con fecha y usuario.</li>
+            <li>Si viene de una recepción Cerrada, la recepción pasa a Confirmada.</li>
+            <li>Si viene de un pedido, se suma lo confirmado a la cantidad preparada de cada ítem. Cuando todas las
+                OMC no anuladas del pedido están confirmadas, el pedido pasa a <code>Preparado</code>.</li>
+        </ol>
+
+        <h2>Modificar</h2>
+        <p>Cambia la ubicación de destino y las observaciones. El stock entrante se quita del destino anterior y
+        se registra en el nuevo. Los contenedores y sus orígenes no se pueden cambiar.</p>
+
+        <h2>Anular</h2>
+        <ol>
+            <li>En el destino, el stock entrante vuelve a cero.</li>
+            <li>En el origen, el stock saliente vuelve a total y disponible.</li>
+            <li>La OMC queda Anulada, con fecha y usuario.</li>
+            <li>Si viene de un pedido, el pedido pasa a <code>Anulado</code>, salvo que ya esté Despachado.</li>
+            <li>Si viene de una recepción, la recepción sigue Cerrada y la mercadería queda disponible en la
+                ubicación de recepción.</li>
+        </ol>
+
+        <h2>Rutas y permisos</h2>
+        <p>Grupo "OMC" del catálogo:</p>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Ruta</th><th>Uso</th></tr></thead>
+                <tbody>
+                    <tr><td><code>/omc</code></td><td>Listado.</td></tr>
+                    <tr><td><code>/omc/nueva</code>, <code>/omc/guardar</code></td><td>Alta manual.</td></tr>
+                    <tr><td><code>/omc/ver/*</code></td><td>Detalle.</td></tr>
+                    <tr><td><code>/omc/confirmar/*</code></td><td>Confirmación. Además del permiso, exige rol <code>ADMIN</code>.</td></tr>
+                    <tr><td><code>/omc/modificar/*</code>, <code>/omc/anular/*</code></td><td>Cambio de destino y anulación.</td></tr>
+                    <tr><td><code>/omc/buscar_*</code>, <code>/omc/tipos_ubicacion</code></td><td>Búsquedas de contenedores y ubicaciones.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Tablas</h2>
+        <p><code>omc</code>, <code>omc_contenedores</code>, <code>stockcontable</code> y
+        <code>stock_movimientos</code>. Actualiza <code>recepciones_cabecera</code>, <code>pedidos_cabecera</code> y
+        <code>pedidos_detalle</code> según el origen. Código en <code>modules/omc.py</code>. Las reglas de stock
+        están en <a href="flujo-stock.html">Flujo operativo y stock</a>.</p>
+
+        <div id="pager"></div>
+    </main>
+</div>
+<script src="../assets/docs.js"></script>
+</body>
+</html>

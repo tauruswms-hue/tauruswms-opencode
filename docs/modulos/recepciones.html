@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Recepciones — Taurus WMS</title>
+    <link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body data-root="../" data-page="modulos/recepciones.html">
+<div class="layout">
+    <nav id="sidebar"></nav>
+    <main class="content">
+        <p class="migas">Módulos del WMS</p>
+        <h1>Recepciones</h1>
+        <p class="bajada">Registro de la mercadería que llega de un proveedor y su ingreso al stock.</p>
+
+        <h2>Para qué sirve</h2>
+        <p>Una recepción agrupa los materiales recibidos de un proveedor en una ubicación de recepción, dentro
+        de un contenedor. Al cerrarla, la mercadería queda en tránsito hacia su ubicación de destino; al
+        confirmar ese traslado, queda disponible.</p>
+
+        <h2>Estados</h2>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Estado</th><th>Significado</th><th>Cómo se llega</th></tr></thead>
+                <tbody>
+                    <tr><td><code>Abierta</code></td><td>Se están cargando ítems. Todavía no afecta el stock.</td><td>Al crearla.</td></tr>
+                    <tr><td><code>Cerrada</code></td><td>Stock en tránsito hacia el destino, con una OMC pendiente.</td><td>Al cerrarla.</td></tr>
+                    <tr><td><code>Confirmada</code></td><td>Stock disponible en el destino.</td><td>Al confirmar la OMC o la entrada.</td></tr>
+                    <tr><td><code>Anulada</code></td><td>Descartada sin efecto sobre el stock.</td><td>Al anular una recepción Abierta.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Pantallas</h2>
+        <h3>Listado (<code>/recepciones</code>)</h3>
+        <p>Todas las recepciones del tenant, con proveedor, ubicaciones, cantidad de ítems y unidades recibidas.
+        El filtro de fechas arranca con los días definidos en los parámetros del tenant.</p>
+
+        <h3>Nueva recepción (<code>/recepciones/nueva</code>)</h3>
+        <ul>
+            <li><strong>Proveedor</strong>: entre los activos.</li>
+            <li><strong>Ubicación de recepción</strong>: obligatoria. Solo se ofrecen ubicaciones cuyo tipo contiene
+                "Recepci" en la descripción. Se recuerda la última usada.</li>
+            <li><strong>Ubicación de destino</strong> y <strong>observaciones</strong>: opcionales.</li>
+        </ul>
+        <p>Al guardar se asignan el número (<code>REC-AAAA-NNNNN</code>) y el contenedor (<code>RC</code> + ID).</p>
+
+        <h3>Detalle (<code>/recepciones/ver/&lt;id&gt;</code>)</h3>
+        <p>Carga de ítems, cierre y acceso a la OMC relacionada.</p>
+        <ul>
+            <li>Solo se ofrecen materiales activos asociados al proveedor.</li>
+            <li>Búsqueda por nombre, código, código de barras o referencia del proveedor. Con lector, la búsqueda
+                es por coincidencia exacta.</li>
+            <li>Por ítem: lote (si se deja vacío, <code>UNICO</code>), fecha de vencimiento, cantidad esperada,
+                cantidad recibida, tipo de stock (por defecto <code>Libre Venta</code>) y observaciones.</li>
+            <li>Los ítems se agregan, modifican y eliminan solo con la recepción Abierta.</li>
+        </ul>
+
+        <h2>Reglas</h2>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Acción</th><th>Condiciones</th></tr></thead>
+                <tbody>
+                    <tr><td>Cerrar</td><td>Recepción Abierta, ubicación de destino indicada y al menos un ítem con cantidad
+                        recibida mayor a cero. Los ítems con recibido en cero no ingresan.</td></tr>
+                    <tr><td>Eliminar</td><td>Recepción Abierta y sin ítems.</td></tr>
+                    <tr><td>Anular</td><td>Recepción Abierta. Queda en estado Anulada.</td></tr>
+                    <tr><td>Confirmar entrada</td><td>Recepción Cerrada.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Efecto sobre el stock</h2>
+        <h3>Al cerrar</h3>
+        <ol>
+            <li>Por cada ítem recibido, se registra la cantidad como <em>Saliendo</em> en la ubicación de recepción
+                y como <em>Entrando</em> en la de destino.</li>
+            <li>Se genera una <a href="omc.html">OMC</a> Pendiente, de la ubicación de recepción al destino, con el
+                contenedor de la recepción.</li>
+            <li>La recepción pasa a Cerrada.</li>
+        </ol>
+        <p>Si algo falla, no se guarda ningún cambio.</p>
+
+        <h3>Al confirmar</h3>
+        <p>Lo habitual es confirmar la OMC generada: el stock pasa a disponible en el destino y la recepción
+        queda Confirmada.</p>
+        <div class="aviso atencion">
+            <p><strong>Confirmación directa.</strong> Existe además la ruta
+            <code>/recepciones/confirmar_stock/&lt;id&gt;</code>, que pasa el stock entrante del contenedor a
+            disponible y marca la recepción Confirmada sin pasar por la OMC: no cambia el estado de la OMC ni
+            el saldo saliente de la ubicación de recepción.</p>
+        </div>
+
+        <h2>Importación</h2>
+        <p>Desde el listado se importan recepciones en CSV, JSON o XLSX. Hay plantillas descargables en
+        <code>/recepciones/plantilla/&lt;formato&gt;</code>.</p>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Columna</th><th>Obligatoria</th><th>Notas</th></tr></thead>
+                <tbody>
+                    <tr><td><code>agrupador</code></td><td>No</td><td>Las filas con el mismo valor forman una recepción. Sin valor, cada fila es una recepción.</td></tr>
+                    <tr><td><code>proveedor_codigo</code></td><td>Sí</td><td>Debe existir.</td></tr>
+                    <tr><td><code>ubicacion_recep</code></td><td>Sí</td><td>Código de ubicación. Debe existir.</td></tr>
+                    <tr><td><code>ubicacion_destino</code></td><td>No</td><td>Si no existe, se ignora.</td></tr>
+                    <tr><td><code>observaciones</code></td><td>No</td><td></td></tr>
+                    <tr><td><code>material_codigo</code></td><td>Sí</td><td>Debe existir. Las filas sin material se saltean.</td></tr>
+                    <tr><td><code>lote</code></td><td>No</td><td>Por defecto <code>UNICO</code>.</td></tr>
+                    <tr><td><code>fecha_vencimiento</code></td><td>No</td><td></td></tr>
+                    <tr><td><code>cantidad</code></td><td>No</td><td>Se carga como cantidad esperada; la recibida queda en cero.</td></tr>
+                    <tr><td><code>tipo_stock</code></td><td>No</td><td>Por defecto <code>Libre Venta</code>.</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p>Los datos de cabecera se toman de la primera fila de cada grupo. Las recepciones quedan Abiertas. El
+        resultado informa cuántas se crearon y el detalle de errores por fila.</p>
+
+        <h2>Rutas y permisos</h2>
+        <p>Grupo "Recepciones" del catálogo:</p>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Ruta</th><th>Uso</th></tr></thead>
+                <tbody>
+                    <tr><td><code>/recepciones</code></td><td>Listado.</td></tr>
+                    <tr><td><code>/recepciones/nueva</code>, <code>/recepciones/guardar</code></td><td>Alta.</td></tr>
+                    <tr><td><code>/recepciones/ver/*</code></td><td>Detalle.</td></tr>
+                    <tr><td><code>/recepciones/buscar_*</code></td><td>Búsquedas de materiales y ubicaciones.</td></tr>
+                    <tr><td><code>/recepciones/guardar_item</code>, <code>/recepciones/eliminar_item/*</code></td><td>Ítems.</td></tr>
+                    <tr><td><code>/recepciones/cerrar/*</code></td><td>Cierre.</td></tr>
+                    <tr><td><code>/recepciones/confirmar_stock/*</code></td><td>Confirmación directa.</td></tr>
+                    <tr><td><code>/recepciones/eliminar/*</code>, <code>/recepciones/anular/*</code></td><td>Baja y anulación.</td></tr>
+                    <tr><td><code>/recepciones/importar</code>, <code>/recepciones/plantilla/*</code></td><td>Importación.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Tablas</h2>
+        <p><code>recepciones_cabecera</code>, <code>recepciones_detalle</code>, <code>stockcontable</code>,
+        <code>omc</code>, <code>omc_contenedores</code> y <code>stock_movimientos</code>. Lee
+        <code>proveedores</code>, <code>materiales</code>, <code>material_proveedor</code> y
+        <code>ubicaciones</code>. Código en <code>modules/recepciones.py</code>.</p>
+
+        <div id="pager"></div>
+    </main>
+</div>
+<script src="../assets/docs.js"></script>
+</body>
+</html>

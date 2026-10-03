@@ -36,8 +36,8 @@
         {
             titulo: 'Administración',
             paginas: [
-                { href: 'administracion/panel-admin.html', titulo: 'Panel admin', estado: 'pendiente',
-                  desc: 'Tenants, usuarios, roles y parámetros.' },
+                { href: 'administracion/panel-admin.html', titulo: 'Panel admin', estado: 'completa',
+                  desc: 'Tenants, usuarios, roles, parámetros, configuración y auditoría.' },
                 { href: 'administracion/superusuario.html', titulo: 'Superusuario (exe)', estado: 'completa',
                   desc: 'Ejecutable portable para gestionar los usuarios del panel.' },
                 { href: 'administracion/migraciones.html', titulo: 'Schema y migraciones', estado: 'completa',
@@ -48,7 +48,19 @@
             titulo: 'Módulos del WMS',
             paginas: [
                 { href: 'modulos/index.html', titulo: 'Catálogo de módulos', estado: 'borrador',
-                  desc: 'Listado de módulos y estado de su documentación.' }
+                  desc: 'Listado de módulos y estado de su documentación.' },
+                { href: 'modulos/flujo-stock.html', titulo: 'Flujo operativo y stock', estado: 'completa',
+                  desc: 'El circuito de la mercadería y las reglas de stock.' },
+                { href: 'modulos/recepciones.html', titulo: 'Recepciones', estado: 'completa',
+                  desc: 'Ingreso de mercadería de proveedores.' },
+                { href: 'modulos/omc.html', titulo: 'OMC', estado: 'completa',
+                  desc: 'Órdenes de movimiento entre ubicaciones.' },
+                { href: 'modulos/pedidos.html', titulo: 'Pedidos', estado: 'completa',
+                  desc: 'Carga y preparación de pedidos de clientes.' },
+                { href: 'modulos/despacho.html', titulo: 'Despacho', estado: 'completa',
+                  desc: 'Salida de los pedidos preparados.' },
+                { href: 'modulos/movil.html', titulo: 'Móvil', estado: 'completa',
+                  desc: 'Recepción, picking e inventario con lector.' }
             ]
         },
         {

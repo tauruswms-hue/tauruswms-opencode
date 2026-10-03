@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Flujo operativo y stock — Taurus WMS</title>
+    <link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body data-root="../" data-page="modulos/flujo-stock.html">
+<div class="layout">
+    <nav id="sidebar"></nav>
+    <main class="content">
+        <p class="migas">Módulos del WMS</p>
+        <h1>Flujo operativo y stock</h1>
+        <p class="bajada">El circuito completo de la mercadería y las reglas de stock que comparten los módulos
+        operativos. Conviene leerlo antes que las páginas de cada módulo.</p>
+
+        <h2>El circuito</h2>
+        <ol>
+            <li><strong><a href="recepciones.html">Recepción</a></strong>: se registra lo que llega de un proveedor en
+                una ubicación de recepción, dentro de un contenedor.</li>
+            <li><strong><a href="omc.html">OMC</a></strong>: al cerrar la recepción se genera una orden de movimiento
+                hacia la ubicación de destino. Al confirmarla, el stock queda disponible.</li>
+            <li><strong><a href="pedidos.html">Pedido</a></strong>: se carga lo que pide un cliente y se prepara. El
+                traslado de los contenedores al muelle de salida es otra OMC.</li>
+            <li><strong><a href="despacho.html">Despacho</a></strong>: los pedidos preparados se marcan como
+                despachados.</li>
+        </ol>
+        <p>El <a href="movil.html">módulo móvil</a> permite hacer la recepción y confirmar las OMC desde un
+        dispositivo con lector.</p>
+
+        <h2>Cómo se guarda el stock</h2>
+        <p>La tabla <code>stockcontable</code> tiene una fila por combinación de ubicación, material y
+        contenedor, con su lote, tipo de stock y fecha de vencimiento. Cada fila lleva cuatro cantidades:</p>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Columna</th><th>Significado</th></tr></thead>
+                <tbody>
+                    <tr><td><code>StockTotal</code></td><td>Lo que está físicamente en la posición.</td></tr>
+                    <tr><td><code>StockDisponible</code></td><td>Lo que se puede usar o mover.</td></tr>
+                    <tr><td><code>StockEntrando</code></td><td>En camino hacia esta posición, pendiente de confirmar.</td></tr>
+                    <tr><td><code>StockSaliendo</code></td><td>Reservado para salir de esta posición, pendiente de confirmar.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Movimiento en dos fases</h2>
+        <p>Todo traslado se hace con una OMC y pasa por dos momentos:</p>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Momento</th><th>Origen</th><th>Destino</th></tr></thead>
+                <tbody>
+                    <tr><td>Se crea la OMC</td><td>Disponible pasa a Saliendo.</td><td>Se suma a Entrando.</td></tr>
+                    <tr><td>Se confirma</td><td>La fila del contenedor se elimina.</td><td>Entrando pasa a Total y Disponible.</td></tr>
+                    <tr><td>Se anula</td><td>Saliendo vuelve a Total y Disponible.</td><td>Entrando vuelve a cero.</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p>Mientras la OMC está pendiente, la mercadería no está disponible ni en el origen ni en el destino.</p>
+
+        <h2>Contenedores</h2>
+        <ul>
+            <li>Cada recepción genera un contenedor, <code>RC</code> seguido del ID de la recepción en 5 dígitos
+                (por ejemplo, <code>RC00042</code>).</li>
+            <li>Un contenedor se mueve entero: la OMC traslada todo lo disponible de ese contenedor en la
+                ubicación de origen.</li>
+            <li>Un contenedor con movimientos pendientes no puede entrar en otra OMC.</li>
+        </ul>
+
+        <h2>Tipos de stock</h2>
+        <p>Cada cantidad lleva un tipo: <code>Libre Venta</code> (el valor por defecto), <code>Calidad</code>,
+        <code>Bloqueado</code> o <code>Mal Estado</code>. Los pedidos piden un tipo de stock por ítem.</p>
+
+        <h2>Numeración</h2>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Documento</th><th>Formato</th></tr></thead>
+                <tbody>
+                    <tr><td>Recepción</td><td><code>REC-AAAA-NNNNN</code></td></tr>
+                    <tr><td>OMC</td><td><code>OMC-AAAA-NNNNN</code></td></tr>
+                    <tr><td>Pedido</td><td><code>PED-AAAA-NNNNN</code></td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p>La secuencia es por tenant y se reinicia cada año.</p>
+
+        <h2>Historial de movimientos</h2>
+        <p>Cada cambio de stock deja un registro en <code>stock_movimientos</code>, con cantidad positiva para
+        ingresos y negativa para egresos. Se consulta desde el reporte de auditoría.</p>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Acción</th><th>Cuándo</th></tr></thead>
+                <tbody>
+                    <tr><td><code>RECEPCION</code></td><td>Al cerrar una recepción.</td></tr>
+                    <tr><td><code>CONFIRMAR_RECEPCION</code></td><td>Al confirmar la entrada de una recepción.</td></tr>
+                    <tr><td><code>OMC_CREAR</code></td><td>Al crear una OMC manual.</td></tr>
+                    <tr><td><code>CONFIRMAR_OMC</code></td><td>Al confirmar una OMC.</td></tr>
+                    <tr><td><code>MODIFICAR_OMC</code></td><td>Al cambiar el destino de una OMC.</td></tr>
+                    <tr><td><code>ANULAR_OMC</code></td><td>Al anular una OMC.</td></tr>
+                    <tr><td><code>PREPARAR_PEDIDO</code></td><td>Al generar la OMC de un pedido.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div id="pager"></div>
+    </main>
+</div>
+<script src="../assets/docs.js"></script>
+</body>
+</html>

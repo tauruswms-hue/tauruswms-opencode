@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Móvil — Taurus WMS</title>
+    <link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body data-root="../" data-page="modulos/movil.html">
+<div class="layout">
+    <nav id="sidebar"></nav>
+    <main class="content">
+        <p class="migas">Módulos del WMS</p>
+        <h1>Móvil</h1>
+        <p class="bajada">Pantallas pensadas para un dispositivo de mano con lector de códigos: recepción,
+        confirmación de movimientos y consulta de stock.</p>
+
+        <h2>Para qué sirve</h2>
+        <p>Permite hacer en el depósito, escaneando, las mismas operaciones que en las pantallas de escritorio.
+        Trabaja sobre los mismos datos y aplica las mismas reglas que
+        <a href="recepciones.html">Recepciones</a> y <a href="omc.html">OMC</a>.</p>
+
+        <h2>Inicio (<code>/movil</code>)</h2>
+        <p>Menú con la cantidad de recepciones Abiertas y de OMC Pendientes.</p>
+
+        <h2>Recepción (<code>/movil/recepcion</code>)</h2>
+        <ul>
+            <li>Muestra las últimas 50 recepciones y permite crear una nueva indicando proveedor y ubicación de
+                recepción.</li>
+            <li>En el detalle se escanea cada material. La búsqueda es por coincidencia exacta de código de barras,
+                código del material o referencia del proveedor, entre los materiales activos del proveedor.</li>
+            <li>Se carga una sola cantidad, que se guarda como esperada y como recibida.</li>
+            <li>Lote (por defecto <code>UNICO</code>), vencimiento y tipo de stock, igual que en escritorio.</li>
+            <li>El cierre pide la ubicación de destino y hace lo mismo que el cierre de escritorio: registra el
+                stock en tránsito y genera la OMC.</li>
+        </ul>
+
+        <h2>Picking (<code>/movil/picking</code>)</h2>
+        <ul>
+            <li>Lista las últimas 50 OMC Pendientes, con su destino, sus contenedores y el pedido o la recepción
+                de origen.</li>
+            <li>El detalle muestra los contenedores, su ubicación de origen y el stock a mover.</li>
+            <li>La confirmación tiene el mismo efecto y las mismas condiciones que en escritorio: rol
+                <code>ADMIN</code> y contraseña.</li>
+        </ul>
+
+        <h2>Inventario (<code>/movil/inventario</code>)</h2>
+        <p>Consulta de stock por escaneo. Busca un material por código de barras o código exactos, o por parte
+        del nombre, y muestra sus posiciones con stock: ubicación, contenedor, lote, tipo de stock, cantidades
+        y vencimiento. Si hay más de una coincidencia, muestra la primera por código. Es solo consulta.</p>
+
+        <h2>Rutas y permisos</h2>
+        <p>Grupo "Móvil" del catálogo: <code>/movil</code> y <code>/movil/*</code>. El permiso habilita todas las
+        pantallas del módulo a la vez.</p>
+
+        <h2>Tablas</h2>
+        <p>Las mismas que Recepciones y OMC. Los movimientos de stock quedan registrados con módulo
+        <code>movil</code>. Código en <code>modules/movil.py</code>.</p>
+
+        <div id="pager"></div>
+    </main>
+</div>
+<script src="../assets/docs.js"></script>
+</body>
+</html>

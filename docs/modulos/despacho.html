@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Despacho — Taurus WMS</title>
+    <link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body data-root="../" data-page="modulos/despacho.html">
+<div class="layout">
+    <nav id="sidebar"></nav>
+    <main class="content">
+        <p class="migas">Módulos del WMS</p>
+        <h1>Despacho</h1>
+        <p class="bajada">Registro de la salida del depósito de los pedidos ya preparados.</p>
+
+        <h2>Para qué sirve</h2>
+        <p>Es el último paso del circuito: marca como despachados los pedidos que están listos en el muelle.</p>
+
+        <h2>Pantalla (<code>/despacho</code>)</h2>
+        <p>Lista los pedidos en estado <code>Preparado</code>, del más antiguo al más nuevo, con cliente, ruta,
+        transporte y clase de pedido.</p>
+
+        <h2>Acciones</h2>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Acción</th><th>Efecto</th></tr></thead>
+                <tbody>
+                    <tr><td>Despachar un pedido</td><td>Pasa a <code>Despachado</code> y se guarda la fecha de despacho. Si el pedido
+                        ya no está Preparado, se avisa y no se modifica.</td></tr>
+                    <tr><td>Despachar varios</td><td>Lo mismo para todos los seleccionados que sigan Preparados. Informa cuántos se
+                        despacharon.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="aviso">
+            <p><strong>No modifica el stock.</strong> El despacho solo cambia el estado y la fecha del pedido: no
+            descuenta el stock del muelle de salida ni registra movimientos.</p>
+        </div>
+
+        <h2>Rutas y permisos</h2>
+        <p>Grupo "Despacho" del catálogo: <code>/despacho</code>, <code>/despacho/despachar/*</code> y
+        <code>/despacho/despachar_masivo</code>.</p>
+
+        <h2>Tablas</h2>
+        <p>Actualiza <code>pedidos_cabecera</code> (<code>estado</code>, <code>fecha_despacho</code>). Código en
+        <code>modules/despacho.py</code>.</p>
+
+        <div id="pager"></div>
+    </main>
+</div>
+<script src="../assets/docs.js"></script>
+</body>
+</html>

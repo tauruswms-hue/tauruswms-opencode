@@ -12,30 +12,132 @@
     <main class="content">
         <p class="migas">Administración</p>
         <h1>Panel admin</h1>
-        <p class="bajada">Aplicación de administración de la instalación: <code>python admin.py</code>,
-        en <code>http://localhost:5001/admin</code>.</p>
+        <p class="bajada">Aplicación de administración de la instalación: tenants, usuarios del WMS, roles,
+        parámetros y configuración. Se levanta con <code>python admin.py</code> y se usa en
+        <code>http://localhost:5001/admin</code>.</p>
 
-        <h2>Lo básico</h2>
+        <h2>Acceso</h2>
         <ul>
             <li>Sus usuarios están en <code>taurus_admin.admin_usuarios</code>, separados de los usuarios del WMS
-                (<code>taurus_admin.usuarios</code>).</li>
-            <li>Roles del panel: <code>SUPERADMIN</code> y <code>ADMIN</code>. Los parámetros de tenants, los tokens
-                de API y la sección de intercambio son solo para <code>SUPERADMIN</code>.</li>
-            <li>Usa su propia cookie de sesión, <code>taurus_admin_session</code>.</li>
-            <li>El primer usuario se crea con el <a href="superusuario.html">ejecutable de superusuario</a>.</li>
+                (<code>taurus_admin.usuarios</code>). Se gestionan con el
+                <a href="superusuario.html">ejecutable de superusuario</a>, no desde el panel.</li>
+            <li>El login admite 5 intentos cada 15 minutos por dirección IP.</li>
+            <li>Usa su propia cookie de sesión, <code>taurus_admin_session</code>, independiente de la del WMS.</li>
         </ul>
 
-        <div class="aviso pendiente">
-            <p><strong>Pendiente.</strong> Falta documentar cada sección del panel:</p>
-            <ul>
-                <li>Tenants: alta con código, activación y baja.</li>
-                <li>Usuarios del WMS: alta, rol y tenant.</li>
-                <li>Roles y asignación de rutas.</li>
-                <li>Parámetros por tenant.</li>
-                <li>Configuración de conexión a las bases WMS e intercambio.</li>
-                <li>Tokens de API.</li>
-                <li>Intercambio: ejecución y reintentos.</li>
-            </ul>
+        <h2>Qué puede hacer cada rol</h2>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Sección</th><th>Ruta</th><th>ADMIN</th><th>SUPERADMIN</th></tr></thead>
+                <tbody>
+                    <tr><td>Tenants</td><td><code>/admin/tenants</code></td><td>Sí</td><td>Sí</td></tr>
+                    <tr><td>Usuarios de un tenant</td><td><code>/admin/tenants/ver/&lt;id&gt;</code></td><td>Sí</td><td>Sí</td></tr>
+                    <tr><td>Usuarios de todos los tenants</td><td><code>/admin/usuarios</code></td><td>No</td><td>Sí</td></tr>
+                    <tr><td>Roles y rutas</td><td><code>/admin/roles</code></td><td>No</td><td>Sí</td></tr>
+                    <tr><td>Parámetros del tenant y token de API</td><td><code>/admin/parametros/editar/&lt;id&gt;</code></td><td>No</td><td>Sí</td></tr>
+                    <tr><td>Configuración</td><td><code>/admin/configuracion</code></td><td>No</td><td>Sí</td></tr>
+                    <tr><td>Intercambio</td><td><code>/admin/intercambio</code></td><td>No</td><td>Sí</td></tr>
+                    <tr><td>Auditoría</td><td><code>/admin/audit</code></td><td>No</td><td>Sí</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Tenants</h2>
+        <p>Cada tenant es una empresa que opera en la instalación.</p>
+        <ul>
+            <li><strong>Código</strong>: de 1 a 20 caracteres entre letras, números, guion y guion bajo; se guarda en
+                mayúsculas y debe ser único. Se carga solo en el alta y después no se puede cambiar, porque
+                <a href="../integraciones/intercambio.html">Intercambio</a> lo usa como clave
+                (<code>tenant_codigo</code>).</li>
+            <li><strong>Datos</strong>: nombre, razón social, CUIT, dirección, teléfono y email.</li>
+            <li><strong>Desactivar</strong> es una baja lógica: el tenant queda inactivo y se puede volver a activar.</li>
+        </ul>
+
+        <h2>Usuarios del WMS</h2>
+        <p>Se administran desde el detalle de cada tenant.</p>
+        <ul>
+            <li>El nombre de usuario es único en toda la instalación.</li>
+            <li>La contraseña debe cumplir la política (mínimo 8 caracteres). Al editar, dejarla en blanco conserva
+                la actual.</li>
+            <li>El rol se elige entre los roles activos del catálogo.</li>
+            <li><strong>Desactivar</strong> impide el ingreso y se puede revertir. <strong>Borrar</strong> elimina el
+                usuario de la base en forma definitiva.</li>
+        </ul>
+
+        <h2>Roles y rutas</h2>
+        <ul>
+            <li>El nombre del rol se guarda en mayúsculas y es único. Al renombrarlo, se actualizan sus usuarios y
+                sus rutas.</li>
+            <li>Un rol con usuarios activos no se puede desactivar.</li>
+            <li>La pantalla de rutas muestra el catálogo agrupado por módulo. Marcar "Acceso total" guarda el
+                permiso <code>*</code> y reemplaza al resto.</li>
+            <li>Los cambios llegan al WMS sin que los usuarios vuelvan a iniciar sesión; pueden demorar hasta el
+                tiempo de caché (30 s por defecto).</li>
+        </ul>
+        <p>El modelo completo está en <a href="../arquitectura/roles-permisos.html">Roles y permisos</a>.</p>
+
+        <h2>Parámetros del tenant</h2>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Parámetro</th><th>Uso</th></tr></thead>
+                <tbody>
+                    <tr><td>Datos de la empresa</td><td>Nombre, razón social, CUIT, dirección, teléfono, email.</td></tr>
+                    <tr><td>Nombre del almacén</td><td>Identificación del depósito.</td></tr>
+                    <tr><td>Métodos de picking</td><td>Habilitados para el tenant: <code>fifo</code>, <code>lifo</code>, <code>fefo</code>,
+                        <code>libre</code>. Si no se marca ninguno, queda <code>fifo</code>.</td></tr>
+                    <tr><td>Método por defecto</td><td>Debe ser uno de los habilitados; si no lo es, se toma el primero.</td></tr>
+                    <tr><td>Bajo stock</td><td>Umbral de stock bajo del tenant.</td></tr>
+                    <tr><td>Días de filtro de fechas</td><td>Rango inicial de los listados de recepciones, OMC y pedidos. Por defecto, 30.</td></tr>
+                    <tr><td>Inteligencia artificial</td><td>Proveedor, clave de API, modelo, contexto y prompt.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h3>Token de API</h3>
+        <p>Desde la misma pantalla se genera el token del tenant para la
+        <a href="../integraciones/api.html">API REST</a>. Se muestra una sola vez y se guarda como hash; generar
+        uno nuevo invalida el anterior.</p>
+
+        <h2>Configuración</h2>
+        <p>Tabla de pares clave y valor. Las claves se guardan en mayúsculas y son únicas. Acá se define la
+        conexión del WMS a sus bases:</p>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Base</th><th>Claves</th></tr></thead>
+                <tbody>
+                    <tr><td>Operativa (<code>taurus_wms</code>)</td><td><code>DB_ENGINE</code>, <code>DB_HOST</code>, <code>DB_PORT</code>,
+                        <code>DB_NAME</code>, <code>DB_USER</code>, <code>DB_PASSWORD</code>, <code>DB_CHAR_SET</code></td></tr>
+                    <tr><td>Intercambio</td><td><code>INTERCAMBIO_ENGINE</code>, <code>INTERCAMBIO_HOST</code>, <code>INTERCAMBIO_PORT</code>,
+                        <code>INTERCAMBIO_NAME</code>, <code>INTERCAMBIO_USER</code>, <code>INTERCAMBIO_PASSWORD</code>,
+                        <code>INTERCAMBIO_CHAR_SET</code></td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p>Un cambio se aplica en el WMS sin reiniciarlo, al vencer la caché de configuración. Ver
+        <a href="../arquitectura/base-de-datos.html">Base de datos</a>.</p>
+
+        <h2>Intercambio</h2>
+        <p>Pantalla de monitoreo de la <a href="../integraciones/intercambio.html">interfase de intercambio</a>:</p>
+        <ul>
+            <li>Cantidad de registros pendientes, procesados y con error, sumando todos los módulos.</li>
+            <li>Los últimos 100 registros con error, con su mensaje y cantidad de intentos.</li>
+            <li>Las últimas 20 ejecuciones.</li>
+            <li><strong>Procesar</strong> aplica todas las pendientes. <strong>Reintentar</strong> devuelve a pendiente
+                todos los registros con error.</li>
+        </ul>
+
+        <h2>Auditoría</h2>
+        <p>El panel registra en <code>audit_logs</code> los ingresos (correctos y fallidos), los accesos a cada
+        sección, las altas, modificaciones y bajas, y los errores, con usuario, dirección IP y navegador.</p>
+        <ul>
+            <li>Filtros por acción, módulo y rango de fechas.</li>
+            <li>El rango es de una semana como mínimo; sin fechas, muestra los últimos 7 días.</li>
+            <li>50 registros por página.</li>
+        </ul>
+
+        <div class="aviso">
+            <p><strong>IDs en las URLs.</strong> Las rutas de tenants y de sus usuarios usan el ID del tenant
+            codificado (<code>encode_id</code> / <code>decode_id</code>); la de parámetros usa el ID numérico.</p>
         </div>
 
         <div id="pager"></div>

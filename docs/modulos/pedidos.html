@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Pedidos — Taurus WMS</title>
+    <link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body data-root="../" data-page="modulos/pedidos.html">
+<div class="layout">
+    <nav id="sidebar"></nav>
+    <main class="content">
+        <p class="migas">Módulos del WMS</p>
+        <h1>Pedidos</h1>
+        <p class="bajada">Carga de los pedidos de clientes y su preparación para el despacho.</p>
+
+        <h2>Para qué sirve</h2>
+        <p>Un pedido registra qué materiales pide un cliente, con su ruta de reparto y su transporte. Desde la
+        consola de pedidos se verifica el stock, se genera el documento de picking y se sigue el avance hasta
+        que el pedido queda listo para <a href="despacho.html">despachar</a>.</p>
+
+        <h2>Estados</h2>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Estado</th><th>Significado</th><th>Cómo se llega</th></tr></thead>
+                <tbody>
+                    <tr><td><code>Pendiente</code></td><td>Cargado, sin preparar. Es el único estado en que se puede editar o anular.</td><td>Al crearlo.</td></tr>
+                    <tr><td><code>Trabajo</code></td><td>En preparación, con documento de picking generado.</td><td>Con "Preparar" desde la consola.</td></tr>
+                    <tr><td><code>Trabajo OMC</code></td><td>En preparación, con una OMC hacia el muelle de salida.</td><td>Al crearlo con contenedores.</td></tr>
+                    <tr><td><code>Preparado</code></td><td>Listo para despachar.</td><td>Al confirmar todas las OMC del pedido.</td></tr>
+                    <tr><td><code>Despachado</code></td><td>Salió del depósito.</td><td>Desde Despacho.</td></tr>
+                    <tr><td><code>Anulado</code></td><td>Cancelado.</td><td>Al anularlo, o al anular su OMC.</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="aviso pendiente">
+            <p><strong>A confirmar.</strong> En el código de estos módulos, el paso a <code>Preparado</code> solo
+            ocurre al confirmar una OMC del pedido. No está documentado cómo pasa a <code>Preparado</code> un
+            pedido en <code>Trabajo</code> que no tiene OMC.</p>
+        </div>
+
+        <h2>Pantallas</h2>
+        <h3>Consola (<code>/pedidos</code>)</h3>
+        <p>Listado de pedidos con cliente, ruta, transporte y clase, y las acciones masivas sobre los pedidos
+        seleccionados. El filtro de fechas arranca con los días definidos en los parámetros del tenant.</p>
+
+        <h3>Alta y edición (<code>/pedidos/nuevo</code>, <code>/pedidos/editar/&lt;id&gt;</code>)</h3>
+        <ul>
+            <li><strong>Cabecera</strong>: cliente, clase de pedido, fecha, ruta, transporte, dirección de entrega y
+                observaciones. La ruta y el transporte se proponen según el cliente.</li>
+            <li><strong>Ítems</strong>: material, cantidad y tipo de stock (por defecto <code>Libre Venta</code>).</li>
+            <li><strong>Contenedores</strong> (solo en el alta, opcional): contenedores a enviar al muelle.</li>
+        </ul>
+        <p>Solo se edita un pedido Pendiente. Al guardar la edición, los ítems se reemplazan por los nuevos.</p>
+
+        <h3>Detalle (<code>/pedidos/ver/&lt;id&gt;</code>)</h3>
+        <p>Cabecera e ítems del pedido, con la cantidad preparada de cada uno.</p>
+
+        <h2>OMC automática al crear el pedido</h2>
+        <p>Si en el alta se indican contenedores, se genera una sola <a href="omc.html">OMC</a> que los lleva al
+        muelle de salida del transporte, y el pedido queda en <code>Trabajo OMC</code>. Cada contenedor debe
+        cumplir:</p>
+        <ul>
+            <li>El transporte del pedido tiene un muelle de salida definido.</li>
+            <li>El contenedor tiene stock disponible en una ubicación cuyo tipo admite picking.</li>
+            <li>El contenedor no tiene movimientos pendientes ni otra OMC Pendiente.</li>
+        </ul>
+        <p>Los contenedores que no cumplen se informan con un aviso y quedan fuera de la OMC; el pedido se
+        guarda igual. Si ninguno cumple, el pedido queda Pendiente.</p>
+
+        <h2>Acciones de la consola</h2>
+        <h3>Verificar stock</h3>
+        <p>Informe para los pedidos seleccionados, consolidado por material y tipo de stock: cantidad pedida,
+        stock disponible, stock entrando y diferencia. Las líneas con faltante aparecen primero, con el detalle
+        de qué pedidos las incluyen. No modifica nada.</p>
+
+        <h3>Preparar</h3>
+        <ol>
+            <li>Muestra un resumen: pedidos, clientes, materiales, unidades y ubicaciones de picking con stock.</li>
+            <li>Se elige el modo: <code>directa</code>, <code>cliente</code> o <code>dospasos</code>.</li>
+            <li>Se genera el documento de picking en JSON: se descarga y se guarda en
+                <code>picking_docs/AAAA-MM/</code>.</li>
+            <li>Los pedidos Pendientes seleccionados pasan a <code>Trabajo</code>.</li>
+        </ol>
+        <div class="aviso">
+            <p><strong>Preparar no mueve stock.</strong> Solo genera el documento y cambia el estado. El modo
+            queda registrado en el documento.</p>
+        </div>
+
+        <h3>Cambiar ruta o transporte</h3>
+        <p>Cambia la ruta, el transporte o ambos en todos los pedidos seleccionados.</p>
+
+        <h3>Anular</h3>
+        <p>Solo para pedidos Pendientes. El pedido no se borra: queda en estado Anulado.</p>
+
+        <h2>Documento de picking</h2>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Sección</th><th>Contenido</th></tr></thead>
+                <tbody>
+                    <tr><td><code>tarea_picking</code></td><td>Fecha, modo, usuario, tenant e IDs de los pedidos.</td></tr>
+                    <tr><td><code>pedidos</code></td><td>Cabecera y detalle de cada pedido.</td></tr>
+                    <tr><td><code>ubicaciones_picking</code></td><td>Ubicaciones que admiten picking y tienen stock de los materiales pedidos,
+                        en el orden de recorrido (<code>orden_picking</code>).</td></tr>
+                    <tr><td><code>stock_picking</code></td><td>Stock disponible en esas ubicaciones: contenedor, lote, tipo de stock y vencimiento.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Importación</h2>
+        <p>Desde la consola se importan pedidos en CSV, JSON o XLSX. Plantillas en
+        <code>/pedidos/plantilla/&lt;formato&gt;</code>.</p>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Columna</th><th>Obligatoria</th><th>Notas</th></tr></thead>
+                <tbody>
+                    <tr><td><code>agrupador</code></td><td>No</td><td>Las filas con el mismo valor forman un pedido. Sin valor, cada fila es un pedido.</td></tr>
+                    <tr><td><code>cliente_codigo</code></td><td>Sí</td><td>Debe existir.</td></tr>
+                    <tr><td><code>fecha_pedido</code></td><td>No</td><td>Por defecto, la fecha del día.</td></tr>
+                    <tr><td><code>observaciones</code></td><td>No</td><td></td></tr>
+                    <tr><td><code>material_codigo</code></td><td>Sí</td><td>Debe existir. Las filas sin material se saltean.</td></tr>
+                    <tr><td><code>cantidad</code></td><td>No</td><td></td></tr>
+                    <tr><td><code>tipo_stock</code></td><td>No</td><td>Por defecto <code>Libre Venta</code>.</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p>Los pedidos importados quedan Pendientes, sin ruta ni transporte. El resultado informa cuántos se
+        crearon y los errores por fila.</p>
+
+        <h2>Rutas y permisos</h2>
+        <p>Grupo "Pedidos" del catálogo:</p>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Ruta</th><th>Uso</th></tr></thead>
+                <tbody>
+                    <tr><td><code>/pedidos</code></td><td>Consola.</td></tr>
+                    <tr><td><code>/pedidos/nuevo</code>, <code>/pedidos/editar/*</code>, <code>/pedidos/guardar</code></td><td>Alta y edición.</td></tr>
+                    <tr><td><code>/pedidos/ver/*</code></td><td>Detalle.</td></tr>
+                    <tr><td><code>/pedidos/eliminar/*</code></td><td>Anulación.</td></tr>
+                    <tr><td><code>/pedidos/verificar_stock_masivo</code></td><td>Verificar stock.</td></tr>
+                    <tr><td><code>/pedidos/resumen_preparar</code>, <code>/pedidos/picking_json</code>, <code>/pedidos/preparar_masivo</code></td><td>Preparar.</td></tr>
+                    <tr><td><code>/pedidos/cambiar_ruta_transporte</code></td><td>Cambio masivo de ruta y transporte.</td></tr>
+                    <tr><td><code>/pedidos/buscar_contenedores</code>, <code>/pedidos/filtros/*</code>, <code>/pedidos/contenedor_stock</code></td><td>Búsqueda de contenedores.</td></tr>
+                    <tr><td><code>/pedidos/importar</code>, <code>/pedidos/plantilla/*</code></td><td>Importación.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Tablas</h2>
+        <p><code>pedidos_cabecera</code> y <code>pedidos_detalle</code>; con contenedores, también
+        <code>omc</code>, <code>omc_contenedores</code>, <code>stockcontable</code> y <code>stock_movimientos</code>.
+        Lee <code>clientes</code>, <code>rutas</code>, <code>transportes</code>, <code>transporte_rutas</code>,
+        <code>clases_pedido</code> y <code>materiales</code>. Código en <code>modules/pedidos.py</code>.</p>
+
+        <div id="pager"></div>
+    </main>
+</div>
+<script src="../assets/docs.js"></script>
+</body>
+</html>
