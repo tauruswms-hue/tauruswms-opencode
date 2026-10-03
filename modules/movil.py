@@ -562,7 +562,7 @@ def picking_confirmar(id_omc):
             usuario = session.get('nombre', 'sistema')
 
             cursor.execute("""
-                SELECT oc.id_contenedor, oc.id_ubicacion_origen,
+                SELECT oc.id_contenedor, oc.id_contenedor_destino, oc.id_ubicacion_origen,
                        u.codigo AS origen_codigo
                 FROM omc_contenedores oc
                 JOIN ubicaciones u ON oc.id_ubicacion_origen = u.id

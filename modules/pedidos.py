@@ -1116,11 +1116,12 @@ def importar():
                             errores.append({'fila': fila_num, 'codigo': agrupador, 'razon': f'Material "{material_cod}" no encontrado'})
                             continue
                         cursor.execute(
-                            "INSERT INTO pedidos_detalle (id_pedido, id_material, cantidad, tipo_stock) VALUES (%s, %s, %s, %s)",
+                            "INSERT INTO pedidos_detalle (id_pedido, id_material, cantidad, tipo_stock, tenant_id) VALUES (%s, %s, %s, %s, %s)",
                             (
                                 id_pedido, mat['id'],
                                 float_or_zero(row.get('cantidad')),
-                                str(row.get('tipo_stock', '') or '').strip() or 'Libre Venta'
+                                str(row.get('tipo_stock', '') or '').strip() or 'Libre Venta',
+                                tenant_id
                             )
                         )
                         lineas_ok += 1

@@ -240,3 +240,67 @@ def test_movil_hub_y_recepcion(client, usuario_admin_movil, datos_movil):
         conn.commit()
         cur.close()
         conn.close()
+
+
+@requires_db
+def test_movil_confirma_omc_con_contenedor_destino(client, usuario_admin_movil, datos_movil):
+    """Una OMC que unifica en otro contenedor deja el stock Disponible en el contenedor destino."""
+    tid = datos_movil['tenant_id']
+    sufijo = datos_movil['sufijo']
+    cont_origen, cont_destino = 'TA' + sufijo[:6], 'TB' + sufijo[:6]
+    id_omc = None
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        sql_stock = """
+            INSERT INTO stockcontable
+                (Ubicacion, Material, Lote, TipoStock, IDContenedor,
+                 StockTotal, StockDisponible, StockEntrando, StockSaliendo, tenant_id)
+            VALUES (%s, %s, 'LOTE-MOVIL', 'Libre Venta', %s, 0, 0, %s, %s, %s)
+        """
+        cur.execute(sql_stock, (datos_movil['id_ubic_recep'], datos_movil['id_material'], cont_origen, 0, 30, tid))
+        cur.execute(sql_stock, (datos_movil['id_ubic_dest'], datos_movil['id_material'], cont_destino, 30, 0, tid))
+        cur.execute("""
+            INSERT INTO omc (numero, id_contenedor_destino, id_ubicacion_destino, estado,
+                             usuario_creacion, fecha_creacion, tenant_id)
+            VALUES (%s, %s, %s, 'Pendiente', 'test', NOW(), %s)
+        """, ('T' + sufijo + '-0', cont_destino, datos_movil['id_ubic_dest'], tid))
+        id_omc = cur.lastrowid
+        cur.execute("""
+            INSERT INTO omc_contenedores (id_omc, id_contenedor, id_contenedor_destino, id_ubicacion_origen, tenant_id)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (id_omc, cont_origen, cont_destino, datos_movil['id_ubic_recep'], tid))
+        conn.commit()
+
+        client.post('/login', data={
+            'username': usuario_admin_movil['username'],
+            'password': usuario_admin_movil['password'],
+        })
+        resp = client.post(f'/movil/picking/{id_omc}/confirmar', data={
+            'password_admin': usuario_admin_movil['password'],
+        }, follow_redirects=True)
+        assert resp.status_code == 200
+        conn.commit()
+
+        cur.execute("SELECT estado FROM omc WHERE id_omc = %s", (id_omc,))
+        assert cur.fetchone()['estado'].upper() == 'CONFIRMADA'
+        cur.execute("""
+            SELECT StockDisponible, StockEntrando FROM stockcontable
+            WHERE Ubicacion = %s AND IDContenedor = %s AND tenant_id = %s
+        """, (datos_movil['id_ubic_dest'], cont_destino, tid))
+        fila = cur.fetchone()
+        assert fila['StockDisponible'] == 30
+        assert fila['StockEntrando'] == 0
+        cur.execute("SELECT COUNT(*) AS total FROM stockcontable WHERE IDContenedor = %s AND tenant_id = %s",
+                    (cont_origen, tid))
+        assert cur.fetchone()['total'] == 0
+    finally:
+        cur.execute("DELETE FROM stockcontable WHERE Material = %s AND tenant_id = %s",
+                    (datos_movil['id_material'], tid))
+        if id_omc:
+            cur.execute("DELETE FROM omc_contenedores WHERE id_omc = %s", (id_omc,))
+            cur.execute("DELETE FROM omc WHERE id_omc = %s", (id_omc,))
+        conn.commit()
+        cur.close()
+        conn.close()
