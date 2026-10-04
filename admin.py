@@ -11,6 +11,7 @@ from modules.admin import admin_bp, admin_limiter
 from modules.bootstrap import (
     check_default_secrets,
     harden_session_config,
+    passwords_bd,
     register_error_handlers,
 )
 from modules.db_config import _get_admin_connection
@@ -42,8 +43,7 @@ check_default_secrets(APP_ENV, [
     ('ADMIN_SECRET_KEY', os.getenv('ADMIN_SECRET_KEY')),
     ('SECRET_KEY', os.getenv('SECRET_KEY')),
     ('SECRET_SALT', os.getenv('SECRET_SALT')),
-    ('DB_ADMIN_PASSWORD', os.getenv('DB_ADMIN_PASSWORD')),
-    ('DB_PASSWORD', os.getenv('DB_PASSWORD')),
+    *passwords_bd(APP_ENV, logger),
 ], logger)
 
 harden_session_config(app, APP_ENV)

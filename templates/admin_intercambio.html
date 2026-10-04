@@ -145,15 +145,16 @@
                             </tr>
                             {% else %}
                             <tr><td colspan="3" class="text-center text-muted">
-                                Sin claves INTERCAMBIO_* configuradas. Se usan los valores por defecto (.env).
+                                El archivo de conexiones no tiene la sección <code>intercambio</code>.
                             </td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
-                <a href="{{ url_for('admin.configuracion') }}" class="btn btn-outline-secondary btn-sm">
-                    <i class="fas fa-edit me-1"></i>Editar en Configuración
-                </a>
+                <p class="text-muted small mb-0">
+                    La conexión se define en la sección <code>intercambio</code> del archivo de conexiones
+                    (<code>conexiones.json</code>) del servidor.
+                </p>
             </div>
         </div>
 

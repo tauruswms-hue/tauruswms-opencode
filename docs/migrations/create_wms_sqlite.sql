@@ -477,6 +477,3 @@ INSERT OR IGNORE INTO "clases_pedido" ("nombre", "activo") VALUES ('Devolucion',
 
 -- === FIN DEL SCRIPT ===;
 -- Schema generado para engine: sqlite;
--- Usuarios por defecto:;
---   SuperAdmin: admin / Admin@2024!;
---   Operador:   operador / Admin@2024!;

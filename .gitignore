@@ -9,3 +9,6 @@ picking_docs/
 
 # Ejecutable portable de superusuarios: archivos intermedios
 build/
+
+# Conexiones a las bases (credenciales reales)
+conexiones.json

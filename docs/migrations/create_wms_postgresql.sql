@@ -478,6 +478,3 @@ INSERT INTO "clases_pedido" ("nombre", "activo") VALUES ('Devolucion', TRUE) ON 
 
 -- === FIN DEL SCRIPT ===;
 -- Schema generado para engine: postgresql;
--- Usuarios por defecto:;
---   SuperAdmin: admin / Admin@2024!;
---   Operador:   operador / Admin@2024!;

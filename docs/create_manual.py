@@ -63,7 +63,7 @@ doc.add_heading('Paso 2: Crear la base de datos', level=1)
 
 doc.add_paragraph(
     'En el motor correspondiente, crear la base de datos taurus_wms '
-    'y ejecutar las migraciones que se encuentran en migrations/. '
+    'y ejecutar las migraciones que se encuentran en docs/migrations/. '
     'Si partís de cero, primero creá las tablas con crear_tablas.py '
     '(solo funciona con MySQL).'
 )

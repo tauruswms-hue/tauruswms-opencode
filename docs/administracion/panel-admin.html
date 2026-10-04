@@ -20,7 +20,7 @@
         <ul>
             <li>Sus usuarios están en <code>taurus_admin.admin_usuarios</code>, separados de los usuarios del WMS
                 (<code>taurus_admin.usuarios</code>). Se gestionan con el
-                <a href="superusuario.html">ejecutable de superusuario</a>, no desde el panel.</li>
+                <a href="../inicio/base-de-datos/superusuario.html">ejecutable de superusuario</a>, no desde el panel.</li>
             <li>El login admite 5 intentos cada 15 minutos por dirección IP.</li>
             <li>Usa su propia cookie de sesión, <code>taurus_admin_session</code>, independiente de la del WMS.</li>
         </ul>
@@ -99,26 +99,17 @@
         uno nuevo invalida el anterior.</p>
 
         <h2>Configuración</h2>
-        <p>Tabla de pares clave y valor. Las claves se guardan en mayúsculas y son únicas. Acá se define la
-        conexión del WMS a sus bases:</p>
-        <div class="tabla-scroll">
-            <table>
-                <thead><tr><th>Base</th><th>Claves</th></tr></thead>
-                <tbody>
-                    <tr><td>Operativa (<code>taurus_wms</code>)</td><td><code>DB_ENGINE</code>, <code>DB_HOST</code>, <code>DB_PORT</code>,
-                        <code>DB_NAME</code>, <code>DB_USER</code>, <code>DB_PASSWORD</code>, <code>DB_CHAR_SET</code></td></tr>
-                    <tr><td>Intercambio</td><td><code>INTERCAMBIO_ENGINE</code>, <code>INTERCAMBIO_HOST</code>, <code>INTERCAMBIO_PORT</code>,
-                        <code>INTERCAMBIO_NAME</code>, <code>INTERCAMBIO_USER</code>, <code>INTERCAMBIO_PASSWORD</code>,
-                        <code>INTERCAMBIO_CHAR_SET</code></td></tr>
-                </tbody>
-            </table>
+        <p>Tabla de pares clave y valor para parámetros generales de la instalación. Las claves se guardan en
+        mayúsculas y son únicas.</p>
+        <div class="aviso">
+            <p><strong>Las conexiones a las bases no se configuran acá.</strong> Se definen en el archivo
+            <code>conexiones.json</code> del servidor. Ver <a href="../inicio/configuracion.html">Configuración</a>.</p>
         </div>
-        <p>Un cambio se aplica en el WMS sin reiniciarlo, al vencer la caché de configuración. Ver
-        <a href="../arquitectura/base-de-datos.html">Base de datos</a>.</p>
 
         <h2>Intercambio</h2>
         <p>Pantalla de monitoreo de la <a href="../integraciones/intercambio.html">interfase de intercambio</a>:</p>
         <ul>
+            <li>La conexión de intercambio en uso, sin la contraseña.</li>
             <li>Cantidad de registros pendientes, procesados y con error, sumando todos los módulos.</li>
             <li>Los últimos 100 registros con error, con su mensaje y cantidad de intentos.</li>
             <li>Las últimas 20 ejecuciones.</li>

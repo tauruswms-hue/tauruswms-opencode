@@ -6,6 +6,7 @@
  *   1. Copiar docs/_plantilla.html a la carpeta de la sección.
  *   2. Ajustar data-root y data-page en su <body>.
  *   3. Agregarla acá con su estado: 'completa' | 'borrador' | 'pendiente'.
+ * Una página puede tener subpáginas en `hijos` (se anidan en el menú).
  */
 (function () {
     var NAV = [
@@ -13,9 +14,23 @@
             titulo: 'Primeros pasos',
             paginas: [
                 { href: 'inicio/instalacion.html', titulo: 'Instalación', estado: 'completa',
-                  desc: 'Requisitos, entorno, creación de las bases y arranque.' },
-                { href: 'inicio/configuracion.html', titulo: 'Configuración (.env)', estado: 'completa',
-                  desc: 'Variables de entorno, secretos y cachés.' },
+                  desc: 'Requisitos, entorno, creación de las bases y arranque.',
+                  hijos: [
+                      { href: 'inicio/base-de-datos/index.html', titulo: 'Base de datos', estado: 'completa',
+                        desc: 'Creación de las tres bases en MySQL.',
+                        hijos: [
+                            { href: 'inicio/base-de-datos/taurus-admin.html', titulo: 'taurus_admin', estado: 'completa',
+                              desc: 'Script de creación de la base administrativa.' },
+                            { href: 'inicio/base-de-datos/superusuario.html', titulo: 'Superusuario (exe)', estado: 'completa',
+                              desc: 'Alta del primer usuario del panel admin.' },
+                            { href: 'inicio/base-de-datos/taurus-wms.html', titulo: 'taurus_wms', estado: 'completa',
+                              desc: 'Script de creación de la base operativa.' },
+                            { href: 'inicio/base-de-datos/taurus-intercambio.html', titulo: 'taurus_intercambio', estado: 'completa',
+                              desc: 'Script de creación de la base de intercambio.' }
+                        ] }
+                  ] },
+                { href: 'inicio/configuracion.html', titulo: 'Configuración', estado: 'completa',
+                  desc: 'Archivo de conexiones a las bases, entorno y secretos.' },
                 { href: 'inicio/docker.html', titulo: 'Docker', estado: 'borrador',
                   desc: 'Entorno de desarrollo con docker compose.' }
             ]
@@ -38,8 +53,6 @@
             paginas: [
                 { href: 'administracion/panel-admin.html', titulo: 'Panel admin', estado: 'completa',
                   desc: 'Tenants, usuarios, roles, parámetros, configuración y auditoría.' },
-                { href: 'administracion/superusuario.html', titulo: 'Superusuario (exe)', estado: 'completa',
-                  desc: 'Ejecutable portable para gestionar los usuarios del panel.' },
                 { href: 'administracion/migraciones.html', titulo: 'Schema y migraciones', estado: 'completa',
                   desc: 'Generador de schema y migration runner.' }
             ]
@@ -117,7 +130,21 @@
     ]);
     body.insertBefore(el('header', { 'class': 'topbar' }, [boton, marca]), body.firstChild);
 
-    // Menú lateral
+    // Menú lateral (las páginas con `hijos` se anidan)
+    function listaMenu(paginas, anidada) {
+        var lista = el('ul', anidada ? { 'class': 'sub' } : {});
+        paginas.forEach(function (p) {
+            var hijos = [p.titulo];
+            if (p.estado !== 'completa') { hijos.push(badge(p.estado)); }
+            var enlace = el('a', { href: root + p.href }, hijos);
+            if (p.href === actual) { enlace.className = 'activo'; }
+            var item = el('li', {}, [enlace]);
+            if (p.hijos) { item.appendChild(listaMenu(p.hijos, true)); }
+            lista.appendChild(item);
+        });
+        return lista;
+    }
+
     var sidebar = document.getElementById('sidebar');
     if (sidebar) {
         var inicio = el('a', { href: root + 'index.html' }, ['Inicio']);
@@ -125,38 +152,46 @@
         sidebar.appendChild(el('ul', {}, [el('li', {}, [inicio])]));
         NAV.forEach(function (grupo) {
             sidebar.appendChild(el('div', { 'class': 'grupo' }, [grupo.titulo]));
-            var lista = el('ul', {});
-            grupo.paginas.forEach(function (p) {
-                var hijos = [p.titulo];
-                if (p.estado !== 'completa') { hijos.push(badge(p.estado)); }
-                var enlace = el('a', { href: root + p.href }, hijos);
-                if (p.href === actual) { enlace.className = 'activo'; }
-                lista.appendChild(el('li', {}, [enlace]));
-            });
-            sidebar.appendChild(lista);
+            sidebar.appendChild(listaMenu(grupo.paginas, false));
         });
     }
 
     // Mapa de la portada
+    function listaMapa(paginas, anidada) {
+        var lista = el('ul', anidada ? { 'class': 'sub' } : {});
+        paginas.forEach(function (p) {
+            var item = el('li', {}, [
+                el('a', { href: root + p.href }, [p.titulo, badge(p.estado)]),
+                el('p', {}, [p.desc])
+            ]);
+            if (p.hijos) { item.appendChild(listaMapa(p.hijos, true)); }
+            lista.appendChild(item);
+        });
+        return lista;
+    }
+
     var mapa = document.getElementById('mapa');
     if (mapa) {
         NAV.forEach(function (grupo) {
-            var lista = el('ul', {});
-            grupo.paginas.forEach(function (p) {
-                lista.appendChild(el('li', {}, [
-                    el('a', { href: root + p.href }, [p.titulo, badge(p.estado)]),
-                    el('p', {}, [p.desc])
-                ]));
-            });
-            mapa.appendChild(el('div', { 'class': 'tarjeta' }, [el('h3', {}, [grupo.titulo]), lista]));
+            mapa.appendChild(el('div', { 'class': 'tarjeta' }, [
+                el('h3', {}, [grupo.titulo]), listaMapa(grupo.paginas, false)
+            ]));
         });
     }
 
-    // Anterior / siguiente
+    // Anterior / siguiente (recorre el árbol en orden)
+    function aplanar(paginas, destino) {
+        paginas.forEach(function (p) {
+            destino.push(p);
+            if (p.hijos) { aplanar(p.hijos, destino); }
+        });
+        return destino;
+    }
+
     var pager = document.getElementById('pager');
     if (pager) {
         var plano = [{ href: 'index.html', titulo: 'Inicio' }];
-        NAV.forEach(function (grupo) { plano = plano.concat(grupo.paginas); });
+        NAV.forEach(function (grupo) { aplanar(grupo.paginas, plano); });
         var i = plano.map(function (p) { return p.href; }).indexOf(actual);
         var enlace = function (p, rotulo) {
             if (!p) { return el('div', {}); }

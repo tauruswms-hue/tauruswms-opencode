@@ -24,7 +24,7 @@
                     <tr><td><code>ADMIN_TABLES</code></td><td>Tablas de <code>taurus_admin</code>.</td></tr>
                     <tr><td><code>WMS_TABLES</code></td><td>Tablas de <code>taurus_wms</code>.</td></tr>
                     <tr><td><code>INTERCAMBIO_TABLES</code></td><td>Tablas de <code>taurus_intercambio</code>.</td></tr>
-                    <tr><td><code>ADMIN_SEEDS</code></td><td>Datos iniciales (usuarios, roles).</td></tr>
+                    <tr><td><code>ADMIN_SEEDS</code></td><td>Datos iniciales (roles, rutas por rol y configuración).</td></tr>
                     <tr><td><code>ROUTE_CATALOG</code></td><td>Rutas asignables a roles.</td></tr>
                 </tbody>
             </table>
@@ -37,9 +37,9 @@
                 <tbody>
                     <tr><td><code>python modules/schema_generator.py --all</code></td>
                         <td>Regenera los archivos SQL para los 4 motores: <code>schema_{motor}.sql</code> en la raíz y
-                            <code>migrations/create_{admin,wms,intercambio}_{motor}.sql</code>. No toca ninguna base.</td></tr>
+                            <code>docs/migrations/create_{admin,wms,intercambio}_{motor}.sql</code>. No toca ninguna base.</td></tr>
                     <tr><td><code>python generar_schema.py</code></td>
-                        <td>Genera y ejecuta el schema contra las bases del <code>.env</code>. Opciones:
+                        <td>Genera y ejecuta el schema contra las bases de <code>conexiones.json</code>. Opciones:
                             <code>--execute</code>, <code>--drop</code>, <code>--seed</code>, <code>--dry-run</code>,
                             <code>--admin-only</code>, <code>--wms-only</code>.</td></tr>
                     <tr><td><code>python migrate.py</code></td>
@@ -51,7 +51,7 @@
         </div>
 
         <h2>Migration runner (<code>migrate.py</code>)</h2>
-        <p>Lee <code>migrations/*.sql</code> en orden alfabético, salteando los <code>create_*</code>, y registra
+        <p>Lee <code>docs/migrations/*.sql</code> en orden alfabético, salteando los <code>create_*</code>, y registra
         las aplicadas en la tabla <code>schema_migrations</code>.</p>
 <pre><code>python migrate.py                # pendientes sobre el WMS
 python migrate.py --db admin     # sobre taurus_admin
@@ -78,10 +78,10 @@ ALTER TABLE ...</code></pre>
 
         <h2>Procedimiento para un cambio de schema</h2>
         <ol>
-            <li>Revisar las migraciones pendientes en <code>migrations/</code>.</li>
+            <li>Revisar las migraciones pendientes en <code>docs/migrations/</code>.</li>
             <li>Actualizar la definición en <code>modules/schema_generator.py</code>.</li>
             <li>Regenerar los SQL: <code>python modules/schema_generator.py --all</code>.</li>
-            <li>Escribir la migración incremental en <code>migrations/</code> para las bases que ya existen.</li>
+            <li>Escribir la migración incremental en <code>docs/migrations/</code> para las bases que ya existen.</li>
             <li>Probarla con <code>python migrate.py --dry-run</code> y luego aplicarla.</li>
         </ol>
         <div class="aviso atencion">

@@ -43,6 +43,36 @@ requires_db = pytest.mark.skipif(
 )
 
 
+@pytest.fixture(scope='session', autouse=True)
+def _tenant_de_pruebas():
+    """Garantiza un tenant activo: el schema ya no trae ninguno por defecto.
+
+    Los tests de integración usan el primer tenant activo. Si la BD no tiene
+    ninguno (p. ej. recién creada en CI) se crea uno y se elimina al final.
+    """
+    if not DB_OK:
+        yield
+        return
+    from modules.db_config import _get_admin_connection
+    codigo = None
+    conn = _get_admin_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT id FROM tenants WHERE activo = 1 ORDER BY id LIMIT 1")
+        if not cur.fetchone():
+            codigo = 'TEST' + uuid.uuid4().hex[:8].upper()
+            cur.execute("INSERT INTO tenants (codigo, nombre, activo) VALUES (%s, %s, 1)",
+                        (codigo, 'Tenant de pruebas'))
+            conn.commit()
+        yield
+    finally:
+        if codigo:
+            cur = conn.cursor()
+            cur.execute("DELETE FROM tenants WHERE codigo = %s", (codigo,))
+            conn.commit()
+        conn.close()
+
+
 @pytest.fixture(autouse=True)
 def _desactivar_limiter_y_csrf():
     """Por defecto: sin rate limiting y sin CSRF para poder testear flujos.

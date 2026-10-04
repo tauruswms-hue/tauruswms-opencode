@@ -10,6 +10,7 @@ import datetime
 DEFAULT_SECRETS = (
     'taurus-wms-secret-2024-dev', 'taurus-admin-secret-2024-dev',
     'taurus-wms-salt-2024', 'Admin@2024!', 'Taurus_2001', 'dev-fallback',
+    'CAMBIAR',  # placeholder de conexiones.json
 )
 
 
@@ -27,6 +28,22 @@ def check_default_secrets(app_env, secret_vars, logger, label=''):
     if app_env == 'production':
         raise RuntimeError(mensaje)
     logger.warning('[SEGURIDAD] %s', mensaje)
+
+
+def passwords_bd(app_env, logger):
+    """Passwords del archivo de conexiones, para pasarlas a check_default_secrets.
+
+    En production un archivo faltante o inválido impide el arranque; en otros
+    entornos se loguea el problema y se sigue (los tests sin BD no lo necesitan).
+    """
+    from modules.db_config import ConexionesError, passwords_conexiones
+    try:
+        return passwords_conexiones()
+    except ConexionesError as e:
+        if app_env == 'production':
+            raise RuntimeError(str(e)) from None
+        logger.error('[CONEXIONES] %s', e)
+        return []
 
 
 def harden_session_config(app, app_env):

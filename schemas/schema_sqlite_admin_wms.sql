@@ -11,7 +11,7 @@ PRAGMA foreign_keys = ON;
 -- --- admin_usuarios ---;
 CREATE TABLE IF NOT EXISTS "admin_usuarios" (
     "id" INTEGER PRIMARY KEY AUTOINCREMENT,
-    "username" TEXT NOT NULL,
+    "username" TEXT NOT NULL UNIQUE,
     "password_hash" TEXT NOT NULL,
     "nombre" TEXT NOT NULL,
     "email" TEXT,
@@ -24,10 +24,22 @@ CREATE TABLE IF NOT EXISTS "admin_usuarios" (
 CREATE INDEX IF NOT EXISTS "idx_username" ON "admin_usuarios" ("username");
 CREATE INDEX IF NOT EXISTS "idx_rol" ON "admin_usuarios" ("rol");
 
+-- --- roles ---;
+CREATE TABLE IF NOT EXISTS "roles" (
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+    "nombre" TEXT NOT NULL,
+    "descripcion" TEXT,
+    "activo" INTEGER DEFAULT 1,
+    "created_at" TEXT DEFAULT (datetime('now')),
+    "updated_at" TEXT DEFAULT (datetime('now')),
+    UNIQUE ("nombre")
+);
+CREATE INDEX IF NOT EXISTS "idx_roles_activo" ON "roles" ("activo");
+
 -- --- tenants ---;
 CREATE TABLE IF NOT EXISTS "tenants" (
     "id" INTEGER PRIMARY KEY AUTOINCREMENT,
-    "codigo" TEXT NOT NULL,
+    "codigo" TEXT NOT NULL UNIQUE,
     "nombre" TEXT NOT NULL,
     "razon_social" TEXT,
     "cuit" TEXT,
@@ -39,13 +51,15 @@ CREATE TABLE IF NOT EXISTS "tenants" (
     "updated_at" TEXT DEFAULT (datetime('now')),
     "nombredelalmacen" TEXT,
     "metodosdepicking" text,
+    "metodo_picking_default" TEXT NOT NULL DEFAULT 'libre',
     "bajostock" REAL DEFAULT 0,
     "dias_filtro_fechas" INTEGER DEFAULT 30,
     "contexto" text,
     "prompt" text,
     "proveedor_api_ia" text,
     "modelo_api_ia" text,
-    "api_key" text
+    "api_key" text,
+    "api_token" TEXT
 );
 CREATE INDEX IF NOT EXISTS "idx_codigo" ON "tenants" ("codigo");
 CREATE INDEX IF NOT EXISTS "idx_activo" ON "tenants" ("activo");
@@ -53,7 +67,7 @@ CREATE INDEX IF NOT EXISTS "idx_activo" ON "tenants" ("activo");
 -- --- usuarios ---;
 CREATE TABLE IF NOT EXISTS "usuarios" (
     "id" INTEGER PRIMARY KEY AUTOINCREMENT,
-    "username" TEXT NOT NULL,
+    "username" TEXT NOT NULL UNIQUE,
     "password_hash" TEXT NOT NULL,
     "nombre" TEXT NOT NULL,
     "email" TEXT,
@@ -72,7 +86,7 @@ CREATE INDEX IF NOT EXISTS "idx_rol" ON "usuarios" ("rol");
 -- --- configuracion ---;
 CREATE TABLE IF NOT EXISTS "configuracion" (
     "id" INTEGER PRIMARY KEY AUTOINCREMENT,
-    "clave" TEXT NOT NULL,
+    "clave" TEXT NOT NULL UNIQUE,
     "valor" text,
     "descripcion" TEXT,
     "updated_at" TEXT DEFAULT (datetime('now'))
@@ -105,112 +119,120 @@ CREATE TABLE IF NOT EXISTS "roles_rutas" (
 
 -- --- Datos iniciales ---;
 
-INSERT OR IGNORE INTO "tenants" ("id", "codigo", "nombre", "razon_social", "activo", "nombredelalmacen", "metodosdepicking", "bajostock", "dias_filtro_fechas") VALUES (1, 'DEFAULT', 'Empresa Principal', 'Empresa Principal S.A.', 1, 'Almacen Principal', '"fifo"', 0, 30);
-
--- SuperAdmin password: Admin@2024!;
-INSERT OR IGNORE INTO "admin_usuarios" ("username", "password_hash", "nombre", "email", "rol") VALUES ('admin', 'scrypt:32768:8:1$WQ6PhKOf81VV3FcH$ed1ca47fd1fd381583f0289acf9e839521b5e74a07adfc034382ea5342d608e393b7143fec95b3aef262f1946f95696e3e8acbfc867c91769d63142d4e4a5db2', 'Administrador', 'admin@taurus.local', 'SUPERADMIN');
-
--- Operador password: Admin@2024!;
-INSERT OR IGNORE INTO "usuarios" ("username", "password_hash", "nombre", "email", "rol", "tenant_id", "activo") VALUES ('operador', 'scrypt:32768:8:1$WQ6PhKOf81VV3FcH$ed1ca47fd1fd381583f0289acf9e839521b5e74a07adfc034382ea5342d608e393b7143fec95b3aef262f1946f95696e3e8acbfc867c91769d63142d4e4a5db2', 'Operador General', 'operador@taurus.local', 'OPERADOR', 1, 1);
+-- Roles por defecto del sistema;
+INSERT OR IGNORE INTO "roles" ("nombre", "descripcion", "activo") VALUES ('ADMIN', 'Acceso total a todas las rutas', 1);
+INSERT OR IGNORE INTO "roles" ("nombre", "descripcion", "activo") VALUES ('OPERADOR', 'Rutas operativas del WMS', 1);
+INSERT OR IGNORE INTO "roles" ("nombre", "descripcion", "activo") VALUES ('CONSULTA', 'Acceso de solo lectura', 1);
 
 INSERT OR IGNORE INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('app_version', '1.0.0', 'Version actual de la aplicacion');
 INSERT OR IGNORE INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('app_name', 'Taurus WMS', 'Nombre de la aplicacion');
 INSERT OR IGNORE INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('mantenimiento', 'false', 'Modo mantenimiento (true/false)');
-INSERT OR IGNORE INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('DB_HOST', 'localhost', 'Host del servidor de base de datos');
-INSERT OR IGNORE INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('DB_PORT', '3306', 'Puerto del servidor MySQL');
-INSERT OR IGNORE INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('DB_NAME', 'taurus_wms', 'Nombre de la base de datos principal');
-INSERT OR IGNORE INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('DB_USER', 'taurus', 'Usuario de la base de datos');
-INSERT OR IGNORE INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('DB_PASSWORD', 'Taurus_2001', 'Contrasena de la base de datos');
-INSERT OR IGNORE INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('DB_CHAR_SET', 'utf8mb4', 'Charset de la base de datos');
-INSERT OR IGNORE INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('DB_ENGINE', 'mysql', 'Motor de BD: mysql, postgresql, sqlite');
 
 -- Permisos de rutas por rol;
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('ADMIN', '*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/materiales');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/materiales/guardar');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/materiales/eliminar');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/materiales/importar');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/materiales/exportar');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/materiales/plantilla');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/materiales/exportar/*');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/materiales/plantilla/*');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/materiales/eliminar/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/ubicaciones');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/ubicaciones/guardar');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/ubicaciones/eliminar/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/ubicaciones/importar');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/ubicaciones/exportar');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/ubicaciones/plantilla');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/ubicaciones/exportar/*');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/ubicaciones/plantilla/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/tipoubicacion');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/tipoubicacion/guardar');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/tipoubicacion/eliminar');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/tipoubicacion/eliminar/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/tipoubicacion/importar');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/tipoubicacion/exportar');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/tipoubicacion/plantilla');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/tipoubicacion/exportar/*');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/tipoubicacion/plantilla/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/proveedores');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/proveedores/guardar');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/proveedores/eliminar');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/proveedores/eliminar/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/proveedores/importar');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/proveedores/exportar');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/proveedores/plantilla');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/proveedores/exportar/*');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/proveedores/plantilla/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/clientes');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/clientes/guardar');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/clientes/eliminar/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/clientes/importar');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/clientes/exportar');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/clientes/plantilla');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/clientes/exportar/*');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/clientes/plantilla/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/categorias');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/categorias/guardar');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/categorias/eliminar');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/categorias/eliminar/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/unidades');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/unidades/guardar');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/unidades/eliminar');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/unidades/eliminar/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/unidades/importar');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/unidades/exportar');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/unidades/plantilla');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/unidades/exportar/*');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/unidades/plantilla/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/transportes');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/transportes/guardar');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/transportes/eliminar/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/transportes/importar');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/transportes/exportar');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/transportes/plantilla');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/transportes/exportar/*');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/transportes/plantilla/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/rutas');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/rutas/guardar');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/rutas/eliminar');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/rutas/eliminar/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/rutas/importar');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/rutas/exportar');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/rutas/plantilla');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/rutas/exportar/*');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/rutas/plantilla/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/pedidos');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/pedidos/nuevo');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/pedidos/editar');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/pedidos/ver/*');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/pedidos/editar/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/pedidos/guardar');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/pedidos/eliminar');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/pedidos/eliminar/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/pedidos/importar');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/pedidos/plantilla');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/pedidos/plantilla/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/pedidos/picking_json');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/pedidos/preparar_masivo');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/pedidos/resumen_preparar');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/pedidos/cambiar_ruta_transporte');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/pedidos/filtros/*');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/pedidos/contenedor_stock');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/recepciones');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/recepciones/nueva');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/recepciones/guardar');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/recepciones/ver');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/recepciones/cerrar');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/recepciones/eliminar');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/recepciones/importar');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/recepciones/plantilla');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/recepciones/ver/*');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/recepciones/buscar_*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/recepciones/guardar_item');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/recepciones/eliminar_item');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/recepciones/confirmar_stock');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/recepciones/anular');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/recepciones/eliminar_item/*');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/recepciones/cerrar/*');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/recepciones/eliminar/*');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/recepciones/confirmar_stock/*');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/recepciones/anular/*');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/recepciones/importar');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/recepciones/plantilla/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/omc');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/omc/nueva');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/omc/guardar');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/omc/ver');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/omc/ver/*');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/omc/confirmar/*');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/omc/modificar/*');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/omc/anular/*');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/omc/buscar_*');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/omc/tipos_ubicacion');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/despacho');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/despacho/despachar');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/despacho/despachar/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/despacho/despachar_masivo');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/stockcontable');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/stockcontable/editar');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/stockcontable/editar/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/stockcontable/importar');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/stockcontable/exportar');
-INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/stockcontable/plantilla');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/stockcontable/exportar/*');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/stockcontable/plantilla/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/inventario');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/inventario/crear');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/inventario/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/parametros');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/actualizar_parametros');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/movil');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/movil/*');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/sidebar-preferences');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/materiales');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/ubicaciones');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/tipoubicacion');
@@ -220,14 +242,33 @@ INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/catego
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/unidades');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/transportes');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/rutas');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/zonas');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/clases-pedido');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/pedidos');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/pedidos/ver/*');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/pedidos/filtros/*');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/pedidos/buscar_contenedores');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/pedidos/contenedor_stock');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/recepciones');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/recepciones/ver/*');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/recepciones/buscar_*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/omc');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/omc/ver/*');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/omc/buscar_*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/despacho');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/stockcontable');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/stockcontable/exportar/*');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/stockcontable/plantilla/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/inventario');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/inventario/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/parametros');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/reportes');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/reportes/*');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/sidebar-preferences');
 
+
+-- === FIN DEL SCRIPT ===;
+-- Schema generado para engine: sqlite;
 
 -- SQLite schema for taurus_wms;
 PRAGMA foreign_keys = ON;
@@ -248,7 +289,7 @@ CREATE TABLE IF NOT EXISTS "zonas" (
     "activo" INTEGER NOT NULL DEFAULT 1,
     "tenant_id" INTEGER,
     "created_at" TEXT NOT NULL DEFAULT (datetime('now')),
-    UNIQUE ("codigo")
+    UNIQUE ("codigo", "tenant_id")
 );
 CREATE INDEX IF NOT EXISTS "idx_zona_activo" ON "zonas" ("activo");
 CREATE INDEX IF NOT EXISTS "idx_zonas_tenant" ON "zonas" ("tenant_id");
@@ -271,7 +312,8 @@ CREATE TABLE IF NOT EXISTS "categorias" (
     "descripcion" text,
     "activo" INTEGER NOT NULL DEFAULT 1,
     "tenant_id" INTEGER,
-    "created_at" TEXT NOT NULL DEFAULT (datetime('now'))
+    "created_at" TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE ("codigo", "tenant_id")
 );
 CREATE INDEX IF NOT EXISTS "idx_categorias_tenant" ON "categorias" ("tenant_id");
 
@@ -286,7 +328,8 @@ CREATE TABLE IF NOT EXISTS "proveedores" (
     "email" TEXT,
     "activo" INTEGER NOT NULL DEFAULT 1,
     "tenant_id" INTEGER,
-    "created_at" TEXT NOT NULL DEFAULT (datetime('now'))
+    "created_at" TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE ("codigo", "tenant_id")
 );
 CREATE INDEX IF NOT EXISTS "idx_proveedores_tenant" ON "proveedores" ("tenant_id");
 
@@ -339,6 +382,7 @@ CREATE TABLE IF NOT EXISTS "ubicaciones" (
     "activo" INTEGER NOT NULL DEFAULT 1,
     "tenant_id" INTEGER,
     "created_at" TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE ("codigo", "tenant_id"),
     FOREIGN KEY ("id_zona") REFERENCES "zonas" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 CREATE INDEX IF NOT EXISTS "idx_ubicaciones_tenant" ON "ubicaciones" ("tenant_id");
@@ -356,6 +400,7 @@ CREATE TABLE IF NOT EXISTS "transportes" (
     "activo" INTEGER NOT NULL DEFAULT 1,
     "id_muelle_salida" INTEGER,
     "tenant_id" INTEGER,
+    UNIQUE ("codigo", "tenant_id"),
     FOREIGN KEY ("id_muelle_salida") REFERENCES "ubicaciones" ("id")
 );
 CREATE INDEX IF NOT EXISTS "idx_transportes_tenant" ON "transportes" ("tenant_id");
@@ -365,10 +410,12 @@ CREATE TABLE IF NOT EXISTS "transporte_rutas" (
     "id_transporte" INTEGER NOT NULL,
     "id_ruta" INTEGER NOT NULL,
     "observaciones" text,
+    "tenant_id" INTEGER,
     PRIMARY KEY ("id_transporte", "id_ruta"),
     FOREIGN KEY ("id_transporte") REFERENCES "transportes" ("id_transporte") ON DELETE CASCADE,
     FOREIGN KEY ("id_ruta") REFERENCES "rutas" ("id_ruta") ON DELETE CASCADE
 );
+CREATE INDEX IF NOT EXISTS "idx_transporte_rutas_tenant" ON "transporte_rutas" ("tenant_id");
 
 -- --- clientes ---;
 CREATE TABLE IF NOT EXISTS "clientes" (
@@ -386,6 +433,7 @@ CREATE TABLE IF NOT EXISTS "clientes" (
     "id_transporte_predeterminado" INTEGER,
     "activo" INTEGER NOT NULL DEFAULT 1,
     "tenant_id" INTEGER,
+    UNIQUE ("codigo", "tenant_id"),
     FOREIGN KEY ("id_ruta") REFERENCES "rutas" ("id_ruta") ON DELETE SET NULL ON UPDATE CASCADE,
     FOREIGN KEY ("id_transporte_predeterminado") REFERENCES "transportes" ("id_transporte") ON DELETE SET NULL ON UPDATE CASCADE
 );
@@ -403,6 +451,7 @@ CREATE TABLE IF NOT EXISTS "materiales" (
     "stock_maximo" REAL DEFAULT 0,
     "unidad_medida_id" INTEGER,
     "trazabilidad" TEXT NOT NULL DEFAULT 'ninguna',
+    "metodo_picking" TEXT NOT NULL DEFAULT 'libre',
     "peso_bruto" REAL,
     "peso_neto" REAL,
     "costo_promedio" REAL DEFAULT 0,
@@ -411,6 +460,7 @@ CREATE TABLE IF NOT EXISTS "materiales" (
     "tenant_id" INTEGER,
     "created_at" TEXT NOT NULL DEFAULT (datetime('now')),
     "updated_at" TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE ("codigo", "tenant_id"),
     FOREIGN KEY ("categoria_id") REFERENCES "categorias" ("id_categoria") ON DELETE SET NULL ON UPDATE CASCADE
 );
 CREATE INDEX IF NOT EXISTS "idx_materiales_tenant" ON "materiales" ("tenant_id");
@@ -441,7 +491,7 @@ CREATE TABLE IF NOT EXISTS "material_presentaciones" (
     "peso_neto" REAL,
     "activo" INTEGER NOT NULL DEFAULT 1,
     "tenant_id" INTEGER,
-    UNIQUE ("codigo_barras"),
+    UNIQUE ("codigo_barras", "tenant_id"),
     FOREIGN KEY ("id_material") REFERENCES "materiales" ("id") ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS "idx_matpres_tenant" ON "material_presentaciones" ("tenant_id");
@@ -476,6 +526,28 @@ CREATE INDEX IF NOT EXISTS "idx_lote" ON "stockcontable" ("Lote");
 CREATE INDEX IF NOT EXISTS "idx_tipo_stock" ON "stockcontable" ("TipoStock");
 CREATE INDEX IF NOT EXISTS "idx_contenedor" ON "stockcontable" ("IDContenedor");
 CREATE INDEX IF NOT EXISTS "idx_stockcontable_tenant" ON "stockcontable" ("tenant_id");
+
+-- --- stock_movimientos ---;
+CREATE TABLE IF NOT EXISTS "stock_movimientos" (
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+    "tenant_id" INTEGER,
+    "fecha" TEXT NOT NULL,
+    "usuario" TEXT,
+    "accion" TEXT NOT NULL,
+    "modulo" TEXT,
+    "id_ubicacion" INTEGER,
+    "id_material" INTEGER,
+    "id_contenedor" TEXT,
+    "lote" TEXT,
+    "tipo_stock" TEXT,
+    "cantidad" REAL,
+    "detalle" TEXT
+);
+CREATE INDEX IF NOT EXISTS "idx_stockmov_tenant" ON "stock_movimientos" ("tenant_id");
+CREATE INDEX IF NOT EXISTS "idx_stockmov_fecha" ON "stock_movimientos" ("fecha");
+CREATE INDEX IF NOT EXISTS "idx_stockmov_material" ON "stock_movimientos" ("id_material");
+CREATE INDEX IF NOT EXISTS "idx_stockmov_ubicacion" ON "stock_movimientos" ("id_ubicacion");
+CREATE INDEX IF NOT EXISTS "idx_stockmov_contenedor" ON "stock_movimientos" ("id_contenedor");
 
 -- --- clases_pedido ---;
 CREATE TABLE IF NOT EXISTS "clases_pedido" (
@@ -644,7 +716,8 @@ CREATE TABLE IF NOT EXISTS "inventarios_cabecera" (
     "usuario_cierre" TEXT,
     "fecha_anulacion" TEXT,
     "usuario_anulacion" TEXT,
-    "tenant_id" INTEGER
+    "tenant_id" INTEGER,
+    UNIQUE ("numero", "tenant_id")
 );
 CREATE INDEX IF NOT EXISTS "idx_inventarios_cab_tenant" ON "inventarios_cabecera" ("tenant_id");
 
@@ -676,6 +749,184 @@ INSERT OR IGNORE INTO "clases_pedido" ("nombre", "activo") VALUES ('Devolucion',
 
 -- === FIN DEL SCRIPT ===;
 -- Schema generado para engine: sqlite;
--- Usuarios por defecto:;
---   SuperAdmin: admin / Admin@2024!;
---   Operador:   operador / Admin@2024!;
+
+-- SQLite schema for taurus_intercambio;
+PRAGMA foreign_keys = ON;
+
+-- TAURUS WMS - Schema para taurus_intercambio (interfaces con sistemas externos);
+-- Engine: sqlite;
+-- Generado por modules/schema_generator.py;
+
+-- SQLite: database is a file, drop by deleting the file: taurus_intercambio.db;
+
+
+-- --- intercambio_materiales ---;
+CREATE TABLE IF NOT EXISTS "intercambio_materiales" (
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+    "tenant_codigo" TEXT NOT NULL,
+    "codigo" TEXT NOT NULL,
+    "codigo_barras" TEXT,
+    "nombre" TEXT NOT NULL,
+    "descripcion" text,
+    "categoria_codigo" TEXT,
+    "stock_minimo" REAL DEFAULT 0,
+    "stock_maximo" REAL DEFAULT 0,
+    "unidad_medida_codigo" TEXT,
+    "trazabilidad" TEXT NOT NULL DEFAULT 'ninguna',
+    "metodo_picking" TEXT NOT NULL DEFAULT 'libre',
+    "peso_bruto" REAL,
+    "peso_neto" REAL,
+    "costo_promedio" REAL DEFAULT 0,
+    "ultimo_costo" REAL DEFAULT 0,
+    "activo" INTEGER NOT NULL DEFAULT 1,
+    "accion" TEXT NOT NULL DEFAULT 'alta',
+    "estado" TEXT NOT NULL DEFAULT 'pendiente',
+    "intentos" INTEGER NOT NULL DEFAULT 0,
+    "error_mensaje" text,
+    "id_material_wms" INTEGER,
+    "fecha_carga" TEXT NOT NULL DEFAULT (datetime('now')),
+    "fecha_procesado" TEXT,
+    "updated_at" TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS "idx_int_mat_tenant" ON "intercambio_materiales" ("tenant_codigo");
+CREATE INDEX IF NOT EXISTS "idx_int_mat_estado" ON "intercambio_materiales" ("estado");
+CREATE INDEX IF NOT EXISTS "idx_int_mat_codigo" ON "intercambio_materiales" ("codigo");
+
+-- --- intercambio_rutas ---;
+CREATE TABLE IF NOT EXISTS "intercambio_rutas" (
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+    "tenant_codigo" TEXT NOT NULL,
+    "nombre_ruta" TEXT NOT NULL,
+    "descripcion" text,
+    "accion" TEXT NOT NULL DEFAULT 'alta',
+    "estado" TEXT NOT NULL DEFAULT 'pendiente',
+    "intentos" INTEGER NOT NULL DEFAULT 0,
+    "error_mensaje" text,
+    "id_ruta_wms" INTEGER,
+    "fecha_carga" TEXT NOT NULL DEFAULT (datetime('now')),
+    "fecha_procesado" TEXT,
+    "updated_at" TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS "idx_int_rut_tenant" ON "intercambio_rutas" ("tenant_codigo");
+CREATE INDEX IF NOT EXISTS "idx_int_rut_estado" ON "intercambio_rutas" ("estado");
+CREATE INDEX IF NOT EXISTS "idx_int_rut_nombre" ON "intercambio_rutas" ("nombre_ruta");
+
+-- --- intercambio_transportes ---;
+CREATE TABLE IF NOT EXISTS "intercambio_transportes" (
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+    "tenant_codigo" TEXT NOT NULL,
+    "codigo" TEXT NOT NULL,
+    "razonsocial" TEXT NOT NULL,
+    "cuit" TEXT,
+    "telefono" TEXT,
+    "email" TEXT,
+    "muelle_codigo" TEXT,
+    "activo" INTEGER NOT NULL DEFAULT 1,
+    "accion" TEXT NOT NULL DEFAULT 'alta',
+    "estado" TEXT NOT NULL DEFAULT 'pendiente',
+    "intentos" INTEGER NOT NULL DEFAULT 0,
+    "error_mensaje" text,
+    "id_transporte_wms" INTEGER,
+    "fecha_carga" TEXT NOT NULL DEFAULT (datetime('now')),
+    "fecha_procesado" TEXT,
+    "updated_at" TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS "idx_int_tra_tenant" ON "intercambio_transportes" ("tenant_codigo");
+CREATE INDEX IF NOT EXISTS "idx_int_tra_estado" ON "intercambio_transportes" ("estado");
+CREATE INDEX IF NOT EXISTS "idx_int_tra_codigo" ON "intercambio_transportes" ("codigo");
+
+-- --- intercambio_transporte_rutas ---;
+CREATE TABLE IF NOT EXISTS "intercambio_transporte_rutas" (
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+    "tenant_codigo" TEXT NOT NULL,
+    "transporte_codigo" TEXT NOT NULL,
+    "ruta_nombre" TEXT NOT NULL,
+    "observaciones" text,
+    "accion" TEXT NOT NULL DEFAULT 'alta',
+    "estado" TEXT NOT NULL DEFAULT 'pendiente',
+    "intentos" INTEGER NOT NULL DEFAULT 0,
+    "error_mensaje" text,
+    "fecha_carga" TEXT NOT NULL DEFAULT (datetime('now')),
+    "fecha_procesado" TEXT,
+    "updated_at" TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS "idx_int_trr_tenant" ON "intercambio_transporte_rutas" ("tenant_codigo");
+CREATE INDEX IF NOT EXISTS "idx_int_trr_estado" ON "intercambio_transporte_rutas" ("estado");
+CREATE INDEX IF NOT EXISTS "idx_int_trr_transporte" ON "intercambio_transporte_rutas" ("transporte_codigo");
+CREATE INDEX IF NOT EXISTS "idx_int_trr_ruta" ON "intercambio_transporte_rutas" ("ruta_nombre");
+
+-- --- intercambio_clientes ---;
+CREATE TABLE IF NOT EXISTS "intercambio_clientes" (
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+    "tenant_codigo" TEXT NOT NULL,
+    "codigo" TEXT NOT NULL,
+    "razonsocial" TEXT NOT NULL,
+    "cuit" TEXT,
+    "direccion" TEXT,
+    "localidad" TEXT,
+    "provincia" TEXT,
+    "telefono" TEXT,
+    "email" TEXT,
+    "contacto_nombre" TEXT,
+    "ruta_nombre" TEXT,
+    "transporte_codigo" TEXT,
+    "activo" INTEGER NOT NULL DEFAULT 1,
+    "accion" TEXT NOT NULL DEFAULT 'alta',
+    "estado" TEXT NOT NULL DEFAULT 'pendiente',
+    "intentos" INTEGER NOT NULL DEFAULT 0,
+    "error_mensaje" text,
+    "id_cliente_wms" INTEGER,
+    "fecha_carga" TEXT NOT NULL DEFAULT (datetime('now')),
+    "fecha_procesado" TEXT,
+    "updated_at" TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS "idx_int_cli_tenant" ON "intercambio_clientes" ("tenant_codigo");
+CREATE INDEX IF NOT EXISTS "idx_int_cli_estado" ON "intercambio_clientes" ("estado");
+CREATE INDEX IF NOT EXISTS "idx_int_cli_codigo" ON "intercambio_clientes" ("codigo");
+
+-- --- intercambio_pedidos ---;
+CREATE TABLE IF NOT EXISTS "intercambio_pedidos" (
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+    "tenant_codigo" TEXT NOT NULL,
+    "nro_pedido" TEXT NOT NULL,
+    "cliente_codigo" TEXT NOT NULL,
+    "clase_nombre" TEXT,
+    "fecha_pedido" TEXT NOT NULL,
+    "ruta_nombre" TEXT,
+    "transporte_codigo" TEXT,
+    "direccion_entrega" TEXT,
+    "observaciones" text,
+    "estado_pedido" TEXT NOT NULL DEFAULT 'Pendiente',
+    "items_json" text,
+    "accion" TEXT NOT NULL DEFAULT 'alta',
+    "estado" TEXT NOT NULL DEFAULT 'pendiente',
+    "intentos" INTEGER NOT NULL DEFAULT 0,
+    "error_mensaje" text,
+    "id_pedido_wms" INTEGER,
+    "fecha_carga" TEXT NOT NULL DEFAULT (datetime('now')),
+    "fecha_procesado" TEXT,
+    "updated_at" TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS "idx_int_ped_tenant" ON "intercambio_pedidos" ("tenant_codigo");
+CREATE INDEX IF NOT EXISTS "idx_int_ped_estado" ON "intercambio_pedidos" ("estado");
+CREATE INDEX IF NOT EXISTS "idx_int_ped_nro" ON "intercambio_pedidos" ("nro_pedido");
+
+-- --- intercambio_log ---;
+CREATE TABLE IF NOT EXISTS "intercambio_log" (
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+    "modulo" TEXT NOT NULL,
+    "resultado" TEXT NOT NULL DEFAULT 'ok',
+    "registros_procesados" INTEGER NOT NULL DEFAULT 0,
+    "registros_error" INTEGER NOT NULL DEFAULT 0,
+    "detalle" text,
+    "usuario" TEXT,
+    "fecha" TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS "idx_int_log_modulo" ON "intercambio_log" ("modulo");
+CREATE INDEX IF NOT EXISTS "idx_int_log_fecha" ON "intercambio_log" ("fecha");
+
+-- --- Datos iniciales ---;
+
+
+-- === FIN DEL SCRIPT ===;
+-- Schema generado para engine: sqlite;

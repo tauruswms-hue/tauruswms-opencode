@@ -1,7 +1,9 @@
+import json
 import logging
 import os
 import time
 from contextlib import suppress
+from pathlib import Path
 
 from dotenv import load_dotenv
 
@@ -11,29 +13,183 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-_cached_config = None
-_cached_config_ts = 0.0
+# Las conexiones a las tres bases (admin, wms, intercambio) viven en un único
+# archivo JSON fuera de la BD: conexiones.json en la raíz del proyecto, o la
+# ruta indicada en la variable de entorno TAURUS_CONEXIONES.
+CONEXIONES_ARCHIVO = 'conexiones.json'
+CONEXIONES_ENV = 'TAURUS_CONEXIONES'
+BASES = ('admin', 'wms', 'intercambio')
+_BASES_OBLIGATORIAS = ('admin', 'wms')
+_CLAVES = ('engine', 'host', 'port', 'user', 'password', 'database', 'charset')
+_CLAVES_OBLIGATORIAS = ('host', 'user', 'password', 'database')
+_ENGINES = ('mysql', 'postgresql', 'sqlite', 'sqlserver')
+_PUERTOS = {'mysql': 3306, 'postgresql': 5432, 'sqlserver': 1433}
+_CHARSETS = {'mysql': 'utf8mb4', 'postgresql': 'UTF8'}
+
+_conexiones = None
+_conexiones_ts = 0.0
+_conexiones_fijas = {}
 _db_engine = None
-_intercambio_config_cache = None
-_intercambio_config_ts = 0.0
 _pools = {}
 
-# La configuracion vive en taurus_admin.configuracion y la edita el panel admin,
-# que corre en otro proceso: clear_config_cache() alli no limpia la cache del WMS.
-# Por eso la cache expira y se relee cada CONFIG_CACHE_TTL segundos; si cambio,
-# se descartan engine y pools para reconectar con los valores nuevos.
+# El archivo se relee cada CONFIG_CACHE_TTL segundos; si cambió, se descartan
+# engine y pools para reconectar con los valores nuevos sin reiniciar la app.
 CONFIG_CACHE_TTL = float(os.getenv('CONFIG_CACHE_TTL', '30'))
+
+
+class ConexionesError(Exception):
+    """El archivo de conexiones falta, no se puede leer o está incompleto."""
 
 
 def _cache_vigente(ts):
     return (time.monotonic() - ts) < CONFIG_CACHE_TTL
 
-_ENGINES = ('mysql', 'postgresql', 'sqlite', 'sqlserver')
+
+# ============================================================================
+# ARCHIVO DE CONEXIONES
+# ============================================================================
+
+def ruta_conexiones():
+    """Ruta del archivo de conexiones: TAURUS_CONEXIONES o conexiones.json en la raíz."""
+    ruta = os.getenv(CONEXIONES_ENV, '').strip()
+    if ruta:
+        return Path(ruta)
+    return Path(__file__).resolve().parent.parent / CONEXIONES_ARCHIVO
 
 
-def _get_env(key, default=''):
-    return os.getenv(key, default)
+def normalizar_conexion(base, datos, origen):
+    """Valida los datos de conexión de una base y completa los valores por defecto.
 
+    Devuelve un dict con engine, host, port, user, password, database y charset.
+    Lanza ConexionesError con un mensaje que indica qué corregir.
+    """
+    if not isinstance(datos, dict):
+        raise ConexionesError(f"{origen}: la sección '{base}' debe ser un objeto {{...}}")
+    desconocidas = sorted(set(datos) - set(_CLAVES))
+    if desconocidas:
+        raise ConexionesError(f"{origen}: claves desconocidas en '{base}': {', '.join(desconocidas)} "
+                              f"(válidas: {', '.join(_CLAVES)})")
+
+    engine = str(datos.get('engine') or 'mysql').strip().lower()
+    if engine not in _ENGINES:
+        raise ConexionesError(f"{origen}: engine '{engine}' no soportado en '{base}' "
+                              f"(usar: {', '.join(_ENGINES)})")
+
+    obligatorias = ('database',) if engine == 'sqlite' else _CLAVES_OBLIGATORIAS
+    faltantes = [k for k in obligatorias if datos.get(k) in (None, '')]
+    if faltantes:
+        raise ConexionesError(f"{origen}: faltan claves obligatorias en '{base}': {', '.join(faltantes)}")
+
+    port = datos.get('port')
+    if port in (None, ''):
+        port = _PUERTOS.get(engine, 0)
+    elif not str(port).isdigit():
+        raise ConexionesError(f"{origen}: port debe ser numérico en '{base}': {port!r}")
+
+    return {
+        'engine': engine,
+        'host': str(datos.get('host') or ''),
+        'port': int(port),
+        'user': str(datos.get('user') or ''),
+        'password': str(datos.get('password') or ''),
+        'database': str(datos['database']),
+        'charset': str(datos.get('charset') or _CHARSETS.get(engine, '')),
+    }
+
+
+def _leer_conexiones():
+    """Lee y valida el archivo de conexiones. Devuelve {base: conexión normalizada}."""
+    ruta = ruta_conexiones()
+    try:
+        with open(ruta, encoding='utf-8-sig') as fh:
+            datos = json.load(fh)
+    except FileNotFoundError:
+        raise ConexionesError(
+            f"No se encontró el archivo de conexiones ({ruta}). Cree {CONEXIONES_ARCHIVO} con las secciones "
+            f"admin, wms e intercambio (ver docs/inicio/configuracion.html), o indique otra ruta con la "
+            f"variable de entorno {CONEXIONES_ENV}."
+        ) from None
+    except json.JSONDecodeError as e:
+        raise ConexionesError(f"{ruta} no es un JSON válido (línea {e.lineno}, columna {e.colno}): {e.msg}") from None
+    except OSError as e:
+        raise ConexionesError(f"No se pudo leer {ruta}: {e.strerror}") from None
+
+    if not isinstance(datos, dict):
+        raise ConexionesError(f"{ruta} debe contener un objeto JSON {{...}}")
+    desconocidas = sorted(set(datos) - set(BASES))
+    if desconocidas:
+        raise ConexionesError(f"{ruta}: secciones desconocidas: {', '.join(desconocidas)} "
+                              f"(válidas: {', '.join(BASES)})")
+    faltantes = [b for b in _BASES_OBLIGATORIAS if b not in datos]
+    if faltantes:
+        raise ConexionesError(f"{ruta}: faltan las secciones: {', '.join(faltantes)}")
+
+    return {base: normalizar_conexion(base, datos[base], str(ruta)) for base in BASES if base in datos}
+
+
+def get_conexiones():
+    """Conexiones del archivo, cacheadas CONFIG_CACHE_TTL segundos."""
+    global _conexiones, _conexiones_ts
+    if _conexiones is not None and _cache_vigente(_conexiones_ts):
+        return _conexiones
+
+    try:
+        conexiones = _leer_conexiones()
+    except Exception:
+        if _conexiones is None:
+            raise
+        # El archivo no se pudo leer al refrescar: seguir con las conexiones conocidas.
+        logger.warning('No se pudo refrescar el archivo de conexiones; se usan las cacheadas', exc_info=True)
+        _conexiones_ts = time.monotonic()
+        return _conexiones
+
+    if _conexiones is not None and conexiones != _conexiones:
+        logger.info('Archivo de conexiones modificado; se reinician engine y pools')
+        clear_config_cache()
+    _conexiones = conexiones
+    _conexiones_ts = time.monotonic()
+    return _conexiones
+
+
+def get_conexion(base):
+    """Datos de conexión de una base ('admin', 'wms' o 'intercambio')."""
+    if base in _conexiones_fijas:
+        return _conexiones_fijas[base].copy()
+    conexiones = get_conexiones()
+    if base not in conexiones:
+        raise ConexionesError(f"{ruta_conexiones()}: falta la sección '{base}'")
+    return conexiones[base].copy()
+
+
+def set_conexion(base, datos, origen='configuración'):
+    """Fija la conexión de una base sin leer el archivo.
+
+    Lo usa superusuario.exe, que trae sus propias credenciales de taurus_admin.
+    """
+    _conexiones_fijas[base] = normalizar_conexion(base, datos, origen)
+    return _conexiones_fijas[base].copy()
+
+
+def passwords_conexiones():
+    """Pares (nombre, password) de cada base, para check_default_secrets."""
+    return [(f'{CONEXIONES_ARCHIVO} {base}.password', c['password'])
+            for base, c in get_conexiones().items()]
+
+
+def clear_config_cache():
+    global _conexiones, _db_engine, _pools
+    _conexiones = None
+    _db_engine = None
+    for pool in _pools.values():
+        with suppress(Exception):
+            pool.close()
+    _pools = {}
+    set_engine('mysql')
+
+
+# ============================================================================
+# POOL Y DRIVERS
+# ============================================================================
 
 def _get_pooled(pool_key, connect_kwargs):
     """Devuelve una conexion desde un pool DBUtils (reusada, nunca cerrada de verdad).
@@ -80,74 +236,6 @@ def _create_pool_connection(engine, connect_kwargs):
     return driver.connect(**connect_kwargs)
 
 
-def _get_admin_connection():
-    engine = _get_env('DB_ADMIN_ENGINE', 'mysql').strip().lower()
-    connect_kwargs = _admin_connect_kwargs(engine)
-
-    if engine == 'sqlite':
-        return _create_pool_connection(engine, connect_kwargs)
-
-    return _get_pooled(_pool_key_for(engine, connect_kwargs), connect_kwargs)
-
-
-def _admin_connect_kwargs(engine):
-    connect_kwargs = dict(
-        host=_get_env('DB_ADMIN_HOST', 'localhost'),
-        user=_get_env('DB_ADMIN_USER', 'taurus_admin'),
-        password=_get_env('DB_ADMIN_PASSWORD', 'Taurus_2001'),
-        database=_get_env('DB_ADMIN_NAME', 'taurus_admin'),
-    )
-
-    if engine == 'sqlite':
-        connect_kwargs = {'database': connect_kwargs['database']}
-        return connect_kwargs
-
-    port = int(_get_env('DB_ADMIN_PORT', '3306'))
-
-    if engine == 'mysql':
-        connect_kwargs['charset'] = _get_env('DB_CHAR_SET', 'utf8mb4')
-        connect_kwargs['port'] = port
-        connect_kwargs['cursorclass'] = _get_driver_for_engine(engine).cursors.DictCursor
-    elif engine == 'postgresql':
-        connect_kwargs['port'] = port
-        connect_kwargs['options'] = f"-c client_encoding={_get_env('DB_CHAR_SET', 'UTF8')}"
-        from psycopg2.extras import RealDictCursor
-        connect_kwargs['cursor_factory'] = RealDictCursor
-    elif engine == 'sqlserver':
-        connect_kwargs = dict(
-            server=_get_env('DB_ADMIN_HOST', 'localhost'),
-            user=_get_env('DB_ADMIN_USER', 'taurus_admin'),
-            password=_get_env('DB_ADMIN_PASSWORD', 'Taurus_2001'),
-            database=_get_env('DB_ADMIN_NAME', 'taurus_admin'),
-            port=port,
-        )
-
-    return connect_kwargs
-
-
-def get_db_engine():
-    global _db_engine
-    if _db_engine is not None:
-        return _db_engine
-    env_engine = _get_env('DB_ENGINE', '').strip().lower()
-    if env_engine in _ENGINES:
-        _db_engine = env_engine
-        set_engine(env_engine)
-        return _db_engine
-    try:
-        config = get_db_config()
-        engine_val = config.get('DB_ENGINE', 'mysql').strip().lower()
-        if engine_val not in _ENGINES:
-            engine_val = 'mysql'
-        _db_engine = engine_val
-        set_engine(engine_val)
-        return _db_engine
-    except Exception:
-        _db_engine = 'mysql'
-        set_engine('mysql')
-        return _db_engine
-
-
 def _get_driver_for_engine(engine):
     if engine == 'postgresql':
         try:
@@ -168,199 +256,109 @@ def _get_driver_for_engine(engine):
     return pymysql
 
 
-def get_db_config():
-    global _cached_config, _cached_config_ts
-    if _cached_config is not None and _cache_vigente(_cached_config_ts):
-        return _cached_config.copy()
-
-    try:
-        config = _leer_db_config()
-    except Exception:
-        if _cached_config is None:
-            raise
-        # BD admin no disponible al refrescar: seguir con la config conocida.
-        logger.warning('No se pudo refrescar la configuracion WMS; se usa la cacheada', exc_info=True)
-        _cached_config_ts = time.monotonic()
-        return _cached_config.copy()
-
-    if _cached_config is not None and config != _cached_config:
-        logger.info('Configuracion WMS modificada en BD; se reinician engine y pools')
-        clear_config_cache()
-    _cached_config = config
-    _cached_config_ts = time.monotonic()
-    return config.copy()
-
-
-def _leer_db_config():
-    conn = _get_admin_connection()
-    try:
-        cursor = conn.cursor()
-        cursor.execute("SELECT clave, valor FROM configuracion WHERE clave IN ('DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASSWORD', 'DB_CHAR_SET', 'DB_ENGINE')")
-        rows = cursor.fetchall()
-        cursor.close()
-
-        config = {}
-        for row in rows:
-            clave = row['clave']
-            valor = row['valor'] if row['valor'] is not None else ''
-            config[clave] = str(valor)
-
-        required = ['DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASSWORD']
-        missing = [k for k in required if k not in config]
-        if missing:
-            raise Exception(f"Configuración incompleta en BD. Faltan: {', '.join(missing)}")
-
-        if 'DB_ENGINE' not in config:
-            config['DB_ENGINE'] = 'mysql'
-
-        return config
-    finally:
-        conn.close()
-
-
-def clear_config_cache():
-    global _cached_config, _db_engine, _intercambio_config_cache, _pools
-    _cached_config = None
-    _db_engine = None
-    _intercambio_config_cache = None
-    for pool in _pools.values():
-        with suppress(Exception):
-            pool.close()
-    _pools = {}
-    set_engine('mysql')
-
-
-def get_intercambio_config():
-    """Configuracion de la base de intercambio (taurus_intercambio).
-
-    Lee las claves INTERCAMBIO_* de la tabla configuracion de taurus_admin;
-    si faltan, usa el fallback de variables de entorno DB_INTERCAMBIO_*.
-    """
-    global _intercambio_config_cache, _intercambio_config_ts
-    if _intercambio_config_cache is not None and _cache_vigente(_intercambio_config_ts):
-        return _intercambio_config_cache.copy()
-
-    config = {
-        'INTERCAMBIO_HOST':      _get_env('DB_INTERCAMBIO_HOST', 'localhost'),
-        'INTERCAMBIO_PORT':      _get_env('DB_INTERCAMBIO_PORT', '3306'),
-        'INTERCAMBIO_NAME':      _get_env('DB_INTERCAMBIO_NAME', 'taurus_intercambio'),
-        'INTERCAMBIO_USER':      _get_env('DB_INTERCAMBIO_USER', 'taurus'),
-        'INTERCAMBIO_PASSWORD':  _get_env('DB_INTERCAMBIO_PASSWORD', 'Taurus_2001'),
-        'INTERCAMBIO_CHAR_SET':  _get_env('DB_INTERCAMBIO_CHAR_SET', 'utf8mb4'),
-        'INTERCAMBIO_ENGINE':    _get_env('DB_INTERCAMBIO_ENGINE', 'mysql'),
-    }
-
-    try:
-        conn = _get_admin_connection()
-        try:
-            cursor = conn.cursor()
-            cursor.execute("SELECT clave, valor FROM configuracion WHERE clave LIKE 'INTERCAMBIO%'")
-            rows = cursor.fetchall()
-            cursor.close()
-        finally:
-            conn.close()
-        for row in rows:
-            clave = row['clave']
-            valor = row['valor']
-            if clave in config and valor is not None:
-                config[clave] = str(valor)
-    except Exception:
-        if _intercambio_config_cache is not None:
-            # No pisar la config conocida con el fallback de entorno.
-            logger.warning('No se pudo refrescar la configuracion de intercambio; se usa la cacheada', exc_info=True)
-            _intercambio_config_ts = time.monotonic()
-            return _intercambio_config_cache.copy()
-
-    if _intercambio_config_cache is not None and config != _intercambio_config_cache:
-        logger.info('Configuracion de intercambio modificada en BD; se reinician engine y pools')
-        clear_config_cache()
-    _intercambio_config_cache = config
-    _intercambio_config_ts = time.monotonic()
-    return config.copy()
-
-
-def get_intercambio_connection():
-    config = get_intercambio_config()
-    engine = config.get('INTERCAMBIO_ENGINE', 'mysql').strip().lower()
-
-    connect_kwargs = _intercambio_connect_kwargs(engine, config)
-
+def _connect_kwargs(conexion):
+    """Argumentos del driver para una conexión normalizada."""
+    engine = conexion['engine']
     if engine == 'sqlite':
-        return _create_pool_connection(engine, connect_kwargs)
-
-    return _get_pooled(_pool_key_for(engine, connect_kwargs), connect_kwargs)
-
-
-def _intercambio_connect_kwargs(engine, config):
-    if engine == 'sqlite':
-        return {'database': config['INTERCAMBIO_NAME']}
+        return {'database': conexion['database']}
+    if engine == 'sqlserver':
+        return dict(
+            server=conexion['host'],
+            user=conexion['user'],
+            password=conexion['password'],
+            database=conexion['database'],
+            port=conexion['port'],
+        )
 
     connect_kwargs = dict(
-        host=config['INTERCAMBIO_HOST'],
-        user=config['INTERCAMBIO_USER'],
-        password=config['INTERCAMBIO_PASSWORD'],
-        database=config['INTERCAMBIO_NAME'],
-        port=int(config.get('INTERCAMBIO_PORT', 3306)),
+        host=conexion['host'],
+        user=conexion['user'],
+        password=conexion['password'],
+        database=conexion['database'],
+        port=conexion['port'],
     )
     if engine == 'mysql':
-        connect_kwargs['charset'] = config.get('INTERCAMBIO_CHAR_SET', 'utf8mb4')
+        connect_kwargs['charset'] = conexion['charset'] or 'utf8mb4'
         connect_kwargs['cursorclass'] = _get_driver_for_engine(engine).cursors.DictCursor
     elif engine == 'postgresql':
-        connect_kwargs['options'] = f"-c client_encoding={config.get('INTERCAMBIO_CHAR_SET', 'UTF8')}"
+        connect_kwargs['options'] = f"-c client_encoding={conexion['charset'] or 'UTF8'}"
         from psycopg2.extras import RealDictCursor
         connect_kwargs['cursor_factory'] = RealDictCursor
-    elif engine == 'sqlserver':
-        connect_kwargs = dict(
-            server=config['INTERCAMBIO_HOST'],
-            user=config['INTERCAMBIO_USER'],
-            password=config['INTERCAMBIO_PASSWORD'],
-            database=config['INTERCAMBIO_NAME'],
-        )
-        port = config.get('INTERCAMBIO_PORT', '1433')
-        if port:
-            connect_kwargs['port'] = int(port)
-
     return connect_kwargs
 
 
-def get_db_connection():
-    # Primero la config: si expiro y cambio, resetea el engine cacheado.
-    config = get_db_config()
-    engine = get_db_engine()
-
-    connect_kwargs = _wms_connect_kwargs(engine, config)
-
+def _abrir(conexion):
+    engine = conexion['engine']
+    connect_kwargs = _connect_kwargs(conexion)
     if engine == 'sqlite':
         return _create_pool_connection(engine, connect_kwargs)
-
     return _get_pooled(_pool_key_for(engine, connect_kwargs), connect_kwargs)
 
 
-def get_wms_runtime_config():
-    """Configuracion efectiva de la BD WMS con fallback a variables de entorno.
+# ============================================================================
+# CONEXIONES
+# ============================================================================
 
-    Devuelve un dict plano (host/user/password/database/charset/port/engine).
-    Si la tabla `configuracion` no esta disponible (o esta incompleta) se usa
-    el entorno (.env) como fallback, igual que en el bootstrap de app.py.
-    """
+def _get_admin_connection():
+    return _abrir(get_conexion('admin'))
+
+
+def get_intercambio_connection():
+    return _abrir(get_conexion('intercambio'))
+
+
+def get_db_connection():
+    # Primero la conexión: si el archivo cambió, resetea el engine cacheado.
+    conexion = get_conexion('wms')
+    get_db_engine()
+    return _abrir(conexion)
+
+
+def get_db_engine():
+    """Engine de la base WMS; lo deja activo en sql_dialect."""
+    global _db_engine
+    if _db_engine is not None:
+        return _db_engine
     try:
-        config = get_db_config()
+        engine = get_conexion('wms')['engine']
     except Exception:
-        config = {}
-
-    engine = (config.get('DB_ENGINE') or _get_env('DB_ENGINE', 'mysql')).strip().lower()
-    if engine not in _ENGINES:
         engine = 'mysql'
+    _db_engine = engine
+    set_engine(engine)
+    return _db_engine
 
+
+def get_db_config():
+    """Conexión WMS con las claves DB_* (compatibilidad con migrate.py y generar_schema.py)."""
+    c = get_conexion('wms')
     return {
-        'host': config.get('DB_HOST') or _get_env('DB_HOST', 'localhost'),
-        'user': config.get('DB_USER') or _get_env('DB_USER', 'taurus'),
-        'password': config.get('DB_PASSWORD') or _get_env('DB_PASSWORD', ''),
-        'database': config.get('DB_NAME') or _get_env('DB_NAME', 'taurus_wms'),
-        'charset': config.get('DB_CHAR_SET') or _get_env('DB_CHAR_SET', 'utf8mb4'),
-        'port': int(config.get('DB_PORT') or _get_env('DB_PORT', '3306')),
-        'engine': engine,
+        'DB_ENGINE': c['engine'],
+        'DB_HOST': c['host'],
+        'DB_PORT': str(c['port']),
+        'DB_NAME': c['database'],
+        'DB_USER': c['user'],
+        'DB_PASSWORD': c['password'],
+        'DB_CHAR_SET': c['charset'],
     }
+
+
+def get_intercambio_config():
+    """Conexión de intercambio con las claves INTERCAMBIO_* (compatibilidad)."""
+    c = get_conexion('intercambio')
+    return {
+        'INTERCAMBIO_ENGINE': c['engine'],
+        'INTERCAMBIO_HOST': c['host'],
+        'INTERCAMBIO_PORT': str(c['port']),
+        'INTERCAMBIO_NAME': c['database'],
+        'INTERCAMBIO_USER': c['user'],
+        'INTERCAMBIO_PASSWORD': c['password'],
+        'INTERCAMBIO_CHAR_SET': c['charset'],
+    }
+
+
+def get_wms_runtime_config():
+    """Conexión efectiva de la BD WMS como dict plano (host/user/password/database/charset/port/engine)."""
+    return get_conexion('wms')
 
 
 def probar_conexion(engine, host=None, port=None, user=None, password=None,
@@ -400,35 +398,3 @@ def _test_connect_kwargs(engine, host, port, user, password, database, charset):
         )
 
     return kwargs
-
-
-def _wms_connect_kwargs(engine, config):
-    if engine == 'sqlite':
-        return {'database': config['DB_NAME']}
-
-    connect_kwargs = dict(
-        host=config['DB_HOST'],
-        user=config['DB_USER'],
-        password=config['DB_PASSWORD'],
-        database=config['DB_NAME'],
-        port=int(config['DB_PORT']),
-    )
-    if engine == 'mysql':
-        connect_kwargs['charset'] = config.get('DB_CHAR_SET', 'utf8mb4')
-        connect_kwargs['cursorclass'] = _get_driver_for_engine(engine).cursors.DictCursor
-    elif engine == 'postgresql':
-        connect_kwargs['options'] = f"-c client_encoding={config.get('DB_CHAR_SET', 'UTF8')}"
-        from psycopg2.extras import RealDictCursor
-        connect_kwargs['cursor_factory'] = RealDictCursor
-    elif engine == 'sqlserver':
-        connect_kwargs = dict(
-            server=config['DB_HOST'],
-            user=config['DB_USER'],
-            password=config['DB_PASSWORD'],
-            database=config['DB_NAME'],
-        )
-        port = config.get('DB_PORT', '1433')
-        if port:
-            connect_kwargs['port'] = int(port)
-
-    return connect_kwargs

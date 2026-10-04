@@ -480,6 +480,3 @@ IF NOT EXISTS (SELECT 1 FROM [clases_pedido] WHERE [nombre] = 'Devolucion') INSE
 
 -- === FIN DEL SCRIPT ===;
 -- Schema generado para engine: sqlserver;
--- Usuarios por defecto:;
---   SuperAdmin: admin / Admin@2024!;
---   Operador:   operador / Admin@2024!;

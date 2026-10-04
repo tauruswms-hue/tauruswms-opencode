@@ -119,36 +119,14 @@ CREATE TABLE IF NOT EXISTS "roles_rutas" (
 
 -- --- Datos iniciales ---;
 
-INSERT OR IGNORE INTO "tenants" ("id", "codigo", "nombre", "razon_social", "activo", "nombredelalmacen", "metodosdepicking", "bajostock", "dias_filtro_fechas") VALUES (1, 'DEFAULT', 'Empresa Principal', 'Empresa Principal S.A.', 1, 'Almacen Principal', '"fifo"', 0, 30);
-
 -- Roles por defecto del sistema;
 INSERT OR IGNORE INTO "roles" ("nombre", "descripcion", "activo") VALUES ('ADMIN', 'Acceso total a todas las rutas', 1);
 INSERT OR IGNORE INTO "roles" ("nombre", "descripcion", "activo") VALUES ('OPERADOR', 'Rutas operativas del WMS', 1);
 INSERT OR IGNORE INTO "roles" ("nombre", "descripcion", "activo") VALUES ('CONSULTA', 'Acceso de solo lectura', 1);
 
--- SuperAdmin password: Admin@2024!;
-INSERT OR IGNORE INTO "admin_usuarios" ("username", "password_hash", "nombre", "email", "rol") VALUES ('admin', 'scrypt:32768:8:1$WQ6PhKOf81VV3FcH$ed1ca47fd1fd381583f0289acf9e839521b5e74a07adfc034382ea5342d608e393b7143fec95b3aef262f1946f95696e3e8acbfc867c91769d63142d4e4a5db2', 'Administrador', 'admin@taurus.local', 'SUPERADMIN');
-
--- Operador password: Admin@2024!;
-INSERT OR IGNORE INTO "usuarios" ("username", "password_hash", "nombre", "email", "rol", "tenant_id", "activo") VALUES ('operador', 'scrypt:32768:8:1$WQ6PhKOf81VV3FcH$ed1ca47fd1fd381583f0289acf9e839521b5e74a07adfc034382ea5342d608e393b7143fec95b3aef262f1946f95696e3e8acbfc867c91769d63142d4e4a5db2', 'Operador General', 'operador@taurus.local', 'OPERADOR', 1, 1);
-
 INSERT OR IGNORE INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('app_version', '1.0.0', 'Version actual de la aplicacion');
 INSERT OR IGNORE INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('app_name', 'Taurus WMS', 'Nombre de la aplicacion');
 INSERT OR IGNORE INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('mantenimiento', 'false', 'Modo mantenimiento (true/false)');
-INSERT OR IGNORE INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('DB_HOST', 'localhost', 'Host del servidor de base de datos');
-INSERT OR IGNORE INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('DB_PORT', '3306', 'Puerto del servidor MySQL');
-INSERT OR IGNORE INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('DB_NAME', 'taurus_wms', 'Nombre de la base de datos principal');
-INSERT OR IGNORE INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('DB_USER', 'taurus', 'Usuario de la base de datos');
-INSERT OR IGNORE INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('DB_PASSWORD', 'Taurus_2001', 'Contrasena de la base de datos');
-INSERT OR IGNORE INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('DB_CHAR_SET', 'utf8mb4', 'Charset de la base de datos');
-INSERT OR IGNORE INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('DB_ENGINE', 'mysql', 'Motor de BD: mysql, postgresql, sqlite');
-INSERT OR IGNORE INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('INTERCAMBIO_ENGINE', 'mysql', 'Motor de BD de intercambio (mysql, postgresql, sqlite, sqlserver)');
-INSERT OR IGNORE INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('INTERCAMBIO_HOST', 'localhost', 'Host de la base de intercambio');
-INSERT OR IGNORE INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('INTERCAMBIO_PORT', '3306', 'Puerto de la base de intercambio');
-INSERT OR IGNORE INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('INTERCAMBIO_NAME', 'taurus_intercambio', 'Nombre de la base de intercambio');
-INSERT OR IGNORE INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('INTERCAMBIO_USER', 'taurus', 'Usuario de la base de intercambio');
-INSERT OR IGNORE INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('INTERCAMBIO_PASSWORD', 'Taurus_2001', 'Contrasena de la base de intercambio');
-INSERT OR IGNORE INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('INTERCAMBIO_CHAR_SET', 'utf8mb4', 'Charset de la base de intercambio');
 
 -- Permisos de rutas por rol;
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('ADMIN', '*');
@@ -291,9 +269,6 @@ INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/sideba
 
 -- === FIN DEL SCRIPT ===;
 -- Schema generado para engine: sqlite;
--- Usuarios por defecto:;
---   SuperAdmin: admin / Admin@2024!;
---   Operador:   operador / Admin@2024!;
 
 -- SQLite schema for taurus_wms;
 PRAGMA foreign_keys = ON;
@@ -774,9 +749,6 @@ INSERT OR IGNORE INTO "clases_pedido" ("nombre", "activo") VALUES ('Devolucion',
 
 -- === FIN DEL SCRIPT ===;
 -- Schema generado para engine: sqlite;
--- Usuarios por defecto:;
---   SuperAdmin: admin / Admin@2024!;
---   Operador:   operador / Admin@2024!;
 
 -- SQLite schema for taurus_intercambio;
 PRAGMA foreign_keys = ON;
@@ -958,6 +930,3 @@ CREATE INDEX IF NOT EXISTS "idx_int_log_fecha" ON "intercambio_log" ("fecha");
 
 -- === FIN DEL SCRIPT ===;
 -- Schema generado para engine: sqlite;
--- Usuarios por defecto:;
---   SuperAdmin: admin / Admin@2024!;
---   Operador:   operador / Admin@2024!;

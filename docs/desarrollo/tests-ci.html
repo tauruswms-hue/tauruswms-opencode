@@ -18,7 +18,7 @@
 <pre><code>pytest -q</code></pre>
         <ul>
             <li>Los tests están en <code>tests/</code>: unitarios y de integración.</li>
-            <li>Los de integración necesitan MySQL con el <code>.env</code> configurado; si no hay conexión, se
+            <li>Los de integración necesitan MySQL y <code>conexiones.json</code> configurado; si no hay conexión, se
                 omiten solos.</li>
             <li>No dependen de los usuarios del seed. <code>tests/conftest.py</code> ofrece los fixtures
                 <code>usuario_wms</code> (en <code>taurus_admin.usuarios</code>) y <code>usuario_panel</code> (en
@@ -48,7 +48,7 @@
             <li>¿Hay consultas nuevas? Filtro de tenant y sin backticks.
                 Ver <a href="../arquitectura/base-de-datos.html">Base de datos</a>.</li>
             <li>¿Cambió el script de superusuario o sus dependencias? Regenerar el ejecutable.
-                Ver <a href="../administracion/superusuario.html">Superusuario</a>.</li>
+                Ver <a href="../inicio/base-de-datos/superusuario.html">Superusuario</a>.</li>
             <li>¿Cambió algo documentado acá? Actualizar la página correspondiente en <code>docs/</code>.</li>
         </ul>
 

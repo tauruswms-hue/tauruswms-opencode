@@ -23,8 +23,9 @@ pip install -r requirements.txt
 copy .env.example .env          # Windows  (Linux/Mac: cp .env.example .env)
 ```
 
-Editar `.env` y **cambiar los secretos y passwords** (`SECRET_KEY`,
-`ADMIN_SECRET_KEY`, `SECRET_SALT`, `DB_*_PASSWORD`). En `APP_ENV=production`
+Editar `.env` y **cambiar los secretos** (`SECRET_KEY`, `ADMIN_SECRET_KEY`,
+`SECRET_SALT`), y completar en `conexiones.json` las credenciales de las tres
+bases (secciones `admin`, `wms` e `intercambio`). En `APP_ENV=production`
 la app se niega a arrancar si detecta valores por defecto.
 
 ## Crear la base de datos
@@ -40,13 +41,13 @@ python modules/schema_generator.py --all
 Migraciones incrementales (una vez que el schema base existe):
 
 ```bash
-python migrate.py                # aplica migrations/*.sql pendientes al WMS
+python migrate.py                # aplica docs/migrations/*.sql pendientes al WMS
 python migrate.py --db admin     # contra taurus_admin
 python migrate.py --dry-run      # muestra qué se aplicaría sin ejecutar
 ```
 
 Las migraciones ya aplicadas se registran en la tabla `schema_migrations` y se
-mueven a `migrations/procesados/`.
+mueven a `docs/migrations/procesados/`.
 
 ## Ejecutar
 
@@ -55,8 +56,10 @@ python app.py     # WMS  — http://localhost:5000
 python admin.py   # Admin — http://localhost:5001/admin
 ```
 
-Usuarios iniciales (del seed): `admin` y `operador`, ambos con password
-`Admin@2024!`. **Cambiar antes de producción.**
+No hay usuarios ni tenants por defecto. El primer usuario del panel admin se crea
+con `superusuario-dist/superusuario.exe`; los tenants y usuarios del WMS, desde el
+panel. En desarrollo, `admin.py` crea `admin` / `Admin@2024!` si la tabla de
+usuarios del panel está vacía.
 
 ## Docker
 
@@ -74,7 +77,7 @@ dentro del contenedor, o localmente contra el MySQL del compose.
 pytest -q
 ```
 
-Los tests de integración requieren MySQL (con `.env` configurado) y se omiten
+Los tests de integración requieren MySQL (con `conexiones.json` configurado) y se omiten
 automáticamente si no hay conexión. El CI (GitHub Actions) corre lint
 (`ruff`), pytest con MySQL en un contenedor y el build de la imagen Docker.
 
@@ -179,8 +182,8 @@ curl -s -X POST http://localhost:5000/api/v1/recepciones \
 
 ## Configuración multi-engine
 
-El motor de BD se elige con `DB_ENGINE` / `DB_ADMIN_ENGINE` /
-`DB_INTERCAMBIO_ENGINE` (`mysql` | `postgresql` | `sqlite` | `sqlserver`).
+El motor de cada BD se indica en la clave `engine` de su sección en
+`conexiones.json` (`mysql` | `postgresql` | `sqlite` | `sqlserver`).
 Toda la generación de schema es multi-engine (`python modules/schema_generator.py --all`).
 SQLite es de referencia/DLL — la app corre funcionalmente sobre MySQL.
 
@@ -203,7 +206,7 @@ modules/
   movil.py              # Módulo móvil (recepción, picking, inventario)
   *.py                  # Un blueprint por dominio (materiales, pedidos, ...)
 scripts/                # One-offs y datos de ejemplo (no forman parte de las apps)
-migrations/             # DDL incremental + bootstrap generado (create_*.sql)
+docs/migrations/             # DDL incremental + bootstrap generado (create_*.sql)
 tests/                  # pytest (unit + integración)
 ```
 
@@ -215,6 +218,7 @@ tests/                  # pytest (unit + integración)
   cambiarlos (`Admin@2024!`, `Taurus_2001`, etc.).
 - **`No module named 'DBUtils'`** — el venv no tiene `requirements.txt`
   instalado (DBUtils 3.x importa desde `dbutils.pooled_db`).
-- **Config de BD ignorada** — la config real del WMS se lee de la tabla
-  `configuracion` en `taurus_admin` (los `DB_*` de `.env` son fallback).
-  Tras cambiarla desde el panel admin se aplica sin reiniciar.
+- **`No se encontró el archivo de conexiones`** — falta `conexiones.json`;
+  crearlo en la raíz con las secciones `admin`, `wms` e `intercambio`. Las conexiones a las tres
+  bases se leen solo de ese archivo (o de la ruta indicada en la variable
+  `TAURUS_CONEXIONES`); los cambios se toman sin reiniciar.

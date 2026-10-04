@@ -28,9 +28,8 @@ Uso:
     python generar_schema.py --engine mysql --execute --dry-run
 
 Lectura de configuracion:
-    - Lee .env con python-dotenv
-    - Para admin: DB_ADMIN_* (host, port, name, user, password, engine)
-    - Para wms:   DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD, DB_ENGINE
+    - Lee las conexiones de conexiones.json (secciones admin y wms; ver
+      modules/db_config.py). Otra ruta: variable de entorno TAURUS_CONEXIONES.
     - Si solo se pasa --engine sin --execute, genera archivos SQL en stdout o --output
 """
 
@@ -51,39 +50,26 @@ from modules.schema_generator import ENGINE_MAP, generate_schema
 # CONEXION
 # ============================================================================
 
-def _get_env(key, default=''):
-    return os.getenv(key, default)
+def _params_conexion(base, engine=None):
+    """Parámetros de conexión de una base, leídos del archivo de conexiones."""
+    from modules.db_config import get_conexion
+    c = get_conexion(base)
+    return {
+        'engine': engine or c['engine'],
+        'host': c['host'],
+        'port': c['port'],
+        'database': c['database'],
+        'user': c['user'],
+        'password': c['password'],
+    }
 
 
 def get_admin_params(engine=None):
-    eng = engine or _get_env('DB_ADMIN_ENGINE', 'mysql').strip().lower()
-    return {
-        'engine': eng,
-        'host': _get_env('DB_ADMIN_HOST', 'localhost'),
-        'port': int(_get_env('DB_ADMIN_PORT', '3306')),
-        'database': _get_env('DB_ADMIN_NAME', 'taurus_admin'),
-        'user': _get_env('DB_ADMIN_USER', 'taurus_admin'),
-        'password': _get_env('DB_ADMIN_PASSWORD', 'Taurus_2001'),
-    }
+    return _params_conexion('admin', engine)
 
 
 def get_wms_params(engine=None):
-    eng = engine or _get_env('DB_ENGINE', '').strip().lower()
-    if not eng:
-        try:
-            from modules.db_config import get_db_config
-            cfg = get_db_config()
-            eng = cfg.get('DB_ENGINE', 'mysql').strip().lower()
-        except Exception:
-            eng = 'mysql'
-    return {
-        'engine': eng,
-        'host': _get_env('DB_HOST', 'localhost'),
-        'port': int(_get_env('DB_PORT', '3306')),
-        'database': _get_env('DB_NAME', 'taurus_wms'),
-        'user': _get_env('DB_USER', 'taurus'),
-        'password': _get_env('DB_PASSWORD', 'Taurus_2001'),
-    }
+    return _params_conexion('wms', engine)
 
 
 def connect_db(params):
@@ -439,12 +425,11 @@ Ejemplos:
 
     # --- Validar ---
     if not args.engine and not args.all:
-        # Intentar leer de .env
-        env_engine = _get_env('DB_ENGINE', '').strip().lower()
-        if env_engine in ENGINE_MAP:
-            args.engine = env_engine
-            print(f"[INFO] Usando engine de .env: {env_engine}")
-        else:
+        # Sin --engine: usar el de la conexión WMS del archivo de conexiones
+        try:
+            args.engine = get_wms_params()['engine']
+            print(f"[INFO] Usando engine del archivo de conexiones: {args.engine}")
+        except Exception:
             parser.print_help()
             sys.exit(1)
 
@@ -476,8 +461,8 @@ Ejemplos:
         # --- Ejecutar ---
         if args.execute:
             print(f"\n[Taurus WMS] Schema Generator — engine: {args.engine}")
-            print(f"  Admin DB: {args.admin_db or _get_env('DB_ADMIN_NAME', 'taurus_admin')}")
-            print(f"  WMS DB:   {args.wms_db or _get_env('DB_NAME', 'taurus_wms')}")
+            print(f"  Admin DB: {args.admin_db or get_admin_params()['database']}")
+            print(f"  WMS DB:   {args.wms_db or get_wms_params()['database']}")
             print(f"  Drop:     {args.drop}")
             print(f"  Dry-run:  {args.dry_run}")
             print(f"  Seed:     {args.seed}")

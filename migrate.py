@@ -1,7 +1,7 @@
 """
 migrate.py — Migration runner para Taurus WMS.
 
-Lee migrations/*.sql (excepto create_* que son el bootstrap completo generado
+Lee docs/migrations/*.sql (excepto create_* que son el bootstrap completo generado
 por schema_generator) en orden alfabetico y aplica solo las no registradas en
 la tabla de control schema_migrations, que vive en la BD objetivo.
 
@@ -14,14 +14,14 @@ Uso:
     python migrate.py --db admin --baseline   # BD nueva: marca pendientes como aplicadas
 
 Convencion de archivos:
-    - Todo migrations/*.sql se aplica en todos los engines salvo que la primera
+    - Todo docs/migrations/*.sql se aplica en todos los engines salvo que la primera
       linea sea `-- engine: mysql` (o postgresql/sqlite/sqlserver), en cuyo caso
       se aplica solo en ese engine.
     - Un archivo puede restringirse a una BD objetivo con `-- db: wms|admin|intercambio`
       en las primeras lineas (se aplica solo cuando migrate.py corre con ese --db).
     - Los archivos create_*.sql (bootstrap generado) se ignoran: se aplican con
       `python modules/schema_generator.py --all` o `generar_schema.py --execute`.
-    - Las migraciones ya aplicadas se mueven a migrations/procesados/.
+    - Las migraciones ya aplicadas se mueven a docs/migrations/procesados/.
 """
 
 import argparse
@@ -36,13 +36,12 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from generar_schema import split_statements
 from modules.db_config import (
     _get_admin_connection,
-    get_db_config,
+    get_conexion,
     get_db_connection,
-    get_intercambio_config,
     get_intercambio_connection,
 )
 
-MIGRATIONS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'migrations')
+MIGRATIONS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'docs', 'migrations')
 
 
 def _tabla_control_sql(engine):
@@ -110,12 +109,7 @@ def _conectar(engine, db):
 def _engine_objetivo(engine, db):
     if engine:
         return engine.strip().lower()
-    if db == 'admin':
-        import os as _os
-        return _os.getenv('DB_ADMIN_ENGINE', 'mysql').strip().lower()
-    if db == 'intercambio':
-        return get_intercambio_config().get('INTERCAMBIO_ENGINE', 'mysql').strip().lower()
-    return get_db_config().get('DB_ENGINE', 'mysql').strip().lower()
+    return get_conexion(db)['engine']
 
 
 def run(db='wms', engine=None, dry_run=False, verbose=False, baseline=False):

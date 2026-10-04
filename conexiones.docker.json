@@ -1,0 +1,26 @@
+{
+  "admin": {
+    "engine": "mysql",
+    "host": "mysql",
+    "port": 3306,
+    "user": "root",
+    "password": "Taurus_2001",
+    "database": "taurus_admin"
+  },
+  "wms": {
+    "engine": "mysql",
+    "host": "mysql",
+    "port": 3306,
+    "user": "root",
+    "password": "Taurus_2001",
+    "database": "taurus_wms"
+  },
+  "intercambio": {
+    "engine": "mysql",
+    "host": "mysql",
+    "port": 3306,
+    "user": "root",
+    "password": "Taurus_2001",
+    "database": "taurus_intercambio"
+  }
+}

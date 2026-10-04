@@ -36,8 +36,9 @@
         <div class="aviso atencion">
             <p><strong>Es un compose de desarrollo.</strong> Fija <code>APP_ENV=development</code>, conecta con el
             usuario <code>root</code> de MySQL y usa secretos por defecto si no se definen
-            <code>SECRET_KEY</code>, <code>ADMIN_SECRET_KEY</code>, <code>SECRET_SALT</code> y
-            <code>MYSQL_ROOT_PASSWORD</code>. No usarlo tal cual en producción; ver
+            <code>SECRET_KEY</code>, <code>ADMIN_SECRET_KEY</code> y <code>SECRET_SALT</code>. Las conexiones salen de
+            <code>conexiones.docker.json</code>, que se monta en los contenedores como <code>conexiones.json</code>:
+            si se cambia <code>MYSQL_ROOT_PASSWORD</code>, hay que cambiarla también en ese archivo. No usarlo tal cual en producción; ver
             <a href="../operacion/produccion.html">Puesta en producción</a>.</p>
         </div>
 

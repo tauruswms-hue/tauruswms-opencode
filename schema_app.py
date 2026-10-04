@@ -19,6 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import contextlib
 
+from modules.db_config import get_conexion
 from modules.schema_generator import ENGINE_MAP, generate_schema
 
 app = Flask(__name__)
@@ -33,17 +34,23 @@ SCHEMAS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'schemas'
 
 @app.route('/')
 def index():
+    # Valores iniciales del formulario: los del archivo de conexiones, si existe
+    try:
+        wms, admin = get_conexion('wms'), get_conexion('admin')
+    except Exception:
+        wms = {'engine': 'mysql', 'host': 'localhost', 'port': 3306, 'database': 'taurus_wms', 'user': ''}
+        admin = {'engine': 'mysql', 'host': 'localhost', 'port': 3306, 'database': 'taurus_admin', 'user': ''}
     env_config = {
-        'engine': os.getenv('DB_ENGINE', 'mysql'),
-        'host': os.getenv('DB_HOST', 'localhost'),
-        'port': os.getenv('DB_PORT', '3306'),
-        'database': os.getenv('DB_NAME', 'taurus_wms'),
-        'user': os.getenv('DB_USER', 'taurus'),
-        'admin_engine': os.getenv('DB_ADMIN_ENGINE', 'mysql'),
-        'admin_host': os.getenv('DB_ADMIN_HOST', 'localhost'),
-        'admin_port': os.getenv('DB_ADMIN_PORT', '3306'),
-        'admin_database': os.getenv('DB_ADMIN_NAME', 'taurus_admin'),
-        'admin_user': os.getenv('DB_ADMIN_USER', 'taurus_admin'),
+        'engine': wms['engine'],
+        'host': wms['host'],
+        'port': str(wms['port']),
+        'database': wms['database'],
+        'user': wms['user'],
+        'admin_engine': admin['engine'],
+        'admin_host': admin['host'],
+        'admin_port': str(admin['port']),
+        'admin_database': admin['database'],
+        'admin_user': admin['user'],
     }
     return render_template('schema.html', config=env_config)
 

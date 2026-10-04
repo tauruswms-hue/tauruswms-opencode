@@ -122,36 +122,14 @@ CREATE TABLE [roles_rutas] (
 
 -- --- Datos iniciales ---;
 
-IF NOT EXISTS (SELECT 1 FROM [tenants] WHERE [id] = 1) INSERT INTO [tenants] ([id], [codigo], [nombre], [razon_social], [activo], [nombredelalmacen], [metodosdepicking], [bajostock], [dias_filtro_fechas]) VALUES (1, 'DEFAULT', 'Empresa Principal', 'Empresa Principal S.A.', 1, 'Almacen Principal', '"fifo"', 0, 30);
-
 -- Roles por defecto del sistema;
 IF NOT EXISTS (SELECT 1 FROM [roles] WHERE [nombre] = 'ADMIN') INSERT INTO [roles] ([nombre], [descripcion], [activo]) VALUES ('ADMIN', 'Acceso total a todas las rutas', 1);
 IF NOT EXISTS (SELECT 1 FROM [roles] WHERE [nombre] = 'OPERADOR') INSERT INTO [roles] ([nombre], [descripcion], [activo]) VALUES ('OPERADOR', 'Rutas operativas del WMS', 1);
 IF NOT EXISTS (SELECT 1 FROM [roles] WHERE [nombre] = 'CONSULTA') INSERT INTO [roles] ([nombre], [descripcion], [activo]) VALUES ('CONSULTA', 'Acceso de solo lectura', 1);
 
--- SuperAdmin password: Admin@2024!;
-IF NOT EXISTS (SELECT 1 FROM [admin_usuarios] WHERE [username] = 'admin') INSERT INTO [admin_usuarios] ([username], [password_hash], [nombre], [email], [rol]) VALUES ('admin', 'scrypt:32768:8:1$WQ6PhKOf81VV3FcH$ed1ca47fd1fd381583f0289acf9e839521b5e74a07adfc034382ea5342d608e393b7143fec95b3aef262f1946f95696e3e8acbfc867c91769d63142d4e4a5db2', 'Administrador', 'admin@taurus.local', 'SUPERADMIN');
-
--- Operador password: Admin@2024!;
-IF NOT EXISTS (SELECT 1 FROM [usuarios] WHERE [username] = 'operador') INSERT INTO [usuarios] ([username], [password_hash], [nombre], [email], [rol], [tenant_id], [activo]) VALUES ('operador', 'scrypt:32768:8:1$WQ6PhKOf81VV3FcH$ed1ca47fd1fd381583f0289acf9e839521b5e74a07adfc034382ea5342d608e393b7143fec95b3aef262f1946f95696e3e8acbfc867c91769d63142d4e4a5db2', 'Operador General', 'operador@taurus.local', 'OPERADOR', 1, 1);
-
 IF NOT EXISTS (SELECT 1 FROM [configuracion] WHERE [clave] = 'app_version') INSERT INTO [configuracion] ([clave], [valor], [descripcion]) VALUES ('app_version', '1.0.0', 'Version actual de la aplicacion');
 IF NOT EXISTS (SELECT 1 FROM [configuracion] WHERE [clave] = 'app_name') INSERT INTO [configuracion] ([clave], [valor], [descripcion]) VALUES ('app_name', 'Taurus WMS', 'Nombre de la aplicacion');
 IF NOT EXISTS (SELECT 1 FROM [configuracion] WHERE [clave] = 'mantenimiento') INSERT INTO [configuracion] ([clave], [valor], [descripcion]) VALUES ('mantenimiento', 'false', 'Modo mantenimiento (true/false)');
-IF NOT EXISTS (SELECT 1 FROM [configuracion] WHERE [clave] = 'DB_HOST') INSERT INTO [configuracion] ([clave], [valor], [descripcion]) VALUES ('DB_HOST', 'localhost', 'Host del servidor de base de datos');
-IF NOT EXISTS (SELECT 1 FROM [configuracion] WHERE [clave] = 'DB_PORT') INSERT INTO [configuracion] ([clave], [valor], [descripcion]) VALUES ('DB_PORT', '3306', 'Puerto del servidor MySQL');
-IF NOT EXISTS (SELECT 1 FROM [configuracion] WHERE [clave] = 'DB_NAME') INSERT INTO [configuracion] ([clave], [valor], [descripcion]) VALUES ('DB_NAME', 'taurus_wms', 'Nombre de la base de datos principal');
-IF NOT EXISTS (SELECT 1 FROM [configuracion] WHERE [clave] = 'DB_USER') INSERT INTO [configuracion] ([clave], [valor], [descripcion]) VALUES ('DB_USER', 'taurus', 'Usuario de la base de datos');
-IF NOT EXISTS (SELECT 1 FROM [configuracion] WHERE [clave] = 'DB_PASSWORD') INSERT INTO [configuracion] ([clave], [valor], [descripcion]) VALUES ('DB_PASSWORD', 'Taurus_2001', 'Contrasena de la base de datos');
-IF NOT EXISTS (SELECT 1 FROM [configuracion] WHERE [clave] = 'DB_CHAR_SET') INSERT INTO [configuracion] ([clave], [valor], [descripcion]) VALUES ('DB_CHAR_SET', 'utf8mb4', 'Charset de la base de datos');
-IF NOT EXISTS (SELECT 1 FROM [configuracion] WHERE [clave] = 'DB_ENGINE') INSERT INTO [configuracion] ([clave], [valor], [descripcion]) VALUES ('DB_ENGINE', 'mysql', 'Motor de BD: mysql, postgresql, sqlite');
-IF NOT EXISTS (SELECT 1 FROM [configuracion] WHERE [clave] = 'INTERCAMBIO_ENGINE') INSERT INTO [configuracion] ([clave], [valor], [descripcion]) VALUES ('INTERCAMBIO_ENGINE', 'mysql', 'Motor de BD de intercambio (mysql, postgresql, sqlite, sqlserver)');
-IF NOT EXISTS (SELECT 1 FROM [configuracion] WHERE [clave] = 'INTERCAMBIO_HOST') INSERT INTO [configuracion] ([clave], [valor], [descripcion]) VALUES ('INTERCAMBIO_HOST', 'localhost', 'Host de la base de intercambio');
-IF NOT EXISTS (SELECT 1 FROM [configuracion] WHERE [clave] = 'INTERCAMBIO_PORT') INSERT INTO [configuracion] ([clave], [valor], [descripcion]) VALUES ('INTERCAMBIO_PORT', '3306', 'Puerto de la base de intercambio');
-IF NOT EXISTS (SELECT 1 FROM [configuracion] WHERE [clave] = 'INTERCAMBIO_NAME') INSERT INTO [configuracion] ([clave], [valor], [descripcion]) VALUES ('INTERCAMBIO_NAME', 'taurus_intercambio', 'Nombre de la base de intercambio');
-IF NOT EXISTS (SELECT 1 FROM [configuracion] WHERE [clave] = 'INTERCAMBIO_USER') INSERT INTO [configuracion] ([clave], [valor], [descripcion]) VALUES ('INTERCAMBIO_USER', 'taurus', 'Usuario de la base de intercambio');
-IF NOT EXISTS (SELECT 1 FROM [configuracion] WHERE [clave] = 'INTERCAMBIO_PASSWORD') INSERT INTO [configuracion] ([clave], [valor], [descripcion]) VALUES ('INTERCAMBIO_PASSWORD', 'Taurus_2001', 'Contrasena de la base de intercambio');
-IF NOT EXISTS (SELECT 1 FROM [configuracion] WHERE [clave] = 'INTERCAMBIO_CHAR_SET') INSERT INTO [configuracion] ([clave], [valor], [descripcion]) VALUES ('INTERCAMBIO_CHAR_SET', 'utf8mb4', 'Charset de la base de intercambio');
 
 -- Permisos de rutas por rol;
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'ADMIN') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('ADMIN', '*');
@@ -294,6 +272,3 @@ IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'CONSULTA') INSERT INTO
 
 -- === FIN DEL SCRIPT ===;
 -- Schema generado para engine: sqlserver;
--- Usuarios por defecto:;
---   SuperAdmin: admin / Admin@2024!;
---   Operador:   operador / Admin@2024!;

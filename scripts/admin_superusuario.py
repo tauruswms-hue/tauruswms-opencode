@@ -13,7 +13,7 @@ Uso (desde cualquier directorio):
 Conexión (primera que aplique):
     1. --config <ruta.json>
     2. superusuario.json junto al ejecutable (o junto a este script)
-    3. Solo ejecutando con Python: variables DB_ADMIN_* del .env de la raíz.
+    3. Solo ejecutando con Python: sección `admin` de conexiones.json del proyecto.
     El JSON tiene las claves engine (mysql|postgresql|sqlserver, default mysql),
     host, port, user, password, database y opcional charset; ver
     superusuario-dist/superusuario.json. Se conecta con
@@ -63,23 +63,18 @@ if not CONGELADO and str(ROOT) not in sys.path:
 
 from werkzeug.security import generate_password_hash
 
-from modules.db_config import _get_admin_connection
+from modules.db_config import (
+    ConexionesError,
+    _get_admin_connection,
+    get_conexion,
+    ruta_conexiones,
+    set_conexion,
+)
 from modules.passwords import PASSWORD_MIN_LEN, validar_password
 
 ROLES_VALIDOS = ('SUPERADMIN', 'ADMIN')
 COLUMNAS_USUARIO = "id, username, nombre, email, rol, activo"
 CONFIG_NOMBRE = 'superusuario.json'
-# Clave del JSON -> variable que lee modules/db_config.py
-CONFIG_A_ENV = {
-    'engine': 'DB_ADMIN_ENGINE',
-    'host': 'DB_ADMIN_HOST',
-    'port': 'DB_ADMIN_PORT',
-    'user': 'DB_ADMIN_USER',
-    'password': 'DB_ADMIN_PASSWORD',
-    'database': 'DB_ADMIN_NAME',
-    'charset': 'DB_CHAR_SET',
-}
-CONFIG_OBLIGATORIAS = ('host', 'user', 'password', 'database')
 ENGINES_SOPORTADOS = ('mysql', 'postgresql', 'sqlserver')
 
 
@@ -446,7 +441,7 @@ def _directorio_base():
 
 
 def cargar_config_json(ruta):
-    """Valida el JSON de conexión y lo vuelca a las variables DB_ADMIN_* (pisa el .env)."""
+    """Valida el JSON de conexión y lo fija como conexión de taurus_admin (no usa conexiones.json)."""
     try:
         with open(ruta, encoding='utf-8-sig') as fh:
             datos = json.load(fh)
@@ -457,45 +452,34 @@ def cargar_config_json(ruta):
 
     if not isinstance(datos, dict):
         raise ConfigError(f"{ruta} debe contener un objeto JSON {{...}}")
-    desconocidas = sorted(set(datos) - set(CONFIG_A_ENV))
-    if desconocidas:
-        raise ConfigError(f"Claves desconocidas en {ruta}: {', '.join(desconocidas)} "
-                          f"(válidas: {', '.join(CONFIG_A_ENV)})")
-    faltantes = [k for k in CONFIG_OBLIGATORIAS if datos.get(k) in (None, '')]
-    if faltantes:
-        raise ConfigError(f"Faltan claves obligatorias en {ruta}: {', '.join(faltantes)}")
-    engine = str(datos.get('engine', 'mysql')).strip().lower()
+    engine = str(datos.get('engine') or 'mysql').strip().lower()
     if engine not in ENGINES_SOPORTADOS:
         raise ConfigError(f"engine '{engine}' no soportado (usar: {', '.join(ENGINES_SOPORTADOS)})")
-    if 'port' in datos and not str(datos['port']).isdigit():
-        raise ConfigError(f"port debe ser numérico: {datos['port']!r}")
+    try:
+        return set_conexion('admin', datos, origen=str(ruta))
+    except ConexionesError as e:
+        raise ConfigError(str(e)) from None
 
-    datos['engine'] = engine
-    # El JSON es la única fuente: se descartan DB_ADMIN_* que db_config haya
-    # tomado de algún .env, para no mezclar (p. ej. un port de otro entorno).
-    for var in CONFIG_A_ENV.values():
-        os.environ.pop(var, None)
-    for clave, valor in datos.items():
-        os.environ[CONFIG_A_ENV[clave]] = str(valor)
-    return datos
+
+def _describir(datos, origen):
+    return f"{datos['engine']}://{datos['user']}@{datos['host']}:{datos['port']}/{datos['database']} ({origen})"
 
 
 def resolver_config(ruta_cli=None):
     """Aplica la configuración de conexión y devuelve una descripción (sin password)."""
     ruta = Path(ruta_cli) if ruta_cli else _directorio_base() / CONFIG_NOMBRE
     if ruta_cli or ruta.exists():
-        datos = cargar_config_json(ruta)
-        return f"{datos['engine']}://{datos['user']}@{datos['host']}:{datos.get('port', 'default')}/{datos['database']} ({ruta.name})"
+        return _describir(cargar_config_json(ruta), ruta.name)
     if CONGELADO:
         raise ConfigError(
             f"No se encontró {CONFIG_NOMBRE} junto al ejecutable ({ruta.parent}).\n"
             f"  Cree {CONFIG_NOMBRE} con las credenciales de taurus_admin (ver LEEME.txt),\n"
             f"  o indique otro archivo con --config <ruta.json>."
         )
-    from dotenv import load_dotenv
-    load_dotenv(dotenv_path=ROOT / '.env')
-    return (f"{os.getenv('DB_ADMIN_ENGINE', 'mysql')}://{os.getenv('DB_ADMIN_USER', '')}@"
-            f"{os.getenv('DB_ADMIN_HOST', 'localhost')}/{os.getenv('DB_ADMIN_NAME', 'taurus_admin')} (.env)")
+    try:
+        return _describir(get_conexion('admin'), ruta_conexiones().name)
+    except ConexionesError as e:
+        raise ConfigError(str(e)) from None
 
 
 # --- Bucle principal: una sola conexión a taurus_admin para toda la sesión ---

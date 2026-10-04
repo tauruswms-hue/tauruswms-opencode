@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Base de datos — Taurus WMS</title>
+    <link rel="stylesheet" href="../../assets/docs.css">
+</head>
+<body data-root="../../" data-page="inicio/base-de-datos/index.html">
+<div class="layout">
+    <nav id="sidebar"></nav>
+    <main class="content">
+        <p class="migas">Primeros pasos · Instalación</p>
+        <h1>Base de datos</h1>
+        <p class="bajada">Creación de las tres bases del sistema en MySQL, con los scripts que trae el
+        proyecto.</p>
+
+        <div class="aviso">
+            <p><strong>Solo MySQL.</strong> La instalación se documenta para MySQL 8, que es el motor con el que
+            se trabaja. Los scripts de los otros motores existen en <code>docs/migrations/</code>, pero quedan fuera
+            de esta guía.</p>
+        </div>
+
+        <h2>Las tres bases</h2>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Orden</th><th>Base</th><th>Contenido</th><th>Script</th></tr></thead>
+                <tbody>
+                    <tr><td>1</td><td><a href="taurus-admin.html">taurus_admin</a></td>
+                        <td>Usuarios, tenants, roles, permisos y configuración.</td>
+                        <td><code>docs/migrations/create_admin_mysql.sql</code></td></tr>
+                    <tr><td>2</td><td><a href="taurus-wms.html">taurus_wms</a></td>
+                        <td>Datos operativos: maestros, stock, recepciones, pedidos.</td>
+                        <td><code>docs/migrations/create_wms_mysql.sql</code></td></tr>
+                    <tr><td>3</td><td><a href="taurus-intercambio.html">taurus_intercambio</a></td>
+                        <td>Interfase con sistemas externos. Solo si se usa Intercambio.</td>
+                        <td><code>docs/migrations/create_intercambio_mysql.sql</code></td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p>Cada página muestra el script completo, sus tablas y los datos iniciales que carga. El primer
+        usuario se crea después, con <a href="superusuario.html">superusuario.exe</a>.</p>
+
+        <h2>Procedimiento</h2>
+        <div class="aviso peligro">
+            <p><strong>Los scripts borran la base si ya existe.</strong> Cada uno empieza con
+            <code>DROP DATABASE IF EXISTS</code>. Usarlos solo en una instalación nueva.</p>
+        </div>
+        <ol>
+            <li>Crear las bases, desde la raíz del proyecto:
+<pre><code>mysql -u root -p -e "source docs/migrations/create_admin_mysql.sql"
+mysql -u root -p -e "source docs/migrations/create_wms_mysql.sql"
+mysql -u root -p -e "source docs/migrations/create_intercambio_mysql.sql"</code></pre></li>
+            <li>Cargar las credenciales de las tres bases en <code>conexiones.json</code>. Ver
+                <a href="../configuracion.html">Configuración</a>.</li>
+            <li>Registrar las migraciones existentes como aplicadas, para que el runner no intente ejecutarlas
+                sobre una base recién creada:
+<pre><code>python migrate.py --db admin --baseline
+python migrate.py --db wms --baseline
+python migrate.py --db intercambio --baseline</code></pre></li>
+        </ol>
+
+        <h2>Alternativa: generar y ejecutar en un paso</h2>
+        <p>En desarrollo, el mismo resultado se obtiene sin el cliente <code>mysql</code>:</p>
+<pre><code>python generar_schema.py --engine mysql --execute --seed</code></pre>
+        <p>Usa las conexiones de <code>conexiones.json</code>. Después hay que registrar las migraciones igual que en el
+        paso 3.</p>
+
+        <h2>Usuarios</h2>
+        <p>Los scripts no crean usuarios ni tenants: no hay usuarios ni contraseñas por defecto.</p>
+        <ol>
+            <li>Crear el primer usuario del panel admin con <a href="superusuario.html">superusuario.exe</a>.</li>
+            <li>Ingresar al <a href="../../administracion/panel-admin.html">panel admin</a> con ese usuario y dar
+                de alta los tenants y los usuarios del WMS.</li>
+        </ol>
+
+        <h2>Mantener los scripts al día</h2>
+        <p>Los scripts se generan desde <code>modules/schema_generator.py</code>. Después de un cambio de
+        schema hay que regenerarlos y actualizar estas páginas:</p>
+<pre><code>python modules/schema_generator.py --all
+python docs/generar_scripts_bd.py</code></pre>
+        <p>Más detalle en <a href="../../administracion/migraciones.html">Schema y migraciones</a>.</p>
+
+        <div id="pager"></div>
+    </main>
+</div>
+<script src="../../assets/docs.js"></script>
+</body>
+</html>

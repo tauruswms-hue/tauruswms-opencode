@@ -4,16 +4,19 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Superusuario (exe) — Taurus WMS</title>
-    <link rel="stylesheet" href="../assets/docs.css">
+    <link rel="stylesheet" href="../../assets/docs.css">
 </head>
-<body data-root="../" data-page="administracion/superusuario.html">
+<body data-root="../../" data-page="inicio/base-de-datos/superusuario.html">
 <div class="layout">
     <nav id="sidebar"></nav>
     <main class="content">
-        <p class="migas">Administración</p>
+        <p class="migas">Primeros pasos · Instalación · Base de datos</p>
         <h1>Superusuario (exe)</h1>
         <p class="bajada"><code>superusuario.exe</code> gestiona por consola los usuarios del panel admin. No
         necesita Python instalado y es la forma de crear el primer SUPERADMIN en producción.</p>
+
+        <p>Es el paso que sigue a la creación de <a href="taurus-admin.html">taurus_admin</a>: el script de la
+        base no crea usuarios, así que el primero se da de alta con este programa.</p>
 
         <p>Trabaja sobre la tabla <code>admin_usuarios</code> de <code>taurus_admin</code>. No toca los usuarios
         del WMS (<code>taurus_admin.usuarios</code>), que se administran desde el panel.</p>
@@ -63,7 +66,7 @@
         <ol>
             <li>El archivo indicado con <code>--config</code>.</li>
             <li><code>superusuario.json</code> junto al ejecutable.</li>
-            <li>Solo al ejecutar el script con Python: las variables <code>DB_ADMIN_*</code> del <code>.env</code>.</li>
+            <li>Solo al ejecutar el script con Python: la sección <code>admin</code> de <code>conexiones.json</code>.</li>
         </ol>
 
         <h2>Menú</h2>
@@ -116,6 +119,6 @@ python scripts/build_superusuario.py</code></pre>
         <div id="pager"></div>
     </main>
 </div>
-<script src="../assets/docs.js"></script>
+<script src="../../assets/docs.js"></script>
 </body>
 </html>

@@ -120,36 +120,14 @@ CREATE TABLE "roles_rutas" (
 
 -- --- Datos iniciales ---;
 
-INSERT INTO "tenants" ("id", "codigo", "nombre", "razon_social", "activo", "nombredelalmacen", "metodosdepicking", "bajostock", "dias_filtro_fechas") VALUES (1, 'DEFAULT', 'Empresa Principal', 'Empresa Principal S.A.', TRUE, 'Almacen Principal', '"fifo"', 0, 30) ON CONFLICT DO NOTHING;
-
 -- Roles por defecto del sistema;
 INSERT INTO "roles" ("nombre", "descripcion", "activo") VALUES ('ADMIN', 'Acceso total a todas las rutas', TRUE) ON CONFLICT DO NOTHING;
 INSERT INTO "roles" ("nombre", "descripcion", "activo") VALUES ('OPERADOR', 'Rutas operativas del WMS', TRUE) ON CONFLICT DO NOTHING;
 INSERT INTO "roles" ("nombre", "descripcion", "activo") VALUES ('CONSULTA', 'Acceso de solo lectura', TRUE) ON CONFLICT DO NOTHING;
 
--- SuperAdmin password: Admin@2024!;
-INSERT INTO "admin_usuarios" ("username", "password_hash", "nombre", "email", "rol") VALUES ('admin', 'scrypt:32768:8:1$WQ6PhKOf81VV3FcH$ed1ca47fd1fd381583f0289acf9e839521b5e74a07adfc034382ea5342d608e393b7143fec95b3aef262f1946f95696e3e8acbfc867c91769d63142d4e4a5db2', 'Administrador', 'admin@taurus.local', 'SUPERADMIN') ON CONFLICT DO NOTHING;
-
--- Operador password: Admin@2024!;
-INSERT INTO "usuarios" ("username", "password_hash", "nombre", "email", "rol", "tenant_id", "activo") VALUES ('operador', 'scrypt:32768:8:1$WQ6PhKOf81VV3FcH$ed1ca47fd1fd381583f0289acf9e839521b5e74a07adfc034382ea5342d608e393b7143fec95b3aef262f1946f95696e3e8acbfc867c91769d63142d4e4a5db2', 'Operador General', 'operador@taurus.local', 'OPERADOR', 1, TRUE) ON CONFLICT DO NOTHING;
-
 INSERT INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('app_version', '1.0.0', 'Version actual de la aplicacion') ON CONFLICT DO NOTHING;
 INSERT INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('app_name', 'Taurus WMS', 'Nombre de la aplicacion') ON CONFLICT DO NOTHING;
 INSERT INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('mantenimiento', 'false', 'Modo mantenimiento (true/false)') ON CONFLICT DO NOTHING;
-INSERT INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('DB_HOST', 'localhost', 'Host del servidor de base de datos') ON CONFLICT DO NOTHING;
-INSERT INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('DB_PORT', '3306', 'Puerto del servidor MySQL') ON CONFLICT DO NOTHING;
-INSERT INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('DB_NAME', 'taurus_wms', 'Nombre de la base de datos principal') ON CONFLICT DO NOTHING;
-INSERT INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('DB_USER', 'taurus', 'Usuario de la base de datos') ON CONFLICT DO NOTHING;
-INSERT INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('DB_PASSWORD', 'Taurus_2001', 'Contrasena de la base de datos') ON CONFLICT DO NOTHING;
-INSERT INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('DB_CHAR_SET', 'utf8mb4', 'Charset de la base de datos') ON CONFLICT DO NOTHING;
-INSERT INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('DB_ENGINE', 'mysql', 'Motor de BD: mysql, postgresql, sqlite') ON CONFLICT DO NOTHING;
-INSERT INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('INTERCAMBIO_ENGINE', 'mysql', 'Motor de BD de intercambio (mysql, postgresql, sqlite, sqlserver)') ON CONFLICT DO NOTHING;
-INSERT INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('INTERCAMBIO_HOST', 'localhost', 'Host de la base de intercambio') ON CONFLICT DO NOTHING;
-INSERT INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('INTERCAMBIO_PORT', '3306', 'Puerto de la base de intercambio') ON CONFLICT DO NOTHING;
-INSERT INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('INTERCAMBIO_NAME', 'taurus_intercambio', 'Nombre de la base de intercambio') ON CONFLICT DO NOTHING;
-INSERT INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('INTERCAMBIO_USER', 'taurus', 'Usuario de la base de intercambio') ON CONFLICT DO NOTHING;
-INSERT INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('INTERCAMBIO_PASSWORD', 'Taurus_2001', 'Contrasena de la base de intercambio') ON CONFLICT DO NOTHING;
-INSERT INTO "configuracion" ("clave", "valor", "descripcion") VALUES ('INTERCAMBIO_CHAR_SET', 'utf8mb4', 'Charset de la base de intercambio') ON CONFLICT DO NOTHING;
 
 -- Permisos de rutas por rol;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('ADMIN', '*') ON CONFLICT DO NOTHING;
@@ -292,6 +270,3 @@ INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/sidebar-preferen
 
 -- === FIN DEL SCRIPT ===;
 -- Schema generado para engine: postgresql;
--- Usuarios por defecto:;
---   SuperAdmin: admin / Admin@2024!;
---   Operador:   operador / Admin@2024!;

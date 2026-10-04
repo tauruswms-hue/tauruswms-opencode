@@ -7,3 +7,4 @@ __pycache__
 picking_docs
 tests
 *.db
+conexiones.json

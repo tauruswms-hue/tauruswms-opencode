@@ -16,10 +16,11 @@
 
         <h2>Motores</h2>
         <p>No hay ORM: el código escribe SQL y lo adapta a cada motor con <code>modules/sql_dialect.py</code>.
-        El motor se elige con <code>DB_ENGINE</code> (o <code>DB_&lt;BASE&gt;_ENGINE</code> por base).</p>
+        El motor de cada base se indica en la clave <code>engine</code> de su sección en
+        <code>conexiones.json</code>.</p>
         <div class="tabla-scroll">
             <table>
-                <thead><tr><th>Motor</th><th><code>DB_ENGINE</code></th><th>Driver</th><th>Puerto</th><th>Uso</th></tr></thead>
+                <thead><tr><th>Motor</th><th><code>engine</code></th><th>Driver</th><th>Puerto</th><th>Uso</th></tr></thead>
                 <tbody>
                     <tr><td>MySQL</td><td><code>mysql</code></td><td><code>pymysql</code></td><td>3306</td><td>Default y recomendado.</td></tr>
                     <tr><td>PostgreSQL</td><td><code>postgresql</code></td><td><code>psycopg2</code></td><td>5432</td><td>Soportado.</td></tr>
@@ -37,14 +38,14 @@
         <h2>Las tres bases</h2>
         <div class="tabla-scroll">
             <table>
-                <thead><tr><th>Base</th><th>Contenido</th><th>De dónde sale la conexión</th></tr></thead>
+                <thead><tr><th>Base</th><th>Contenido</th><th>Sección de <code>conexiones.json</code></th></tr></thead>
                 <tbody>
                     <tr><td><code>taurus_admin</code></td><td>Usuarios, tenants, roles, configuración.</td>
-                        <td>Variables <code>DB_ADMIN_*</code> del entorno.</td></tr>
+                        <td><code>admin</code></td></tr>
                     <tr><td><code>taurus_wms</code></td><td>Datos operativos: maestros, stock, pedidos, recepciones.</td>
-                        <td>Tabla <code>configuracion</code> de <code>taurus_admin</code>; <code>DB_*</code> como respaldo.</td></tr>
+                        <td><code>wms</code></td></tr>
                     <tr><td><code>taurus_intercambio</code></td><td>Interfase con sistemas externos.</td>
-                        <td>Claves <code>INTERCAMBIO_*</code> de <code>configuracion</code>; <code>DB_INTERCAMBIO_*</code> como respaldo.</td></tr>
+                        <td><code>intercambio</code> (opcional)</td></tr>
                 </tbody>
             </table>
         </div>
@@ -57,6 +58,7 @@
                     <tr><td><code>get_db_connection()</code></td><td>WMS</td></tr>
                     <tr><td><code>_get_admin_connection()</code></td><td>Admin</td></tr>
                     <tr><td><code>get_intercambio_connection()</code></td><td>Intercambio</td></tr>
+                    <tr><td><code>get_conexion(base)</code></td><td>Datos de conexión de una base, sin abrirla.</td></tr>
                     <tr><td><code>probar_conexion()</code></td><td>Prueba una conexión con parámetros sueltos, sin tocar el pool.</td></tr>
                 </tbody>
             </table>
@@ -68,11 +70,11 @@
             Los pools se desarman con <code>clear_config_cache()</code> o cuando cambia la configuración.</p>
         </div>
 
-        <h2>Propagación de cambios de configuración</h2>
-        <p>La configuración leída de la tabla <code>configuracion</code> se cachea y se relee cada
-        <code>CONFIG_CACHE_TTL</code> segundos (30 por defecto). Si los valores cambiaron, se reinician el motor y
-        los pools. Así llegan al proceso del WMS los cambios hechos desde el panel admin, que corre en otro
-        proceso. Si la base admin está caída al refrescar, se conserva la última configuración conocida.</p>
+        <h2>Cambios de conexión sin reiniciar</h2>
+        <p>Las conexiones se leen de <code>conexiones.json</code> (ver
+        <a href="../inicio/configuracion.html">Configuración</a>) y se cachean. El archivo se relee cada
+        <code>CONFIG_CACHE_TTL</code> segundos (30 por defecto); si cambió, se reinician el motor y los pools. Si
+        no se puede leer al refrescar, se conservan las conexiones conocidas.</p>
 
         <h2>Reglas al escribir SQL</h2>
         <ul>

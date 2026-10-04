@@ -33,6 +33,7 @@ from modules.api import api_bp
 from modules.bootstrap import (
     check_default_secrets,
     harden_session_config,
+    passwords_bd,
     register_error_handlers,
 )
 from modules.categorias import categorias_bp
@@ -49,6 +50,7 @@ from modules.db_config import (
     get_db_engine,
     get_wms_runtime_config,
     probar_conexion,
+    ruta_conexiones,
 )
 from modules.despacho import despacho_bp
 from modules.intercambio import intercambio_bp
@@ -110,9 +112,7 @@ check_default_secrets(APP_ENV, [
     ('SECRET_KEY', os.getenv('SECRET_KEY')),
     ('ADMIN_SECRET_KEY', os.getenv('ADMIN_SECRET_KEY')),
     ('SECRET_SALT', os.getenv('SECRET_SALT')),
-    ('DB_ADMIN_PASSWORD', os.getenv('DB_ADMIN_PASSWORD')),
-    ('DB_PASSWORD', os.getenv('DB_PASSWORD')),
-    ('DB_INTERCAMBIO_PASSWORD', os.getenv('DB_INTERCAMBIO_PASSWORD')),
+    *passwords_bd(APP_ENV, logger),
 ], logger)
 
 harden_session_config(app, APP_ENV)
@@ -472,7 +472,7 @@ def configuracion_db():
 # FUNCIONES AUXILIARES PARA CONFIGURACIÓN
 # ============================================================================
 def get_db_config_from_env():
-    """Obtiene la configuración de BD desde la tabla configuracion en taurus_admin."""
+    """Obtiene la configuración de la BD WMS desde el archivo de conexiones."""
     config = get_wms_runtime_config()
     return {
         'DB_HOST': config['host'],
@@ -485,10 +485,10 @@ def get_db_config_from_env():
 
 
 def get_env_file_modification_time():
-    """Obtiene la fecha de última modificación del archivo .env"""
-    env_path = Path('.') / '.env'
-    if env_path.exists():
-        timestamp = env_path.stat().st_mtime
+    """Obtiene la fecha de última modificación del archivo de conexiones."""
+    ruta = ruta_conexiones()
+    if ruta.exists():
+        timestamp = ruta.stat().st_mtime
         return datetime.datetime.fromtimestamp(timestamp).strftime('%d/%m/%Y %H:%M:%S')
     return None
 
@@ -503,14 +503,13 @@ def probar_conexion_db():
     try:
         data = request.get_json()
 
-        # Recargar .env para asegurar valores actuales
-        load_dotenv(dotenv_path=env_path, override=True)
+        # Valores actuales del archivo de conexiones: completan lo que no venga en el formulario
+        actual = get_wms_runtime_config()
 
-        # Para depuración (puedes borrar esto después)
         logger.info("Verificando conexión a BD...")
-        logger.debug("Host: %s", data.get('host', os.getenv('DB_HOST')))
-        logger.debug("Usuario: %s", data.get('username', os.getenv('DB_USER')))
-        logger.debug("Base de datos: %s", data.get('database', os.getenv('DB_NAME')))
+        logger.debug("Host: %s", data.get('host', actual['host']))
+        logger.debug("Usuario: %s", data.get('username', actual['user']))
+        logger.debug("Base de datos: %s", data.get('database', actual['database']))
 
         # Determinar qué contraseña usar
         password_input = data.get('password', '')
@@ -519,18 +518,18 @@ def probar_conexion_db():
             password = password_input
             logger.debug("Usando contraseña del formulario")
         else:
-            # Usar la contraseña del .env
-            password = os.getenv('DB_PASSWORD', '')
-            logger.debug("Usando contraseña del archivo .env")
+            # Usar la contraseña del archivo de conexiones
+            password = actual['password']
+            logger.debug("Usando contraseña del archivo de conexiones")
 
         # Configuración de prueba
         test_config = {
-            'host': data.get('host', os.getenv('DB_HOST', 'localhost')),
-            'port': int(data.get('port', os.getenv('DB_PORT', 3306))),
-            'user': data.get('username', os.getenv('DB_USER', 'taurus')),
+            'host': data.get('host', actual['host']),
+            'port': int(data.get('port', actual['port'])),
+            'user': data.get('username', actual['user']),
             'password': password,
-            'database': data.get('database', os.getenv('DB_NAME', 'taurus_wms')),
-            'charset': data.get('charset', os.getenv('DB_CHARSET', 'utf8mb4')),
+            'database': data.get('database', actual['database']),
+            'charset': data.get('charset', actual['charset']),
         }
 
         # Intentar conexión con el engine efectivo (la app decide el engine;

@@ -1126,16 +1126,9 @@ ROUTES_CONSULTA = [
     "/sidebar-preferences",
 ]
 
+# Sin usuarios ni tenants: el primer SUPERADMIN del panel se crea con
+# superusuario-dist/superusuario.exe y los tenants/usuarios del WMS desde el panel admin.
 ADMIN_SEEDS = [
-    {
-        "table": "tenants",
-        "rows": [
-            {"id": 1, "codigo": "DEFAULT", "nombre": "Empresa Principal",
-             "razon_social": "Empresa Principal S.A.", "activo": True,
-             "nombredelalmacen": "Almacen Principal", "metodosdepicking": '"fifo"',
-             "bajostock": 0, "dias_filtro_fechas": 30},
-        ],
-    },
     {
         "table": "roles",
         "comment": "Roles por defecto del sistema",
@@ -1146,42 +1139,11 @@ ADMIN_SEEDS = [
         ],
     },
     {
-        "table": "admin_usuarios",
-        "comment": "SuperAdmin password: Admin@2024!",
-        "rows": [
-            {"username": "admin", "password_hash": "scrypt:32768:8:1$WQ6PhKOf81VV3FcH$ed1ca47fd1fd381583f0289acf9e839521b5e74a07adfc034382ea5342d608e393b7143fec95b3aef262f1946f95696e3e8acbfc867c91769d63142d4e4a5db2",
-             "nombre": "Administrador", "email": "admin@taurus.local", "rol": "SUPERADMIN"},
-        ],
-    },
-    {
-        "table": "usuarios",
-        "comment": "Operador password: Admin@2024!",
-        "rows": [
-            {"username": "operador", "password_hash": "scrypt:32768:8:1$WQ6PhKOf81VV3FcH$ed1ca47fd1fd381583f0289acf9e839521b5e74a07adfc034382ea5342d608e393b7143fec95b3aef262f1946f95696e3e8acbfc867c91769d63142d4e4a5db2",
-             "nombre": "Operador General", "email": "operador@taurus.local",
-             "rol": "OPERADOR", "tenant_id": 1, "activo": True},
-        ],
-    },
-    {
         "table": "configuracion",
         "rows": [
             {"clave": "app_version",  "valor": "1.0.0",      "descripcion": "Version actual de la aplicacion"},
             {"clave": "app_name",     "valor": "Taurus WMS", "descripcion": "Nombre de la aplicacion"},
             {"clave": "mantenimiento","valor": "false",       "descripcion": "Modo mantenimiento (true/false)"},
-            {"clave": "DB_HOST",      "valor": "localhost",   "descripcion": "Host del servidor de base de datos"},
-            {"clave": "DB_PORT",      "valor": "3306",        "descripcion": "Puerto del servidor MySQL"},
-            {"clave": "DB_NAME",      "valor": "taurus_wms",  "descripcion": "Nombre de la base de datos principal"},
-            {"clave": "DB_USER",      "valor": "taurus",      "descripcion": "Usuario de la base de datos"},
-            {"clave": "DB_PASSWORD",  "valor": "Taurus_2001", "descripcion": "Contrasena de la base de datos"},
-            {"clave": "DB_CHAR_SET",  "valor": "utf8mb4",     "descripcion": "Charset de la base de datos"},
-            {"clave": "DB_ENGINE",    "valor": "mysql",       "descripcion": "Motor de BD: mysql, postgresql, sqlite"},
-            {"clave": "INTERCAMBIO_ENGINE",   "valor": "mysql",        "descripcion": "Motor de BD de intercambio (mysql, postgresql, sqlite, sqlserver)"},
-            {"clave": "INTERCAMBIO_HOST",     "valor": "localhost",    "descripcion": "Host de la base de intercambio"},
-            {"clave": "INTERCAMBIO_PORT",     "valor": "3306",         "descripcion": "Puerto de la base de intercambio"},
-            {"clave": "INTERCAMBIO_NAME",     "valor": "taurus_intercambio", "descripcion": "Nombre de la base de intercambio"},
-            {"clave": "INTERCAMBIO_USER",     "valor": "taurus",       "descripcion": "Usuario de la base de intercambio"},
-            {"clave": "INTERCAMBIO_PASSWORD", "valor": "Taurus_2001",  "descripcion": "Contrasena de la base de intercambio"},
-            {"clave": "INTERCAMBIO_CHAR_SET", "valor": "utf8mb4",      "descripcion": "Charset de la base de intercambio"},
         ],
     },
     {
@@ -1903,9 +1865,6 @@ def generate_database(engine_name, db_name, tables, seeds, title, output_file=No
     engine.add_blank()
     engine.comment_sql("=== FIN DEL SCRIPT ===")
     engine.comment_sql(f"Schema generado para engine: {engine_name}")
-    engine.comment_sql("Usuarios por defecto:")
-    engine.comment_sql("  SuperAdmin: admin / Admin@2024!")
-    engine.comment_sql("  Operador:   operador / Admin@2024!")
 
     sql = "\n".join(engine.statements) + "\n"
 
@@ -1945,7 +1904,7 @@ def generate_schema(engine_name, output_file=None):
     return sql
 
 
-def generate_migrations(engine_name, migrations_dir="migrations"):
+def generate_migrations(engine_name, migrations_dir="docs/migrations"):
     """Generate create_admin_<engine>.sql, create_wms_<engine>.sql and create_intercambio_<engine>.sql."""
     generate_database(
         engine_name, "taurus_admin", ADMIN_TABLES, ADMIN_SEEDS,
@@ -1981,7 +1940,7 @@ def main():
             out_path = os.path.join(args.output_dir, f"schema_{eng}.sql")
             print(f"Generando {out_path} ...")
             generate_schema(eng, out_path)
-            print(f"Generando migrations/create_admin_{eng}.sql y create_wms_{eng}.sql ...")
+            print(f"Generando docs/migrations/create_admin_{eng}.sql y create_wms_{eng}.sql ...")
             generate_migrations(eng)
         print("Listo.")
     elif args.engine:

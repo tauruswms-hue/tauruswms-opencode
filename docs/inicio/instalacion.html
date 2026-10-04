@@ -17,10 +17,7 @@
         <h2>Requisitos</h2>
         <ul>
             <li>Python 3.10 o superior (probado con 3.12).</li>
-            <li>MySQL 8 (recomendado), PostgreSQL o SQL Server. Ver
-                <a href="../arquitectura/base-de-datos.html">Base de datos</a>.</li>
-            <li>Los drivers de PostgreSQL (<code>psycopg2-binary</code>) y SQL Server (<code>pymssql</code>)
-                ya están en <code>requirements.txt</code>.</li>
+            <li>MySQL 8.</li>
         </ul>
 
         <h2>1. Entorno y dependencias</h2>
@@ -29,39 +26,30 @@
 pip install -r requirements.txt
 
 copy .env.example .env          # Windows  (Linux/Mac: cp .env.example .env)</code></pre>
-        <p>Editar <code>.env</code> y cambiar los secretos y contraseñas. El detalle de cada variable está en
-        <a href="configuracion.html">Configuración</a>.</p>
+        <p>Editar <code>.env</code> (secretos de sesión) y <code>conexiones.json</code> (acceso a las tres
+        bases). El detalle está en <a href="configuracion.html">Configuración</a>.</p>
 
         <h2>2. Crear las bases de datos</h2>
-<pre><code># Genera y ejecuta el schema completo (admin + wms + intercambio) con datos iniciales
-python generar_schema.py --engine mysql --execute --seed</code></pre>
-        <p>Después de crear una base desde cero hay que registrar las migraciones existentes como aplicadas,
-        para que el runner no intente ejecutarlas de nuevo:</p>
-<pre><code>python migrate.py --baseline
-python migrate.py --db admin --baseline</code></pre>
-        <p>Más detalle en <a href="../administracion/migraciones.html">Schema y migraciones</a>.</p>
+        <p>El sistema usa tres bases en MySQL: <code>taurus_admin</code>, <code>taurus_wms</code> y
+        <code>taurus_intercambio</code>. Se crean con los scripts de <code>docs/migrations/</code>:</p>
+<pre><code>mysql -u root -p -e "source docs/migrations/create_admin_mysql.sql"
+mysql -u root -p -e "source docs/migrations/create_wms_mysql.sql"
+mysql -u root -p -e "source docs/migrations/create_intercambio_mysql.sql"</code></pre>
+        <p>El procedimiento completo, con cada script y sus datos iniciales, está en
+        <a href="base-de-datos/index.html">Base de datos</a>.</p>
 
         <h2>3. Ejecutar</h2>
 <pre><code>python app.py     # WMS   — http://localhost:5000
 python admin.py   # Admin — http://localhost:5001/admin</code></pre>
 
-        <h2>Usuarios iniciales</h2>
-        <div class="tabla-scroll">
-            <table>
-                <thead><tr><th>Dónde</th><th>Usuario</th><th>Contraseña</th><th>Origen</th></tr></thead>
-                <tbody>
-                    <tr><td>WMS</td><td><code>admin</code>, <code>operador</code></td><td><code>Admin@2024!</code></td>
-                        <td>Seed del schema (<code>--seed</code>).</td></tr>
-                    <tr><td>Panel admin</td><td><code>admin</code></td><td><code>Admin@2024!</code></td>
-                        <td>Lo crea <code>admin.py</code> al arrancar, solo si <code>admin_usuarios</code> está vacía
-                            y <code>APP_ENV</code> no es <code>production</code>.</td></tr>
-                </tbody>
-            </table>
-        </div>
-        <div class="aviso atencion">
-            <p><strong>Solo para desarrollo.</strong> En producción el panel no crea el usuario por defecto: el
-            primer SUPERADMIN se da de alta con el
-            <a href="../administracion/superusuario.html">ejecutable de superusuario</a>.</p>
+        <h2>Usuarios</h2>
+        <p>Los scripts de creación no traen usuarios ni tenants. El primer usuario del panel admin se crea con
+        <a href="base-de-datos/superusuario.html">superusuario.exe</a>; con él se ingresa al panel y se dan de alta
+        los tenants y los usuarios del WMS.</p>
+        <div class="aviso">
+            <p><strong>Solo en desarrollo.</strong> Si <code>admin.py</code> arranca con la tabla de usuarios del
+            panel vacía y <code>APP_ENV</code> no es <code>production</code>, crea el usuario <code>admin</code>
+            con contraseña <code>Admin@2024!</code>. En producción no lo hace.</p>
         </div>
 
         <div id="pager"></div>

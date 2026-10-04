@@ -15,8 +15,10 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from modules.api import _hash_token
 from modules.db_config import (
+    ConexionesError,
     _get_admin_connection,
     clear_config_cache,
+    get_conexion,
     get_intercambio_connection,
 )
 from modules.intercambio import (
@@ -958,14 +960,15 @@ def intercambio():
         flash('Solo SUPERADMIN puede monitorear el intercambio', 'danger')
         return redirect(url_for('admin.tenants'))
 
-    conn_admin = _get_admin_connection()
+    # Conexión de intercambio (sin la contraseña), tal como está en el archivo de conexiones
+    descripciones = {'engine': 'Motor de BD', 'host': 'Servidor', 'port': 'Puerto',
+                     'database': 'Base de datos', 'user': 'Usuario'}
     try:
-        cursor = conn_admin.cursor()
-        cursor.execute("SELECT clave, valor, descripcion FROM configuracion WHERE clave LIKE 'INTERCAMBIO%' ORDER BY clave")
-        config_intercambio = cursor.fetchall()
-        cursor.close()
-    finally:
-        conn_admin.close()
+        conexion = get_conexion('intercambio')
+        config_intercambio = [{'clave': k, 'valor': conexion[k], 'descripcion': d}
+                              for k, d in descripciones.items()]
+    except ConexionesError:
+        config_intercambio = []
 
     conn_int = get_intercambio_connection()
     try:

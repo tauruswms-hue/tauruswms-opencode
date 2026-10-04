@@ -15,7 +15,7 @@
         <p class="bajada">Cómo está organizado el código y qué pieza se ocupa de cada cosa.</p>
 
         <h2>Aplicaciones</h2>
-        <p>Dos aplicaciones Flask independientes comparten el <code>.env</code> y la base
+        <p>Dos aplicaciones Flask independientes comparten el <code>.env</code>, el archivo de conexiones y la base
         <code>taurus_admin</code>:</p>
         <ul>
             <li><strong><code>app.py</code></strong> (puerto 5000): el WMS. Registra un blueprint por dominio y
@@ -38,7 +38,7 @@
                     <tr><td><code>modules/</code></td><td>Un blueprint por dominio (<code>&lt;nombre&gt;_bp</code>) más los módulos transversales.</td></tr>
                     <tr><td><code>templates/</code></td><td>Plantillas Jinja2. <code>templates/partials/</code> son includes (modales, menú), no páginas.</td></tr>
                     <tr><td><code>static/</code></td><td>CSS, JavaScript e imágenes.</td></tr>
-                    <tr><td><code>migrations/</code></td><td>DDL: <code>create_*.sql</code> por base y motor, y migraciones incrementales.</td></tr>
+                    <tr><td><code>docs/migrations/</code></td><td>DDL: <code>create_*.sql</code> por base y motor, y migraciones incrementales.</td></tr>
                     <tr><td><code>scripts/</code></td><td>Scripts puntuales (bootstrap, datos de ejemplo, alta de usuarios). No forman parte de las apps.</td></tr>
                     <tr><td><code>superusuario-dist/</code></td><td>Ejecutable portable para los usuarios del panel admin.</td></tr>
                     <tr><td><code>tests/</code></td><td>Suite de pytest.</td></tr>

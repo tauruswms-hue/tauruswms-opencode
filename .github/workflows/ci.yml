@@ -20,7 +20,7 @@ jobs:
         # Si falla: correr `python modules/schema_generator.py --all` y commitear el resultado.
         run: |
           python modules/schema_generator.py --all
-          git diff --exit-code -- schema_*.sql migrations/create_*.sql
+          git diff --exit-code -- schema_*.sql docs/migrations/create_*.sql
 
   test:
     name: Tests (pytest)
@@ -50,12 +50,18 @@ jobs:
           python -c "import secrets; print('SECRET_KEY=' + secrets.token_hex(32))" >> .env
           python -c "import secrets; print('ADMIN_SECRET_KEY=' + secrets.token_hex(32))" >> .env
           python -c "import secrets; print('SECRET_SALT=' + secrets.token_hex(32))" >> .env
-          sed -i 's/DB_ADMIN_HOST=.*/DB_ADMIN_HOST=127.0.0.1/' .env
-          sed -i 's/DB_ADMIN_PASSWORD=.*/DB_ADMIN_PASSWORD=Taurus_2001/' .env
-          sed -i 's/DB_HOST=.*/DB_HOST=127.0.0.1/' .env
-          sed -i 's/DB_PASSWORD=.*/DB_PASSWORD=Taurus_2001/' .env
-          sed -i 's/DB_INTERCAMBIO_HOST=.*/DB_INTERCAMBIO_HOST=127.0.0.1/' .env
-          sed -i 's/DB_INTERCAMBIO_PASSWORD=.*/DB_INTERCAMBIO_PASSWORD=Taurus_2001/' .env
+      - name: Conexiones (CI)
+        # Apunta las tres bases al MySQL del servicio, con los mismos usuarios que
+        # usaba el .env de CI (credenciales solo de CI).
+        run: |
+          python - <<'PY'
+          import json
+          usuarios = {'admin': 'taurus_admin', 'wms': 'taurus', 'intercambio': 'taurus'}
+          json.dump({b: {'engine': 'mysql', 'host': '127.0.0.1', 'port': 3306, 'user': u,
+                         'password': 'Taurus_2001', 'database': f'taurus_{b}'}
+                     for b, u in usuarios.items()},
+                    open('conexiones.json', 'w'), indent=2)
+          PY
       - name: Bootstrap schema
         run: |
           python generar_schema.py --engine mysql --execute

@@ -27,8 +27,10 @@
             <li><code>APP_ENV=production</code> en el <code>.env</code>.</li>
             <li>Secretos propios y aleatorios: <code>SECRET_KEY</code>, <code>ADMIN_SECRET_KEY</code>,
                 <code>SECRET_SALT</code>. Con valores por defecto, las apps no arrancan en producción.</li>
-            <li>Contraseñas de base propias en <code>DB_ADMIN_PASSWORD</code>, <code>DB_PASSWORD</code> y
-                <code>DB_INTERCAMBIO_PASSWORD</code>.</li>
+            <li><code>conexiones.json</code> con contraseñas propias para las tres bases, fuera del repositorio y
+                con lectura restringida a la cuenta que ejecuta las aplicaciones. Sin el archivo, o con las
+                contraseñas de ejemplo, las apps no arrancan en producción. Ver
+                <a href="../inicio/configuracion.html">Configuración</a>.</li>
             <li>HTTPS delante de las dos apps: en producción la cookie de sesión es <code>Secure</code> y no viaja
                 por HTTP.</li>
         </ul>
@@ -44,7 +46,7 @@
         <h2>Usuarios</h2>
         <ul>
             <li>Crear el primer <code>SUPERADMIN</code> del panel con el
-                <a href="../administracion/superusuario.html">ejecutable de superusuario</a>. En producción el panel
+                <a href="../inicio/base-de-datos/superusuario.html">ejecutable de superusuario</a>. En producción el panel
                 no crea el usuario <code>admin</code> por defecto.</li>
             <li>Dar de alta tenants y usuarios del WMS desde el panel admin.</li>
         </ul>

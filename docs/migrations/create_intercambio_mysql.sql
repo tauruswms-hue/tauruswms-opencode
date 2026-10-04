@@ -179,6 +179,3 @@ CREATE INDEX `idx_int_log_fecha` ON `intercambio_log` (`fecha`);
 
 -- === FIN DEL SCRIPT ===;
 -- Schema generado para engine: mysql;
--- Usuarios por defecto:;
---   SuperAdmin: admin / Admin@2024!;
---   Operador:   operador / Admin@2024!;
