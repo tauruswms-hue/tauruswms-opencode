@@ -51,15 +51,14 @@ jobs:
           python -c "import secrets; print('ADMIN_SECRET_KEY=' + secrets.token_hex(32))" >> .env
           python -c "import secrets; print('SECRET_SALT=' + secrets.token_hex(32))" >> .env
       - name: Conexiones (CI)
-        # Apunta las tres bases al MySQL del servicio, con los mismos usuarios que
-        # usaba el .env de CI (credenciales solo de CI).
+        # Apunta las tres bases al MySQL del servicio con root, el único usuario
+        # que existe en el contenedor (credenciales solo de CI).
         run: |
           python - <<'PY'
           import json
-          usuarios = {'admin': 'taurus_admin', 'wms': 'taurus', 'intercambio': 'taurus'}
-          json.dump({b: {'engine': 'mysql', 'host': '127.0.0.1', 'port': 3306, 'user': u,
+          json.dump({b: {'engine': 'mysql', 'host': '127.0.0.1', 'port': 3306, 'user': 'root',
                          'password': 'Taurus_2001', 'database': f'taurus_{b}'}
-                     for b, u in usuarios.items()},
+                     for b in ('admin', 'wms', 'intercambio')},
                     open('conexiones.json', 'w'), indent=2)
           PY
       - name: Bootstrap schema
