@@ -181,7 +181,9 @@
                         </div>
                         <div class="mb-2">
                             <label class="form-label">CUIT</label>
-                            <input type="text" name="cuit" id="tenantCuit" class="form-control">
+                            <input type="text" name="cuit" id="tenantCuit" class="form-control"
+                                   maxlength="13" pattern="\d{2}-\d{8}-\d" placeholder="99-99999999-9"
+                                   title="Formato: 99-99999999-9">
                         </div>
                         <div class="mb-2">
                             <label class="form-label">Dirección</label>
@@ -223,6 +225,14 @@
             document.getElementById('tenantActivo').checked = true;
             modal.show();
         }
+
+        // CUIT con formato 99-99999999-9: los guiones se agregan al escribir
+        function formatCuit(input) {
+            const d = input.value.replace(/[^0-9]/g, '').substring(0, 11);
+            input.value = d.length > 10 ? d.substring(0, 2) + '-' + d.substring(2, 10) + '-' + d.substring(10)
+                : d.length > 2 ? d.substring(0, 2) + '-' + d.substring(2) : d;
+        }
+        document.getElementById('tenantCuit').addEventListener('input', function () { formatCuit(this); });
     </script>
 </body>
 </html>

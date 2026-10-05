@@ -17,7 +17,6 @@ from modules.api import _hash_token
 from modules.db_config import (
     ConexionesError,
     _get_admin_connection,
-    clear_config_cache,
     get_conexion,
     get_intercambio_connection,
 )
@@ -78,6 +77,23 @@ def decode_codigo(encoded_codigo):
 
 
 @admin_bp.app_template_filter('datetime')
+def normalizar_cuit(valor):
+    """CUIT de un tenant en formato 99-99999999-9.
+
+    Acepta el valor ya formateado o sus 11 dígitos sin guiones. Devuelve '' si
+    está vacío (el CUIT es opcional) y None si no tiene un formato válido.
+    """
+    valor = (valor or '').strip()
+    if not valor:
+        return ''
+    if re.fullmatch(r'\d{11}', valor):
+        return f'{valor[:2]}-{valor[2:10]}-{valor[10]}'
+    return valor if re.fullmatch(r'\d{2}-\d{8}-\d', valor) else None
+
+
+CUIT_INVALIDO = 'CUIT inválido: debe tener el formato 99-99999999-9.'
+
+
 def format_datetime(value):
     if value is None:
         return '-'
@@ -270,6 +286,10 @@ def tenants_guardar():
     if not tenant_id and not re.fullmatch(r'[A-Z0-9_-]{1,20}', codigo):
         flash('Código inválido: 1 a 20 caracteres entre letras, números, guion y guion bajo.', 'danger')
         return redirect(url_for('admin.tenants'))
+    cuit = normalizar_cuit(d.get('cuit'))
+    if cuit is None:
+        flash(CUIT_INVALIDO, 'danger')
+        return redirect(url_for('admin.tenants'))
 
     conn = _get_admin_connection()
     try:
@@ -282,7 +302,7 @@ def tenants_guardar():
                 WHERE id = %s
             """, (
                 nombre, d.get('razon_social'),
-                d.get('cuit'), d.get('direccion'), d.get('telefono'), d.get('email'),
+                cuit, d.get('direccion'), d.get('telefono'), d.get('email'),
                 1 if d.get('activo') else 0, tenant_id
             ))
             msg = 'Tenant actualizado correctamente'
@@ -293,7 +313,7 @@ def tenants_guardar():
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
             """, (
                 codigo, nombre, d.get('razon_social'),
-                d.get('cuit'), d.get('direccion'), d.get('telefono'), d.get('email')
+                cuit, d.get('direccion'), d.get('telefono'), d.get('email')
             ))
             msg = 'Tenant creado correctamente'
             log_audit('CREATE', 'tenants', {'id': tenant_id, 'codigo': codigo, 'nombre': nombre})
@@ -473,6 +493,8 @@ def usuarios_borrar(usuario_id, encoded_tenant_id):
     conn = _get_admin_connection()
     try:
         cursor = conn.cursor()
+        cursor.execute("SELECT username FROM usuarios WHERE id = %s AND tenant_id = %s", (usuario_id, tenant_id))
+        usuario = cursor.fetchone()
         cursor.execute(
             "DELETE FROM usuarios WHERE id = %s AND tenant_id = %s",
             (usuario_id, tenant_id)
@@ -484,7 +506,8 @@ def usuarios_borrar(usuario_id, encoded_tenant_id):
         if filas_afectadas > 0:
             flash('Usuario eliminado definitivamente de la base de datos.', 'success')
             log_audit('DELETE', 'usuarios', {
-                'id': usuario_id, 'tenant_id': tenant_id, 'action': 'borrado_fisico',
+                'id': usuario_id, 'username': usuario['username'] if usuario else None,
+                'tenant_id': tenant_id, 'action': 'borrado_fisico',
             })
         else:
             flash('Usuario no encontrado para este tenant.', 'warning')
@@ -544,7 +567,7 @@ def usuarios():
         
         if tenant_id:
             cursor.execute("""
-                SELECT u.*, t.nombre as tenant_nombre
+                SELECT u.*, t.codigo as tenant_codigo, t.nombre as tenant_nombre
                 FROM usuarios u
                 JOIN tenants t ON u.tenant_id = t.id
                 WHERE u.tenant_id = %s
@@ -552,7 +575,7 @@ def usuarios():
             """, (tenant_id,))
         else:
             cursor.execute("""
-                SELECT u.*, t.nombre as tenant_nombre
+                SELECT u.*, t.codigo as tenant_codigo, t.nombre as tenant_nombre
                 FROM usuarios u
                 JOIN tenants t ON u.tenant_id = t.id
                 ORDER BY t.nombre, u.nombre
@@ -560,7 +583,7 @@ def usuarios():
         
         usuarios = cursor.fetchall()
         
-        cursor.execute("SELECT id, nombre FROM tenants ORDER BY nombre")
+        cursor.execute("SELECT id, codigo, nombre FROM tenants ORDER BY nombre")
         tenants = cursor.fetchall()
         cursor.close()
     finally:
@@ -749,102 +772,218 @@ def roles_rutas_editar(rol):
     return render_template('admin_roles_rutas.html', role=role, catalogo=ROUTE_CATALOG, asignadas=asignadas)
 
 
+# Rótulos de la pantalla de auditoría. En audit_logs se siguen guardando los
+# códigos (accion, modulo y el detalle en JSON); acá solo se traducen al mostrarlos.
+AUDIT_ACCIONES = {
+    'LOGIN': 'Ingreso',
+    'LOGIN_FAILED': 'Ingreso fallido',
+    'LOGOUT': 'Salida',
+    'CREATE': 'Alta',
+    'UPDATE': 'Modificación',
+    'DELETE': 'Baja',
+    'PROCESS': 'Proceso',
+    'ERROR': 'Error',
+    'ACCESS': 'Consulta de pantalla',
+}
+AUDIT_MODULOS = {
+    'auth': 'Acceso al panel',
+    'tenants': 'Tenants',
+    'usuarios': 'Usuarios',
+    'roles': 'Roles',
+    'roles_rutas': 'Permisos por rol',
+    'parametros': 'Parámetros del tenant',
+    'api_token': 'Token de API',
+    'configuracion': 'Configuración',
+    'intercambio': 'Intercambio',
+    'audit': 'Auditoría',
+}
+# Ayuda de la pantalla: qué significa cada acción y qué abarca cada sección
+AUDIT_AYUDA_ACCIONES = {
+    'LOGIN': 'Alguien ingresó al panel con usuario y contraseña correctos.',
+    'LOGIN_FAILED': 'Intento de ingreso con usuario o contraseña incorrectos. La columna Usuario queda vacía '
+                    'porque nadie llegó a ingresar; el detalle muestra el usuario que se escribió. '
+                    'Muchos seguidos desde un mismo equipo pueden ser un intento de adivinar la contraseña.',
+    'LOGOUT': 'El usuario cerró su sesión.',
+    'CREATE': 'Se creó un registro nuevo (un tenant, un usuario, un rol, una clave de configuración).',
+    'UPDATE': 'Se cambió un registro que ya existía. Incluye reactivar algo que estaba dado de baja.',
+    'DELETE': 'Se dio de baja un registro. Los tenants, usuarios y roles quedan inactivos y se pueden '
+              'reactivar, salvo que el detalle diga "Borrado definitivo". Las claves de configuración se '
+              'eliminan del todo.',
+    'PROCESS': 'Se ejecutó un proceso; hoy, el procesamiento del Intercambio.',
+    'ERROR': 'Una operación falló y no se guardó. El detalle trae el mensaje del error.',
+    'ACCESS': 'Alguien abrió una sección del panel, sin cambiar nada.',
+}
+AUDIT_AYUDA_MODULOS = {
+    'auth': 'Ingresos y salidas del panel.',
+    'tenants': 'Alta, modificación, baja y reactivación de tenants.',
+    'usuarios': 'Usuarios del WMS de cada tenant.',
+    'roles': 'Catálogo de roles.',
+    'roles_rutas': 'Pantallas del WMS habilitadas para cada rol.',
+    'parametros': 'Datos y parámetros de operación de un tenant.',
+    'api_token': 'Generación del token de la API de un tenant (el anterior deja de servir).',
+    'configuracion': 'Claves de la pantalla Configuración.',
+    'intercambio': 'Procesamiento y reintento de registros del Intercambio.',
+    'audit': 'Consultas a esta pantalla y limpieza de registros antiguos, que se hace con superusuario.exe.',
+}
+_AUDIT_CAMPOS = {
+    'username': 'Usuario', 'nombre': 'Nombre', 'codigo': 'Código', 'clave': 'Clave', 'rol': 'Rol',
+    'rutas': 'Rutas', 'error': 'Error', 'action': 'Operación', 'procesados': 'Aplicados',
+    'errores': 'Con error', 'reintentados': 'Reintentados', 'hasta': 'Registros hasta el',
+    'eliminados': 'Registros eliminados', 'origen': 'Hecho desde',
+}
+_AUDIT_OPERACIONES = {'activar': 'Reactivación', 'borrado_fisico': 'Borrado definitivo'}
+# Módulos cuyo detalle trae el `id` de un registro: rótulo y catálogo donde buscar su nombre
+_AUDIT_ID = {'tenants': 'Tenant', 'usuarios': 'Usuario', 'roles': 'Rol'}
+
+
+def _detalle_audit(modulo, detalle, nombres):
+    """Convierte el detalle de un registro de auditoría (JSON) en pares (rótulo, valor) legibles.
+
+    `nombres` es {'tenants': {id: texto}, 'usuarios': {...}, 'roles': {...}} para mostrar
+    a quién corresponde un id en vez del número.
+    """
+    if not detalle:
+        return []
+    try:
+        datos = json.loads(detalle)
+    except (TypeError, ValueError):
+        return [('Detalle', str(detalle))]
+    if not isinstance(datos, dict):
+        return [('Detalle', str(datos))]
+
+    def nombre_de(catalogo, valor):
+        try:
+            return nombres.get(catalogo, {}).get(int(valor)) or f'ID {valor}'
+        except (TypeError, ValueError):
+            return f'ID {valor}'
+
+    # El id solo se muestra si el registro no trae ya un nombre que lo identifique
+    identificado = any(datos.get(k) for k in ('nombre', 'username', 'codigo', 'clave'))
+    pares = []
+    for clave, valor in datos.items():
+        if clave == 'id':
+            if not identificado:
+                pares.append((_AUDIT_ID.get(modulo, 'ID'), nombre_de(modulo, valor) if modulo in _AUDIT_ID else valor))
+        elif clave == 'tenant_id':
+            pares.append(('Tenant', nombre_de('tenants', valor)))
+        elif clave == 'action':
+            pares.append(('Operación', _AUDIT_OPERACIONES.get(valor, valor)))
+        elif isinstance(valor, list):
+            texto = 'Acceso total' if valor == ['*'] else ', '.join(str(v) for v in valor) or 'ninguna'
+            pares.append((_AUDIT_CAMPOS.get(clave, clave), texto))
+        else:
+            pares.append((_AUDIT_CAMPOS.get(clave, clave), valor))
+    return pares
+
+
+def _fecha_filtro(valor, rotulo):
+    """Fecha de un filtro (AAAA-MM-DD) o None si está vacía o es inválida."""
+    if not valor:
+        return None
+    try:
+        return datetime.datetime.strptime(valor, '%Y-%m-%d').date()
+    except ValueError:
+        flash(f'Fecha "{rotulo}" inválida', 'warning')
+        return None
+
+
 @admin_bp.route('/audit')
 @admin_required
 def audit():
     if session.get('admin_rol') != 'SUPERADMIN':
         flash('Solo SUPERADMIN puede ver los logs', 'danger')
         return redirect(url_for('admin.tenants'))
-    
-    page = request.args.get('page', 1, type=int)
+
+    page = max(request.args.get('page', 1, type=int), 1)
     por_pagina = 50
     offset = (page - 1) * por_pagina
-    
+
     filtro_accion = request.args.get('accion', '')
     filtro_modulo = request.args.get('modulo', '')
-    filtro_desde = request.args.get('desde', '')
-    filtro_hasta = request.args.get('hasta', '')
-    
-    desde = None
-    hasta = None
-    
-    if filtro_desde:
-        try:
-            desde = datetime.datetime.strptime(filtro_desde, '%Y-%m-%d')
-        except ValueError:
-            flash('Formato de fecha "desde" inválido', 'warning')
-            filtro_desde = ''
-    
-    if filtro_hasta:
-        try:
-            hasta = datetime.datetime.strptime(filtro_hasta, '%Y-%m-%d')
-        except ValueError:
-            flash('Formato de fecha "hasta" inválido', 'warning')
-            filtro_hasta = ''
-    
-    if desde and hasta:
-        diff = (hasta - desde).days
-        if diff < 7:
-            flash('El rango de fechas no puede ser menor a 1 semana', 'warning')
-            hasta = desde + datetime.timedelta(days=6)
-            filtro_hasta = filtro_desde
-    elif desde and not hasta:
-        hasta = desde + datetime.timedelta(days=6)
-        filtro_hasta = hasta.strftime('%Y-%m-%d')
-    elif not desde and filtro_hasta:
+    # Las consultas de pantalla (ACCESS) son la mayoría de los registros y tapan
+    # los cambios: se muestran solo si se piden.
+    incluir_consultas = bool(request.args.get('consultas')) or filtro_accion == 'ACCESS'
+
+    # Rango de fechas: sin filtro, los últimos 7 días
+    desde = _fecha_filtro(request.args.get('desde', ''), 'desde')
+    hasta = _fecha_filtro(request.args.get('hasta', ''), 'hasta')
+    if not hasta:
+        hasta = desde + datetime.timedelta(days=6) if desde else datetime.date.today()
+    if not desde:
         desde = hasta - datetime.timedelta(days=6)
-        filtro_desde = desde.strftime('%Y-%m-%d')
-    else:
-        hasta = datetime.datetime.now()
-        desde = hasta - datetime.timedelta(days=6)
-        filtro_desde = desde.strftime('%Y-%m-%d')
-        filtro_hasta = hasta.strftime('%Y-%m-%d')
-    
+    if desde > hasta:
+        desde, hasta = hasta, desde
+    filtro_desde = desde.strftime('%Y-%m-%d')
+    filtro_hasta = hasta.strftime('%Y-%m-%d')
+
     conn = _get_admin_connection()
     try:
         cursor = conn.cursor()
-        
-        where = "1=1"
-        params = []
+
+        where = f"{date_func('created_at')} >= %s AND {date_func('created_at')} <= %s"
+        params = [filtro_desde, filtro_hasta]
         if filtro_accion:
             where += " AND accion = %s"
             params.append(filtro_accion)
+        elif not incluir_consultas:
+            where += " AND accion <> 'ACCESS'"
         if filtro_modulo:
             where += " AND modulo = %s"
             params.append(filtro_modulo)
-        if desde:
-            where += f" AND {date_func('created_at')} >= %s"
-            params.append(filtro_desde)
-        if hasta:
-            where += f" AND {date_func('created_at')} <= %s"
-            params.append(filtro_hasta)
-        
+
         cursor.execute(f"SELECT COUNT(*) as total FROM audit_logs WHERE {where}", params)
         total = cursor.fetchone()['total']
-        
+
         cursor.execute(f"""
-            SELECT * FROM audit_logs 
+            SELECT * FROM audit_logs
             WHERE {where}
-            ORDER BY created_at DESC
+            ORDER BY created_at DESC, id DESC
             {limit_sql(por_pagina, offset)}
         """, params)
-        logs = cursor.fetchall()
-        
+        logs = [dict(r) for r in cursor.fetchall()]
+
+        # Nombres para mostrar a qué tenant, usuario o rol corresponde cada id del detalle
+        nombres = {}
+        cursor.execute("SELECT id, codigo, nombre FROM tenants")
+        nombres['tenants'] = {t['id']: f"{t['codigo']} — {t['nombre']}" for t in cursor.fetchall()}
+        cursor.execute("SELECT id, username FROM usuarios")
+        nombres['usuarios'] = {u['id']: u['username'] for u in cursor.fetchall()}
+        cursor.execute("SELECT id, nombre FROM roles")
+        nombres['roles'] = {r['id']: r['nombre'] for r in cursor.fetchall()}
+
         cursor.close()
     finally:
         conn.close()
-    
+
+    for log in logs:
+        log['accion_txt'] = AUDIT_ACCIONES.get(log['accion'], log['accion'])
+        log['modulo_txt'] = AUDIT_MODULOS.get(log['modulo'], log['modulo'])
+        log['detalle_pares'] = _detalle_audit(log['modulo'], log['detalle'], nombres)
+
     total_paginas = (total + por_pagina - 1) // por_pagina if total > 0 else 1
-    
+
     log_audit('ACCESS', 'audit')
-    return render_template('admin_audit.html', 
-                         logs=logs, 
-                         page=page, 
+    return render_template('admin_audit.html',
+                         logs=logs,
+                         total=total,
+                         page=page,
                          total_paginas=total_paginas,
+                         acciones=AUDIT_ACCIONES,
+                         modulos=AUDIT_MODULOS,
+                         ayuda_acciones=AUDIT_AYUDA_ACCIONES,
+                         ayuda_modulos=AUDIT_AYUDA_MODULOS,
                          filtro_accion=filtro_accion,
                          filtro_modulo=filtro_modulo,
+                         incluir_consultas=incluir_consultas,
+                         desde=desde,
+                         hasta=hasta,
                          filtro_desde=filtro_desde,
                          filtro_hasta=filtro_hasta)
+
+
+def _clave_sensible(clave):
+    """Claves de configuracion cuyo valor no se muestra en el panel."""
+    return any(p in (clave or '').upper() for p in ('PASSWORD', 'SECRET', 'TOKEN'))
 
 
 @admin_bp.route('/configuracion')
@@ -858,10 +997,16 @@ def configuracion():
     try:
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM configuracion ORDER BY clave")
-        configs = cursor.fetchall()
+        configs = [dict(c) for c in cursor.fetchall()]
         cursor.close()
     finally:
         conn.close()
+
+    # Los valores sensibles no viajan al navegador: se editan en blanco
+    for c in configs:
+        c['sensible'] = _clave_sensible(c['clave'])
+        if c['sensible']:
+            c['valor'] = ''
     
     log_audit('ACCESS', 'configuracion')
     return render_template('admin_configuracion.html', configs=configs)
@@ -880,7 +1025,7 @@ def configuracion_guardar():
     valor = d.get('valor', '')
     descripcion = d.get('descripcion', '').strip()
     
-    if not clave:
+    if not config_id and not clave:
         flash('La clave es obligatoria', 'danger')
         return redirect(url_for('admin.configuracion'))
     
@@ -889,11 +1034,19 @@ def configuracion_guardar():
         cursor = conn.cursor()
         
         if config_id:
-            cursor.execute("""
-                UPDATE configuracion SET 
-                    clave = %s, valor = %s, descripcion = %s
-                WHERE id = %s
-            """, (clave, valor, descripcion, config_id))
+            # La clave no se cambia al editar; un valor sensible en blanco conserva el actual
+            cursor.execute("SELECT clave FROM configuracion WHERE id = %s", (config_id,))
+            actual = cursor.fetchone()
+            if not actual:
+                flash('Configuración no encontrada.', 'warning')
+                return redirect(url_for('admin.configuracion'))
+            clave = actual['clave']
+            if _clave_sensible(clave) and not valor:
+                cursor.execute("UPDATE configuracion SET descripcion = %s WHERE id = %s",
+                               (descripcion, config_id))
+            else:
+                cursor.execute("UPDATE configuracion SET valor = %s, descripcion = %s WHERE id = %s",
+                               (valor, descripcion, config_id))
             msg = 'Configuración actualizada correctamente'
             log_audit('UPDATE', 'configuracion', {'clave': clave})
         else:
@@ -905,7 +1058,6 @@ def configuracion_guardar():
             log_audit('CREATE', 'configuracion', {'clave': clave})
         
         conn.commit()
-        clear_config_cache()
         flash(msg, 'success')
         cursor.close()
     except Exception as e:
@@ -932,15 +1084,16 @@ def configuracion_eliminar(config_id):
     conn = _get_admin_connection()
     try:
         cursor = conn.cursor()
+        cursor.execute("SELECT clave FROM configuracion WHERE id = %s", (config_id,))
+        config = cursor.fetchone()
         cursor.execute("DELETE FROM configuracion WHERE id = %s", (config_id,))
         conn.commit()
-        clear_config_cache()
         filas = cursor.rowcount
         cursor.close()
         
         if filas > 0:
             flash('Configuración eliminada.', 'success')
-            log_audit('DELETE', 'configuracion', {'id': config_id})
+            log_audit('DELETE', 'configuracion', {'id': config_id, 'clave': config['clave'] if config else None})
         else:
             flash('Configuración no encontrada.', 'warning')
     except Exception as e:
@@ -1089,6 +1242,10 @@ def parametros_editar(tenant_id):
         
         if request.method == 'POST':
             d = request.form
+            cuit = normalizar_cuit(d.get('cuit'))
+            if cuit is None:
+                flash(CUIT_INVALIDO, 'danger')
+                return redirect(url_for('admin.parametros_editar', tenant_id=tenant_id))
             metodos = request.form.getlist('metodosdepicking')
             if not metodos:
                 metodos = ['fifo']
@@ -1120,7 +1277,7 @@ def parametros_editar(tenant_id):
             """, (
                 d.get('nombre', ''),
                 d.get('razon_social', ''),
-                d.get('cuit', ''),
+                cuit,
                 d.get('direccion', ''),
                 d.get('telefono', ''),
                 d.get('email', ''),

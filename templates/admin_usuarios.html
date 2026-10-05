@@ -94,7 +94,7 @@
                     <select class="form-select" onchange="window.location.href='{{ url_for('admin.usuarios') }}?tenant_id=' + this.value" style="max-width: 300px;">
                         <option value="">Todos los tenants</option>
                         {% for t in tenants %}
-                        <option value="{{ t.id }}" {% if tenant_id == t.id %}selected{% endif %}>{{ t.nombre }}</option>
+                        <option value="{{ t.id }}" {% if tenant_id == t.id %}selected{% endif %}>{{ t.codigo }} — {{ t.nombre }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -117,7 +117,7 @@
                                 <td><strong>{{ usuario.username }}</strong></td>
                                 <td>{{ usuario.nombre }}</td>
                                 <td>{{ usuario.email or '-' }}</td>
-                                <td>{{ usuario.tenant_nombre }}</td>
+                                <td><code>{{ usuario.tenant_codigo }}</code> {{ usuario.tenant_nombre }}</td>
                                 <td>
                                     {% if usuario.rol == 'ADMIN' %}
                                         <span class="badge bg-danger">{{ usuario.rol }}</span>

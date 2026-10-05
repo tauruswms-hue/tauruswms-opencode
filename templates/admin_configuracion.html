@@ -92,6 +92,12 @@
             {% endif %}
         {% endwith %}
 
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle me-1"></i>
+            Las conexiones a las bases de datos no se configuran acá: se definen en el archivo
+            <code>conexiones.json</code> del servidor.
+        </div>
+
         <div class="card">
             <div class="card-body">
                 <div class="table-responsive">
@@ -110,7 +116,7 @@
                             <tr>
                                 <td><code>{{ config.clave }}</code></td>
                                 <td>
-                                    {% if 'PASSWORD' in config.clave %}
+                                    {% if config.sensible %}
                                     ********
                                     {% else %}
                                     {{ config.valor[:60] if config.valor else '' }}{% if config.valor|length > 60 %}...{% endif %}
@@ -119,11 +125,14 @@
                                 <td>{{ config.descripcion or '-' }}</td>
                                 <td>{{ config.updated_at.strftime('%d/%m/%Y %H:%M') if config.updated_at else '-' }}</td>
                                 <td>
-                                    <button type="button" class="btn btn-outline-warning btn-sm" 
-                                            onclick="editarConfig({{ config.id }}, '{{ config.clave }}', '{{ config.valor | e }}', '{{ config.descripcion or '' | e }}')">
+                                    <button type="button" class="btn btn-outline-warning btn-sm" title="Editar"
+                                            data-id="{{ config.id }}" data-clave="{{ config.clave }}"
+                                            data-valor="{{ config.valor or '' }}" data-descripcion="{{ config.descripcion or '' }}"
+                                            data-sensible="{{ 1 if config.sensible else 0 }}"
+                                            onclick="editarConfig(this)">
                                         <i class="fas fa-edit"></i>
                                     </button>
-                                    <form method="POST" action="{{ url_for('admin.configuracion_eliminar', config_id=config.id) }}" style="display:inline;" onsubmit="return confirmarEliminarConfig('{{ config.clave }}')">
+                                    <form method="POST" action="{{ url_for('admin.configuracion_eliminar', config_id=config.id) }}" style="display:inline;" data-clave="{{ config.clave }}" onsubmit="return confirmarEliminarConfig(this)">
                                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                         <button type="submit" class="btn btn-outline-danger btn-sm" title="Eliminar">
                                             <i class="fas fa-trash"></i>
@@ -157,12 +166,13 @@
                         <div class="mb-3">
                             <label for="configClave" class="form-label">Clave *</label>
                             <input type="text" class="form-control" id="configClave" name="clave" required
-                                   placeholder="Ej: DB_HOST">
+                                   maxlength="100" placeholder="Ej: APP_NAME">
                         </div>
                         <div class="mb-3">
                             <label for="configValor" class="form-label">Valor</label>
                             <input type="text" class="form-control" id="configValor" name="valor"
-                                   placeholder="Ej: localhost">
+                                   placeholder="Ej: Taurus WMS">
+                            <div class="form-text d-none" id="configValorAyuda">Valor oculto. Dejar en blanco para conservar el actual.</div>
                         </div>
                         <div class="mb-3">
                             <label for="configDescripcion" class="form-label">Descripción</label>
@@ -187,24 +197,27 @@
         document.getElementById('configClave').value = '';
         document.getElementById('configClave').readOnly = false;
         document.getElementById('configValor').value = '';
+        document.getElementById('configValorAyuda').classList.add('d-none');
         document.getElementById('configDescripcion').value = '';
         var modal = new bootstrap.Modal(document.getElementById('modalConfig'));
         modal.show();
     }
 
-    function editarConfig(id, clave, valor, descripcion) {
+    function editarConfig(boton) {
+        var d = boton.dataset;
         document.getElementById('modalTitulo').textContent = 'Editar Configuración';
-        document.getElementById('configId').value = id;
-        document.getElementById('configClave').value = clave;
+        document.getElementById('configId').value = d.id;
+        document.getElementById('configClave').value = d.clave;
         document.getElementById('configClave').readOnly = true;
-        document.getElementById('configValor').value = valor;
-        document.getElementById('configDescripcion').value = descripcion;
+        document.getElementById('configValor').value = d.valor;
+        document.getElementById('configValorAyuda').classList.toggle('d-none', d.sensible !== '1');
+        document.getElementById('configDescripcion').value = d.descripcion;
         var modal = new bootstrap.Modal(document.getElementById('modalConfig'));
         modal.show();
     }
 
-    function confirmarEliminarConfig(clave) {
-        return confirm('¿Está seguro de eliminar la configuración "' + clave + '"?');
+    function confirmarEliminarConfig(form) {
+        return confirm('¿Está seguro de eliminar la configuración "' + form.dataset.clave + '"?');
     }
     </script>
 </body>

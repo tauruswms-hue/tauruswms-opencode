@@ -1,3 +1,14 @@
+{% macro insignia(accion, texto) -%}
+    {%- if accion == 'LOGIN' -%}
+        <span class="badge bg-success">{{ texto }}</span>
+    {%- elif accion in ['LOGIN_FAILED', 'ERROR'] -%}
+        <span class="badge bg-danger">{{ texto }}</span>
+    {%- elif accion in ['CREATE', 'UPDATE', 'DELETE', 'PROCESS'] -%}
+        <span class="badge bg-warning text-dark">{{ texto }}</span>
+    {%- else -%}
+        <span class="badge bg-secondary">{{ texto }}</span>
+    {%- endif -%}
+{%- endmacro -%}
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -86,43 +97,104 @@
         
         <div class="card">
             <div class="card-header">
-                <h5 class="mb-0"><i class="fas fa-clipboard-list me-2"></i>Logs de Auditoría</h5>
+                <h5 class="mb-0"><i class="fas fa-clipboard-list me-2"></i>Auditoría del panel</h5>
             </div>
             <div class="card-body">
+                <p class="text-muted">
+                    Registro de lo que se hace en este panel: ingresos (correctos y fallidos), altas,
+                    modificaciones, bajas, procesos y errores, con el usuario que lo hizo y desde qué equipo.
+                    Los movimientos de stock del WMS no están acá: se consultan en los reportes del WMS.
+                </p>
+                <p class="mb-3">
+                    <a class="btn btn-outline-info btn-sm" data-bs-toggle="collapse" href="#ayudaAuditoria" role="button"
+                       aria-expanded="false" aria-controls="ayudaAuditoria">
+                        <i class="fas fa-question-circle me-1"></i>Cómo leer esta pantalla
+                    </a>
+                </p>
+                <div class="collapse mb-3" id="ayudaAuditoria">
+                    <div class="border rounded p-3 bg-light">
+                        <p class="mb-2">Cada fila es <strong>un hecho</strong>: alguien hizo algo en el panel. Se lee de
+                        izquierda a derecha: <em>cuándo</em>, <em>quién</em>, <em>qué hizo</em>, <em>en qué sección</em>,
+                        <em>sobre qué</em> y <em>desde dónde</em>. Lo más reciente está arriba.</p>
+
+                        <h6 class="mt-3">Columnas</h6>
+                        <table class="table table-sm mb-0">
+                            <tbody>
+                                <tr><th class="text-nowrap">Fecha y hora</th><td>Momento exacto, según el reloj del servidor.</td></tr>
+                                <tr><th>Usuario</th><td>Usuario del panel que hizo la acción. Un guion (-) significa que no había
+                                    nadie identificado, como en un ingreso fallido.</td></tr>
+                                <tr><th>Acción</th><td>Qué se hizo. El color indica el tipo (ver abajo).</td></tr>
+                                <tr><th>Sección</th><td>Parte del panel donde ocurrió.</td></tr>
+                                <tr><th>Detalle</th><td>Sobre qué registro se actuó: el tenant, usuario, rol o clave afectado.
+                                    Dice <em>qué</em> registro cambió, no los valores anteriores y nuevos. Si aparece
+                                    "ID 15" es porque ese registro ya no existe y no se puede mostrar su nombre.</td></tr>
+                                <tr><th class="text-nowrap">Equipo (IP)</th><td>Dirección de red del equipo desde el que se hizo.
+                                    <code>127.0.0.1</code> es el propio servidor. Al pasar el mouse se ve el navegador usado.</td></tr>
+                            </tbody>
+                        </table>
+
+                        <h6 class="mt-3">Acciones</h6>
+                        <table class="table table-sm mb-0">
+                            <tbody>
+                                {% for codigo, texto in acciones.items() %}
+                                <tr><td class="text-nowrap">{{ insignia(codigo, texto) }}</td><td>{{ ayuda_acciones[codigo] }}</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        <p class="small text-muted mt-2 mb-0">
+                            <span class="badge bg-success">&nbsp;</span> ingreso correcto ·
+                            <span class="badge bg-warning text-dark">&nbsp;</span> algo cambió ·
+                            <span class="badge bg-danger">&nbsp;</span> algo falló o fue rechazado ·
+                            <span class="badge bg-secondary">&nbsp;</span> informativo
+                        </p>
+
+                        <h6 class="mt-3">Secciones</h6>
+                        <table class="table table-sm mb-0">
+                            <tbody>
+                                {% for codigo, texto in modulos.items() %}
+                                <tr><th class="text-nowrap">{{ texto }}</th><td>{{ ayuda_modulos[codigo] }}</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+
+                        <h6 class="mt-3">Filtros</h6>
+                        <ul class="mb-0">
+                            <li>Sin fechas se muestran los últimos 7 días. Para ver un solo día, poner la misma fecha en
+                                Desde y Hasta.</li>
+                            <li><strong>Consultas de pantalla</strong> son los registros de "alguien abrió una sección".
+                                Son muchos y no implican cambios, por eso vienen ocultos; marcar la casilla para verlos.</li>
+                            <li>El recuadro azul indica cuántos registros hay con los filtros elegidos. Se muestran de a 50.</li>
+                        </ul>
+                    </div>
+                </div>
                 <form method="GET" class="row g-3 mb-3">
                     <div class="col-md-2">
-                        <label class="form-label">Desde</label>
-                        <input type="date" name="desde" class="form-control" value="{{ filtro_desde }}">
+                        <label class="form-label" for="filtroDesde">Desde</label>
+                        <input type="date" name="desde" id="filtroDesde" class="form-control" value="{{ filtro_desde }}">
                     </div>
                     <div class="col-md-2">
-                        <label class="form-label">Hasta</label>
-                        <input type="date" name="hasta" class="form-control" value="{{ filtro_hasta }}">
-                        <small class="text-muted">Mín. 1 semana</small>
+                        <label class="form-label" for="filtroHasta">Hasta</label>
+                        <input type="date" name="hasta" id="filtroHasta" class="form-control" value="{{ filtro_hasta }}">
                     </div>
                     <div class="col-md-2">
-                        <label class="form-label">Acción</label>
-                        <select name="accion" class="form-select">
+                        <label class="form-label" for="filtroAccion">Acción</label>
+                        <select name="accion" id="filtroAccion" class="form-select">
                             <option value="">Todas</option>
-                            <option value="LOGIN" {% if filtro_accion == 'LOGIN' %}selected{% endif %}>LOGIN</option>
-                            <option value="LOGOUT" {% if filtro_accion == 'LOGOUT' %}selected{% endif %}>LOGOUT</option>
-                            <option value="LOGIN_FAILED" {% if filtro_accion == 'LOGIN_FAILED' %}selected{% endif %}>LOGIN_FAILED</option>
-                            <option value="ACCESS" {% if filtro_accion == 'ACCESS' %}selected{% endif %}>ACCESS</option>
-                            <option value="CREATE" {% if filtro_accion == 'CREATE' %}selected{% endif %}>CREATE</option>
-                            <option value="UPDATE" {% if filtro_accion == 'UPDATE' %}selected{% endif %}>UPDATE</option>
-                            <option value="DELETE" {% if filtro_accion == 'DELETE' %}selected{% endif %}>DELETE</option>
+                            {% for codigo, texto in acciones.items() %}
+                            <option value="{{ codigo }}" {% if filtro_accion == codigo %}selected{% endif %}>{{ texto }}</option>
+                            {% endfor %}
                         </select>
                     </div>
-                    <div class="col-md-2">
-                        <label class="form-label">Módulo</label>
-                        <select name="modulo" class="form-select">
-                            <option value="">Todos</option>
-                            <option value="auth" {% if filtro_modulo == 'auth' %}selected{% endif %}>Auth</option>
-                            <option value="tenants" {% if filtro_modulo == 'tenants' %}selected{% endif %}>Tenants</option>
-                            <option value="usuarios" {% if filtro_modulo == 'usuarios' %}selected{% endif %}>Usuarios</option>
-                            <option value="configuracion" {% if filtro_modulo == 'configuracion' %}selected{% endif %}>Configuración</option>
+                    <div class="col-md-3">
+                        <label class="form-label" for="filtroModulo">Sección</label>
+                        <select name="modulo" id="filtroModulo" class="form-select">
+                            <option value="">Todas</option>
+                            {% for codigo, texto in modulos.items() %}
+                            <option value="{{ codigo }}" {% if filtro_modulo == codigo %}selected{% endif %}>{{ texto }}</option>
+                            {% endfor %}
                         </select>
                     </div>
-                    <div class="col-md-4 d-flex align-items-end">
+                    <div class="col-md-3 d-flex align-items-end">
                         <button type="submit" class="btn btn-primary me-2">
                             <i class="fas fa-search"></i> Filtrar
                         </button>
@@ -130,70 +202,84 @@
                             <i class="fas fa-times"></i> Limpiar
                         </a>
                     </div>
+                    <div class="col-12">
+                        <div class="form-check">
+                            <input type="checkbox" name="consultas" value="1" id="filtroConsultas" class="form-check-input"
+                                   {% if incluir_consultas %}checked{% endif %}>
+                            <label class="form-check-label" for="filtroConsultas">
+                                Incluir consultas de pantalla
+                                <span class="text-muted">(cada vez que alguien abre una sección del panel)</span>
+                            </label>
+                        </div>
+                    </div>
                 </form>
-                
+
                 <div class="alert alert-info mb-3">
                     <i class="fas fa-info-circle me-1"></i>
-                    Mostrando registros desde <strong>{{ filtro_desde }}</strong> hasta <strong>{{ filtro_hasta }}</strong>
+                    <strong>{{ total }}</strong> registro{{ '' if total == 1 else 's' }}
+                    del <strong>{{ desde.strftime('%d/%m/%Y') }}</strong> al <strong>{{ hasta.strftime('%d/%m/%Y') }}</strong>{{ ', sin contar las consultas de pantalla' if not incluir_consultas }}.
                 </div>
-                
+
                 <div class="table-responsive">
-                    <table class="table table-sm table-hover">
+                    <table class="table table-sm table-hover align-middle">
                         <thead>
                             <tr>
-                                <th>Fecha/Hora</th>
+                                <th>Fecha y hora</th>
                                 <th>Usuario</th>
                                 <th>Acción</th>
-                                <th>Módulo</th>
-                                <th>IP</th>
+                                <th>Sección</th>
                                 <th>Detalle</th>
+                                <th>Equipo (IP)</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for log in logs %}
                             <tr>
-                                <td>{{ log.created_at.strftime('%d/%m/%Y %H:%M') if log.created_at else '-' }}</td>
+                                <td class="text-nowrap">{{ log.created_at.strftime('%d/%m/%Y %H:%M:%S') if log.created_at else '-' }}</td>
                                 <td>{{ log.usuario_nombre or '-' }}</td>
                                 <td>
-                                    {% if log.accion == 'LOGIN' %}
-                                        <span class="badge bg-success">{{ log.accion }}</span>
-                                    {% elif log.accion == 'LOGIN_FAILED' %}
-                                        <span class="badge bg-danger">{{ log.accion }}</span>
-                                    {% elif log.accion in ['CREATE', 'UPDATE', 'DELETE'] %}
-                                        <span class="badge bg-warning text-dark">{{ log.accion }}</span>
-                                    {% else %}
-                                        <span class="badge bg-secondary">{{ log.accion }}</span>
-                                    {% endif %}
+                                    {{ insignia(log.accion, log.accion_txt) }}
                                 </td>
-                                <td>{{ log.modulo }}</td>
-                                <td><small>{{ log.ip_address or '-' }}</small></td>
-                                <td><small>{{ log.detalle or '-' }}</small></td>
+                                <td>{{ log.modulo_txt }}</td>
+                                <td>
+                                    {% for rotulo, valor in log.detalle_pares %}
+                                    <div><small><span class="text-muted">{{ rotulo }}:</span> {{ valor }}</small></div>
+                                    {% else %}
+                                    <small class="text-muted">-</small>
+                                    {% endfor %}
+                                </td>
+                                <td><small title="{{ log.user_agent or '' }}">{{ log.ip_address or '-' }}</small></td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center text-muted">No hay registros para los filtros elegidos</td>
                             </tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
-                
+
                 {% if total_paginas > 1 %}
+                {% set consultas = 1 if incluir_consultas else none %}
                 <nav>
                     <ul class="pagination justify-content-center">
                         {% if page > 1 %}
                         <li class="page-item">
-                            <a class="page-link" href="{{ url_for('admin.audit', page=page-1, desde=filtro_desde, hasta=filtro_hasta, accion=filtro_accion, modulo=filtro_modulo) }}">Anterior</a>
+                            <a class="page-link" href="{{ url_for('admin.audit', page=page-1, desde=filtro_desde, hasta=filtro_hasta, accion=filtro_accion, modulo=filtro_modulo, consultas=consultas) }}">Anterior</a>
                         </li>
                         {% endif %}
-                        
+
                         {% for p in range(1, total_paginas + 1) %}
                             {% if p >= page - 2 and p <= page + 2 %}
                                 <li class="page-item {% if p == page %}active{% endif %}">
-                                    <a class="page-link" href="{{ url_for('admin.audit', page=p, desde=filtro_desde, hasta=filtro_hasta, accion=filtro_accion, modulo=filtro_modulo) }}">{{ p }}</a>
+                                    <a class="page-link" href="{{ url_for('admin.audit', page=p, desde=filtro_desde, hasta=filtro_hasta, accion=filtro_accion, modulo=filtro_modulo, consultas=consultas) }}">{{ p }}</a>
                                 </li>
                             {% endif %}
                         {% endfor %}
-                        
+
                         {% if page < total_paginas %}
                         <li class="page-item">
-                            <a class="page-link" href="{{ url_for('admin.audit', page=page+1, desde=filtro_desde, hasta=filtro_hasta, accion=filtro_accion, modulo=filtro_modulo) }}">Siguiente</a>
+                            <a class="page-link" href="{{ url_for('admin.audit', page=page+1, desde=filtro_desde, hasta=filtro_hasta, accion=filtro_accion, modulo=filtro_modulo, consultas=consultas) }}">Siguiente</a>
                         </li>
                         {% endif %}
                     </ul>
@@ -202,7 +288,7 @@
             </div>
         </div>
     </div>
-    
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
