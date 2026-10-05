@@ -2,21 +2,23 @@
 admin_superusuario.py — Administración por consola de los usuarios del panel admin.
 
 Menú interactivo para gestionar la tabla `admin_usuarios` de `taurus_admin`
-(usuarios que ingresan a admin.py, puerto 5001). No toca los usuarios del WMS
-(`taurus_admin.usuarios`); para esos ver `scripts/alta_usuario.py` o el panel admin.
+(usuarios que ingresan a admin.py, puerto 5001) y limpiar la auditoría del panel
+(`audit_logs`). No toca los usuarios del WMS (`taurus_admin.usuarios`); para esos
+ver `scripts/alta_usuario.py` o el panel admin.
 
 Uso (desde cualquier directorio):
     python scripts/admin_superusuario.py [--config ruta.json]
     python -m scripts.admin_superusuario      # equivalente, desde la raíz
     superusuario-dist/superusuario.exe [--config ruta.json]   # ejecutable portable
 
-Conexión (primera que aplique):
+Conexión: sección `admin` del archivo de conexiones de las apps (conexiones.json,
+ver docs/inicio/base-de-datos/conexiones.html). Se busca en (primera que aplique):
     1. --config <ruta.json>
-    2. superusuario.json junto al ejecutable (o junto a este script)
-    3. Solo ejecutando con Python: sección `admin` de conexiones.json del proyecto.
-    El JSON tiene las claves engine (mysql|postgresql|sqlserver, default mysql),
-    host, port, user, password, database y opcional charset; ver
-    superusuario-dist/superusuario.json. Se conecta con
+    2. Variable de entorno TAURUS_CONEXIONES
+    3. Ejecutable: conexiones.json junto al .exe o en la carpeta que lo contiene
+       (la raíz del proyecto, si el .exe está en superusuario-dist/).
+       Con Python: conexiones.json en la raíz del proyecto.
+    Engines soportados: mysql, postgresql y sqlserver. Se conecta con
     `_get_admin_connection()` de modules/db_config.py.
     El ejecutable se construye con `python scripts/build_superusuario.py`.
 
@@ -29,7 +31,11 @@ Opciones del menú:
     2 — Dar de baja: baja lógica (`activo = FALSE`); no borra el registro.
     3 — Activar: revierte la baja (`activo = TRUE`).
     4 — Listar: todos los usuarios o filtrados por username/nombre/email (LIKE).
-    5 — Salir (también Ctrl+C).
+    5 — Limpiar auditoría: borra los registros de `audit_logs` hasta una fecha
+        dada (inclusive). Pide usuario y contraseña de un SUPERADMIN activo, y
+        deja registrada la limpieza en la misma auditoría (quién, hasta qué
+        fecha y cuántos registros).
+    6 — Salir (también Ctrl+C).
 
 Validaciones:
     - Rol: solo SUPERADMIN o ADMIN (SUPERADMIN habilita parámetros de tenants,
@@ -46,6 +52,7 @@ Validaciones:
 Nota: herramienta de desarrollo/soporte, no forma parte de las apps.
 """
 import argparse
+import datetime
 import getpass
 import json
 import os
@@ -61,20 +68,20 @@ ROOT = Path(__file__).resolve().parent.parent
 if not CONGELADO and str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from werkzeug.security import generate_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from modules.db_config import (
+    CONEXIONES_ARCHIVO,
+    CONEXIONES_ENV,
     ConexionesError,
     _get_admin_connection,
     get_conexion,
     ruta_conexiones,
-    set_conexion,
 )
 from modules.passwords import PASSWORD_MIN_LEN, validar_password
 
 ROLES_VALIDOS = ('SUPERADMIN', 'ADMIN')
 COLUMNAS_USUARIO = "id, username, nombre, email, rol, activo"
-CONFIG_NOMBRE = 'superusuario.json'
 ENGINES_SOPORTADOS = ('mysql', 'postgresql', 'sqlserver')
 
 
@@ -118,7 +125,8 @@ def mostrar_menu():
     print(f"  {Color.BOLD}2{Color.RESET} — Dar de baja un usuario")
     print(f"  {Color.BOLD}3{Color.RESET} — Activar usuario")
     print(f"  {Color.BOLD}4{Color.RESET} — Listar usuarios")
-    print(f"  {Color.BOLD}5{Color.RESET} — Salir")
+    print(f"  {Color.BOLD}5{Color.RESET} — Limpiar auditoría")
+    print(f"  {Color.BOLD}6{Color.RESET} — Salir")
     print()
 
 
@@ -429,64 +437,130 @@ def listar(cursor):
           f"{Color.DIM}, {Color.RED}{inactivos} inactivo(s){Color.RESET}")
 
 
+# --- Limpieza de la auditoría del panel ---
+
+ORIGEN_AUDITORIA = 'superusuario.exe'
+
+
+def pedir_fecha(prompt):
+    """Pide una fecha DD/MM/AAAA. Devuelve un date o None si es inválida o futura."""
+    texto = pedir_input(prompt)
+    if texto is None:
+        return None
+    try:
+        fecha = datetime.datetime.strptime(texto, '%d/%m/%Y').date()
+    except ValueError:
+        error("Fecha inválida. Use el formato DD/MM/AAAA, por ejemplo 31/12/2025.")
+        return None
+    if fecha > datetime.date.today():
+        error("La fecha no puede ser posterior a hoy.")
+        return None
+    return fecha
+
+
+def validar_superadmin(cursor):
+    """Pide usuario y contraseña y devuelve el SUPERADMIN activo que los ingresó, o None."""
+    print(f"\n  {Color.YELLOW}Esta operación debe autorizarla un SUPERADMIN.{Color.RESET}")
+    username = pedir_input("  Usuario SUPERADMIN: ")
+    if username is None:
+        return None
+    password = _leer_password("  Contraseña: ")
+    cursor.execute(
+        "SELECT id, username, nombre, password_hash FROM admin_usuarios "
+        "WHERE username = %s AND rol = 'SUPERADMIN' AND activo = TRUE",
+        (username,)
+    )
+    usuario = cursor.fetchone()
+    if not usuario or not check_password_hash(usuario['password_hash'], password):
+        error("Credenciales inválidas o el usuario no es un SUPERADMIN activo.")
+        return None
+    return usuario
+
+
+def limpiar_auditoria(conn, cursor):
+    mostrar_encabezado("Limpiar auditoría")
+    print("  Borra definitivamente los registros de auditoría del panel hasta la fecha")
+    print("  indicada, inclusive. No se puede deshacer.\n")
+
+    hasta = pedir_fecha("  Borrar registros hasta (DD/MM/AAAA): ")
+    if hasta is None:
+        return
+    # Hasta la fecha inclusive: todo lo anterior al día siguiente
+    limite = (hasta + datetime.timedelta(days=1)).strftime('%Y-%m-%d')
+
+    cursor.execute("SELECT COUNT(*) AS total FROM audit_logs WHERE created_at < %s", (limite,))
+    total = cursor.fetchone()['total']
+    if total == 0:
+        advertencia(f"No hay registros de auditoría hasta el {hasta:%d/%m/%Y}.")
+        return
+    info(f"Se borrarán {total} registro(s) de auditoría, hasta el {hasta:%d/%m/%Y} inclusive.")
+
+    autoriza = validar_superadmin(cursor)
+    if autoriza is None:
+        return
+    if not confirmar(f"  ¿Confirma borrar {total} registro(s)? (S/N): "):
+        info("Operación cancelada.")
+        return
+
+    cursor.execute("DELETE FROM audit_logs WHERE created_at < %s", (limite,))
+    eliminados = cursor.rowcount
+    # La limpieza queda en la misma auditoría, a nombre de quien la autorizó
+    cursor.execute(
+        "INSERT INTO audit_logs (usuario_id, usuario_nombre, accion, modulo, detalle, user_agent) "
+        "VALUES (%s, %s, 'DELETE', 'audit', %s, %s)",
+        (autoriza['id'], autoriza['nombre'],
+         json.dumps({'hasta': hasta.strftime('%d/%m/%Y'), 'eliminados': eliminados,
+                     'username': autoriza['username'], 'origen': ORIGEN_AUDITORIA}),
+         ORIGEN_AUDITORIA)
+    )
+    conn.commit()
+    exito(f"{eliminados} registro(s) de auditoría eliminados (autorizó: {autoriza['username']})")
+
+
 # --- Configuración de conexión ---
 
 class ConfigError(Exception):
     pass
 
 
-def _directorio_base():
-    """Carpeta donde se busca superusuario.json: la del .exe o la de este script."""
-    return Path(sys.executable).resolve().parent if CONGELADO else Path(__file__).resolve().parent
-
-
-def cargar_config_json(ruta):
-    """Valida el JSON de conexión y lo fija como conexión de taurus_admin (no usa conexiones.json)."""
-    try:
-        with open(ruta, encoding='utf-8-sig') as fh:
-            datos = json.load(fh)
-    except json.JSONDecodeError as e:
-        raise ConfigError(f"{ruta} no es un JSON válido (línea {e.lineno}, columna {e.colno}): {e.msg}") from None
-    except OSError as e:
-        raise ConfigError(f"No se pudo leer {ruta}: {e.strerror}") from None
-
-    if not isinstance(datos, dict):
-        raise ConfigError(f"{ruta} debe contener un objeto JSON {{...}}")
-    engine = str(datos.get('engine') or 'mysql').strip().lower()
-    if engine not in ENGINES_SOPORTADOS:
-        raise ConfigError(f"engine '{engine}' no soportado (usar: {', '.join(ENGINES_SOPORTADOS)})")
-    try:
-        return set_conexion('admin', datos, origen=str(ruta))
-    except ConexionesError as e:
-        raise ConfigError(str(e)) from None
-
-
-def _describir(datos, origen):
-    return f"{datos['engine']}://{datos['user']}@{datos['host']}:{datos['port']}/{datos['database']} ({origen})"
+def _ruta_config(ruta_cli=None):
+    """Archivo de conexiones a usar: --config, TAURUS_CONEXIONES o conexiones.json."""
+    if ruta_cli:
+        return Path(ruta_cli)
+    if not CONGELADO or os.getenv(CONEXIONES_ENV, '').strip():
+        return ruta_conexiones()
+    # Ejecutable: junto al .exe o en la carpeta que lo contiene (la raíz del
+    # proyecto cuando el .exe está en superusuario-dist/).
+    carpeta = Path(sys.executable).resolve().parent
+    for candidata in (carpeta, carpeta.parent):
+        if (candidata / CONEXIONES_ARCHIVO).exists():
+            return candidata / CONEXIONES_ARCHIVO
+    raise ConfigError(
+        f"No se encontró {CONEXIONES_ARCHIVO} junto al ejecutable ({carpeta}) ni en {carpeta.parent}.\n"
+        f"  Copie ahí el {CONEXIONES_ARCHIVO} de las aplicaciones (ver LEEME.txt),\n"
+        f"  o indique otro archivo con --config <ruta.json>."
+    )
 
 
 def resolver_config(ruta_cli=None):
-    """Aplica la configuración de conexión y devuelve una descripción (sin password)."""
-    ruta = Path(ruta_cli) if ruta_cli else _directorio_base() / CONFIG_NOMBRE
-    if ruta_cli or ruta.exists():
-        return _describir(cargar_config_json(ruta), ruta.name)
-    if CONGELADO:
-        raise ConfigError(
-            f"No se encontró {CONFIG_NOMBRE} junto al ejecutable ({ruta.parent}).\n"
-            f"  Cree {CONFIG_NOMBRE} con las credenciales de taurus_admin (ver LEEME.txt),\n"
-            f"  o indique otro archivo con --config <ruta.json>."
-        )
+    """Aplica el archivo de conexiones y devuelve una descripción de la de taurus_admin (sin password)."""
+    ruta = _ruta_config(ruta_cli)
+    os.environ[CONEXIONES_ENV] = str(ruta)
     try:
-        return _describir(get_conexion('admin'), ruta_conexiones().name)
+        datos = get_conexion('admin')
     except ConexionesError as e:
         raise ConfigError(str(e)) from None
+    if datos['engine'] not in ENGINES_SOPORTADOS:
+        raise ConfigError(f"{ruta}: engine '{datos['engine']}' no soportado en 'admin' "
+                          f"(usar: {', '.join(ENGINES_SOPORTADOS)})")
+    return f"{datos['engine']}://{datos['user']}@{datos['host']}:{datos['port']}/{datos['database']} ({ruta.name})"
 
 
 # --- Bucle principal: una sola conexión a taurus_admin para toda la sesión ---
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Administración de usuarios del panel admin de Taurus WMS")
-    parser.add_argument('--config', help=f"JSON de conexión (default: {CONFIG_NOMBRE} junto al ejecutable)")
+    parser.add_argument('--config', help=f"archivo de conexiones (default: {CONEXIONES_ARCHIVO})")
     args = parser.parse_args(argv)
 
     try:
@@ -507,6 +581,7 @@ def main(argv=None):
         "2": lambda: cambiar_estado(conn, cursor, activar=False),
         "3": lambda: cambiar_estado(conn, cursor, activar=True),
         "4": lambda: listar(cursor),
+        "5": lambda: limpiar_auditoria(conn, cursor),
     }
 
     limpiar_pantalla()
@@ -516,7 +591,7 @@ def main(argv=None):
             mostrar_menu()
             opcion = input(f"  {Color.BOLD}Opción:{Color.RESET} ").strip()
 
-            if opcion == "5":
+            if opcion == "6":
                 info("Hasta luego.")
                 break
             accion = acciones.get(opcion)

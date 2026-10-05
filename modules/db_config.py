@@ -28,7 +28,6 @@ _CHARSETS = {'mysql': 'utf8mb4', 'postgresql': 'UTF8'}
 
 _conexiones = None
 _conexiones_ts = 0.0
-_conexiones_fijas = {}
 _db_engine = None
 _pools = {}
 
@@ -106,7 +105,7 @@ def _leer_conexiones():
     except FileNotFoundError:
         raise ConexionesError(
             f"No se encontró el archivo de conexiones ({ruta}). Cree {CONEXIONES_ARCHIVO} con las secciones "
-            f"admin, wms e intercambio (ver docs/inicio/configuracion.html), o indique otra ruta con la "
+            f"admin, wms e intercambio (ver docs/inicio/base-de-datos/conexiones.html), o indique otra ruta con la "
             f"variable de entorno {CONEXIONES_ENV}."
         ) from None
     except json.JSONDecodeError as e:
@@ -153,21 +152,10 @@ def get_conexiones():
 
 def get_conexion(base):
     """Datos de conexión de una base ('admin', 'wms' o 'intercambio')."""
-    if base in _conexiones_fijas:
-        return _conexiones_fijas[base].copy()
     conexiones = get_conexiones()
     if base not in conexiones:
         raise ConexionesError(f"{ruta_conexiones()}: falta la sección '{base}'")
     return conexiones[base].copy()
-
-
-def set_conexion(base, datos, origen='configuración'):
-    """Fija la conexión de una base sin leer el archivo.
-
-    Lo usa superusuario.exe, que trae sus propias credenciales de taurus_admin.
-    """
-    _conexiones_fijas[base] = normalizar_conexion(base, datos, origen)
-    return _conexiones_fijas[base].copy()
 
 
 def passwords_conexiones():

@@ -3,37 +3,54 @@ TAURUS WMS - Administración de Superusuarios (ejecutable portable)
 
 superusuario.exe gestiona los usuarios del panel admin (tabla admin_usuarios
 de taurus_admin): crear/actualizar, dar de baja, activar y listar.
+También limpia los registros antiguos de la auditoría del panel.
 No necesita Python instalado.
 
 CONFIGURACIÓN
 -------------
-1. Abrir superusuario.json (en esta carpeta, junto al .exe) con un editor de
-   texto.
-2. Completar las credenciales de la base taurus_admin (el archivo viene con
-   valores de ejemplo y "password": "CAMBIAR"):
+superusuario.exe usa el mismo archivo de conexiones que las aplicaciones
+(conexiones.json) y se conecta con los datos de su sección "admin":
 
    {
-     "engine": "mysql",          mysql | postgresql | sqlserver (default mysql)
-     "host": "localhost",
-     "port": 3306,               opcional (default 3306)
-     "user": "taurus",
-     "password": "...",
-     "database": "taurus_admin",
-     "charset": "utf8mb4"        opcional
+     "admin": {
+       "engine": "mysql",          mysql | postgresql | sqlserver (default mysql)
+       "host": "localhost",
+       "port": 3306,               opcional (default: el del motor)
+       "user": "taurus",
+       "password": "...",
+       "database": "taurus_admin",
+       "charset": "utf8mb4"        opcional
+     },
+     "wms": { ... },
+     "intercambio": { ... }        opcional
    }
 
-   host, user, password y database son obligatorios.
+El archivo se busca, en este orden:
+1. El indicado con --config:
+       superusuario.exe --config C:\ruta\conexiones.json
+2. El de la variable de entorno TAURUS_CONEXIONES.
+3. conexiones.json junto al .exe.
+4. conexiones.json en la carpeta que contiene a la del .exe (la raíz del
+   proyecto, si el .exe está en superusuario-dist/).
 
-3. Ejecutar superusuario.exe (doble clic o desde una consola).
+Con el .exe dentro de la instalación de Taurus WMS no hay que configurar nada:
+toma el conexiones.json de las aplicaciones. Para usarlo en otra carpeta o en
+otro equipo, copiar conexiones.json junto al .exe o usar --config.
 
-Para usar otro archivo de credenciales:
-    superusuario.exe --config C:\ruta\produccion.json
+Luego ejecutar superusuario.exe (doble clic o desde una consola).
+
+LIMPIAR LA AUDITORÍA
+--------------------
+La opción 5 del menú borra los registros de auditoría del panel hasta una
+fecha dada (DD/MM/AAAA), inclusive. Informa cuántos registros va a borrar,
+pide el usuario y la contraseña de un SUPERADMIN activo y una confirmación
+final. El borrado es definitivo. La limpieza queda registrada en la misma
+auditoría, a nombre del SUPERADMIN que la autorizó.
 
 SEGURIDAD
 ---------
-- superusuario.json contiene la contraseña de la BD en texto plano: no lo
-  comparta. El repositorio versiona este archivo solo con valores de ejemplo:
-  no suba (commit) la versión con las credenciales reales. Restrinja los
+- conexiones.json contiene las contraseñas de las BD en texto plano: no lo
+  comparta ni lo suba al repositorio (está en .gitignore). Restrinja los
   permisos del archivo al usuario que opera el sistema.
 - Las contraseñas de los usuarios se guardan con hash scrypt; deben tener al
   menos 8 caracteres.

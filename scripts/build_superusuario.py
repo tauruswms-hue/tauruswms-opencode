@@ -3,8 +3,8 @@ build_superusuario.py — Genera superusuario-dist/superusuario.exe (PyInstaller
 
 Empaqueta scripts/admin_superusuario.py en un único ejecutable de consola que
 no requiere Python instalado. Las credenciales NO van dentro del ejecutable:
-se leen en tiempo de ejecución de superusuario.json (junto al .exe) o de
---config <ruta.json>.
+se leen en tiempo de ejecución de la sección `admin` de conexiones.json (el de
+las apps, o uno junto al .exe) o de --config <ruta.json>.
 
 Uso (desde cualquier directorio, con el .venv del proyecto):
     pip install -r requirements-build.txt
@@ -12,8 +12,6 @@ Uso (desde cualquier directorio, con el .venv del proyecto):
 
 Salida:
     superusuario-dist/superusuario.exe    (versionado)
-    superusuario-dist/superusuario.json   (credenciales; versionado con valores de
-                                           plantilla, no commitear las reales)
 Los archivos intermedios quedan en build/ (gitignored).
 """
 import sys

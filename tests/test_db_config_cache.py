@@ -9,7 +9,6 @@ from modules import db_config
 
 @pytest.fixture
 def cache_limpia(monkeypatch):
-    monkeypatch.setattr(db_config, '_conexiones_fijas', {})
     db_config.clear_config_cache()
     yield
     db_config.clear_config_cache()
@@ -112,13 +111,6 @@ def test_archivo_faltante_indica_que_crear(tmp_path, monkeypatch, cache_limpia):
     monkeypatch.setenv(db_config.CONEXIONES_ENV, str(tmp_path / 'no-existe.json'))
     with pytest.raises(db_config.ConexionesError, match='secciones admin, wms e intercambio'):
         db_config.get_conexion('admin')
-
-
-def test_set_conexion_fija_una_base_sin_leer_el_archivo(tmp_path, monkeypatch, cache_limpia):
-    """superusuario.exe trae sus credenciales de taurus_admin y no necesita conexiones.json."""
-    monkeypatch.setenv(db_config.CONEXIONES_ENV, str(tmp_path / 'no-existe.json'))
-    db_config.set_conexion('admin', _conexion('exe'), origen='superusuario.json')
-    assert db_config.get_conexion('admin')['host'] == 'exe'
 
 
 def test_passwords_bd_bloquea_production_sin_archivo(tmp_path, monkeypatch, cache_limpia):
