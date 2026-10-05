@@ -21,6 +21,8 @@
             <li>Sus usuarios están en <code>taurus_admin.admin_usuarios</code>, separados de los usuarios del WMS
                 (<code>taurus_admin.usuarios</code>). Se gestionan con el
                 <a href="../inicio/base-de-datos/superusuario.html">ejecutable de superusuario</a>, no desde el panel.</li>
+            <li>Un <code>ADMIN</code> gestiona tenants y sus usuarios; el resto de las secciones es solo para
+                <code>SUPERADMIN</code>.</li>
             <li>El login admite 5 intentos cada 15 minutos por dirección IP.</li>
             <li>Usa su propia cookie de sesión, <code>taurus_admin_session</code>, independiente de la del WMS.</li>
         </ul>
@@ -50,11 +52,16 @@
                 <a href="../integraciones/intercambio.html">Intercambio</a> lo usa como clave
                 (<code>tenant_codigo</code>).</li>
             <li><strong>Datos</strong>: nombre, razón social, CUIT, dirección, teléfono y email.</li>
+            <li><strong>CUIT</strong>: es opcional y tiene el formato <code>99-99999999-9</code>. El formulario
+                agrega los guiones al escribir y no deja guardar otro formato; el servidor lo valida también en la
+                pantalla de parámetros. Se controla el formato, no el dígito verificador.</li>
             <li><strong>Desactivar</strong> es una baja lógica: el tenant queda inactivo y se puede volver a activar.</li>
         </ul>
 
         <h2>Usuarios del WMS</h2>
-        <p>Se administran desde el detalle de cada tenant.</p>
+        <p>Se administran desde el detalle de cada tenant. La sección <strong>Usuarios</strong>
+        (<code>/admin/usuarios</code>, solo <code>SUPERADMIN</code>) los lista todos juntos, con el código y el nombre
+        del tenant al que pertenece cada uno, y permite filtrarlos por tenant.</p>
         <ul>
             <li>El nombre de usuario es único en toda la instalación.</li>
             <li>La contraseña debe cumplir la política (mínimo 8 caracteres). Al editar, dejarla en blanco conserva
@@ -81,7 +88,7 @@
             <table>
                 <thead><tr><th>Parámetro</th><th>Uso</th></tr></thead>
                 <tbody>
-                    <tr><td>Datos de la empresa</td><td>Nombre, razón social, CUIT, dirección, teléfono, email.</td></tr>
+                    <tr><td>Datos de la empresa</td><td>Nombre, razón social, CUIT (formato <code>99-99999999-9</code>), dirección, teléfono, email.</td></tr>
                     <tr><td>Nombre del almacén</td><td>Identificación del depósito.</td></tr>
                     <tr><td>Métodos de picking</td><td>Habilitados para el tenant: <code>fifo</code>, <code>lifo</code>, <code>fefo</code>,
                         <code>libre</code>. Si no se marca ninguno, queda <code>fifo</code>.</td></tr>
@@ -100,10 +107,17 @@
 
         <h2>Configuración</h2>
         <p>Tabla de pares clave y valor para parámetros generales de la instalación. Las claves se guardan en
-        mayúsculas y son únicas.</p>
+        mayúsculas, son únicas y no se pueden cambiar después del alta. De fábrica trae <code>app_name</code>,
+        <code>app_version</code> y <code>mantenimiento</code>.</p>
+        <div class="aviso pendiente">
+            <p><strong>Hoy es solo un registro.</strong> Ninguna parte de la aplicación lee estas claves: cambiar
+            un valor, incluido <code>mantenimiento</code>, no modifica el comportamiento del sistema.</p>
+        </div>
+        <p>El valor de las claves que contienen <code>PASSWORD</code>, <code>SECRET</code> o <code>TOKEN</code> no
+        se muestra: al editarlas el campo aparece vacío, y dejarlo en blanco conserva el valor actual.</p>
         <div class="aviso">
             <p><strong>Las conexiones a las bases no se configuran acá.</strong> Se definen en el archivo
-            <code>conexiones.json</code> del servidor. Ver <a href="../inicio/configuracion.html">Configuración</a>.</p>
+            <code>conexiones.json</code> del servidor. Ver <a href="../inicio/base-de-datos/conexiones.html">Configuración de conexiones</a>.</p>
         </div>
 
         <h2>Intercambio</h2>
@@ -119,12 +133,46 @@
 
         <h2>Auditoría</h2>
         <p>El panel registra en <code>audit_logs</code> los ingresos (correctos y fallidos), los accesos a cada
-        sección, las altas, modificaciones y bajas, y los errores, con usuario, dirección IP y navegador.</p>
+        sección, las altas, modificaciones y bajas, los procesos y los errores, con usuario, dirección IP y
+        navegador.</p>
         <ul>
-            <li>Filtros por acción, módulo y rango de fechas.</li>
-            <li>El rango es de una semana como mínimo; sin fechas, muestra los últimos 7 días.</li>
-            <li>50 registros por página.</li>
+            <li>La pantalla muestra cada registro en texto: acción (Ingreso, Ingreso fallido, Alta, Modificación,
+                Baja, Proceso, Error), sección del panel y detalle, con el nombre del tenant, usuario o rol
+                afectado en lugar de su ID. En la tabla se siguen guardando los códigos y el detalle en JSON.</li>
+            <li>Filtros por acción, sección y rango de fechas. Sin fechas, muestra los últimos 7 días.</li>
+            <li>Las consultas de pantalla (cada apertura de una sección) no se listan salvo que se marque
+                <strong>Incluir consultas de pantalla</strong>.</li>
+            <li>50 registros por página; arriba de la tabla se informa el total del período.</li>
+            <li>El botón <strong>Cómo leer esta pantalla</strong> despliega una ayuda que explica cada columna,
+                acción, sección y filtro.</li>
+            <li>Solo cubre lo que se hace en el panel. Los movimientos de stock del WMS se consultan en los
+                reportes del WMS (<code>/reportes</code>).</li>
         </ul>
+
+        <h3>Cómo se lee un registro</h3>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Columna</th><th>Qué muestra</th></tr></thead>
+                <tbody>
+                    <tr><td>Fecha y hora</td><td>Momento del hecho, según el reloj del servidor.</td></tr>
+                    <tr><td>Usuario</td><td>Usuario del panel que lo hizo. Vacío si no había nadie identificado, como en
+                        un ingreso fallido.</td></tr>
+                    <tr><td>Acción</td><td>Ingreso, Ingreso fallido, Salida, Alta, Modificación, Baja, Proceso, Error o
+                        Consulta de pantalla.</td></tr>
+                    <tr><td>Sección</td><td>Parte del panel donde ocurrió.</td></tr>
+                    <tr><td>Detalle</td><td>El registro afectado. Indica qué cambió, no los valores anteriores y
+                        nuevos.</td></tr>
+                    <tr><td>Equipo (IP)</td><td>Dirección del equipo desde el que se hizo.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h3>Limpieza</h3>
+        <p>La tabla crece con el uso y el panel no borra registros. La limpieza se hace con la opción
+        <strong>Limpiar auditoría</strong> del
+        <a href="../inicio/base-de-datos/superusuario.html#limpiar-auditoria">ejecutable de superusuario</a>: borra
+        hasta una fecha dada, la debe autorizar un <code>SUPERADMIN</code> con su contraseña y queda registrada en
+        la misma auditoría como una Baja en la sección Auditoría.</p>
 
         <div class="aviso">
             <p><strong>IDs en las URLs.</strong> Las rutas de tenants y de sus usuarios usan el ID del tenant

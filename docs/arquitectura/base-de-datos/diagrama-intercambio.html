@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Diagrama de taurus_intercambio — Taurus WMS</title>
+    <link rel="stylesheet" href="../../assets/docs.css">
+</head>
+<!-- Página generada por docs/generar_diagramas_bd.py: no editar a mano. -->
+<body data-root="../../" data-page="arquitectura/base-de-datos/diagrama-intercambio.html">
+<div class="layout">
+    <nav id="sidebar"></nav>
+    <main class="content">
+        <p class="migas">Arquitectura · Base de datos</p>
+        <h1>Diagrama de taurus_intercambio</h1>
+        <p class="bajada">Tablas de la interfase con sistemas externos.</p>
+
+        <p>7 tablas, sin relaciones entre ellas. El script completo, con todas las columnas, está en
+        <a href="../../inicio/base-de-datos/taurus-intercambio.html">taurus_intercambio</a>.</p>
+
+        <h2>Diagrama</h2>
+        <p>Cada caja es una tabla, con su clave primaria (<strong>PK</strong>) y la cantidad de columnas restantes.
+        No hay líneas porque estas tablas no se relacionan entre sí.</p>
+        <div class="diagrama ancho">
+<svg class="der ajustar" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 782 294" width="782" height="294" role="img" aria-label="Diagrama de tablas y relaciones de taurus_intercambio">
+<defs></defs>
+<g class="tabla">
+<rect class="caja" x="16" y="16" width="230" height="70" rx="5"/>
+<path class="titulo" d="M16,42 v-21 a5,5 0 0 1 5,-5 h220 a5,5 0 0 1 5,5 v21 z"/>
+<text class="nombre" x="26" y="33">intercambio_materiales</text>
+<text class="col" x="26" y="56">id</text>
+<text class="marca" x="232" y="56" text-anchor="end">PK</text>
+<text class="resto" x="26" y="75">+ 24 columnas más</text>
+</g>
+<g class="tabla">
+<rect class="caja" x="276" y="16" width="230" height="70" rx="5"/>
+<path class="titulo" d="M276,42 v-21 a5,5 0 0 1 5,-5 h220 a5,5 0 0 1 5,5 v21 z"/>
+<text class="nombre" x="286" y="33">intercambio_rutas</text>
+<text class="col" x="286" y="56">id</text>
+<text class="marca" x="492" y="56" text-anchor="end">PK</text>
+<text class="resto" x="286" y="75">+ 11 columnas más</text>
+</g>
+<g class="tabla">
+<rect class="caja" x="536" y="16" width="230" height="70" rx="5"/>
+<path class="titulo" d="M536,42 v-21 a5,5 0 0 1 5,-5 h220 a5,5 0 0 1 5,5 v21 z"/>
+<text class="nombre" x="546" y="33">intercambio_transportes</text>
+<text class="col" x="546" y="56">id</text>
+<text class="marca" x="752" y="56" text-anchor="end">PK</text>
+<text class="resto" x="546" y="75">+ 16 columnas más</text>
+</g>
+<g class="tabla">
+<rect class="caja" x="16" y="112" width="230" height="70" rx="5"/>
+<path class="titulo" d="M16,138 v-21 a5,5 0 0 1 5,-5 h220 a5,5 0 0 1 5,5 v21 z"/>
+<text class="nombre" x="26" y="129">intercambio_transporte_rutas</text>
+<text class="col" x="26" y="152">id</text>
+<text class="marca" x="232" y="152" text-anchor="end">PK</text>
+<text class="resto" x="26" y="171">+ 11 columnas más</text>
+</g>
+<g class="tabla">
+<rect class="caja" x="276" y="112" width="230" height="70" rx="5"/>
+<path class="titulo" d="M276,138 v-21 a5,5 0 0 1 5,-5 h220 a5,5 0 0 1 5,5 v21 z"/>
+<text class="nombre" x="286" y="129">intercambio_clientes</text>
+<text class="col" x="286" y="152">id</text>
+<text class="marca" x="492" y="152" text-anchor="end">PK</text>
+<text class="resto" x="286" y="171">+ 21 columnas más</text>
+</g>
+<g class="tabla">
+<rect class="caja" x="536" y="112" width="230" height="70" rx="5"/>
+<path class="titulo" d="M536,138 v-21 a5,5 0 0 1 5,-5 h220 a5,5 0 0 1 5,5 v21 z"/>
+<text class="nombre" x="546" y="129">intercambio_pedidos</text>
+<text class="col" x="546" y="152">id</text>
+<text class="marca" x="752" y="152" text-anchor="end">PK</text>
+<text class="resto" x="546" y="171">+ 19 columnas más</text>
+</g>
+<g class="tabla">
+<rect class="caja" x="16" y="208" width="230" height="70" rx="5"/>
+<path class="titulo" d="M16,234 v-21 a5,5 0 0 1 5,-5 h220 a5,5 0 0 1 5,5 v21 z"/>
+<text class="nombre" x="26" y="225">intercambio_log</text>
+<text class="col" x="26" y="248">id</text>
+<text class="marca" x="232" y="248" text-anchor="end">PK</text>
+<text class="resto" x="26" y="267">+ 7 columnas más</text>
+</g>
+</svg>
+        </div>
+
+        <h2>A qué tabla del WMS se aplica cada una</h2>
+        <p>Al procesar un registro, el id del registro resultante en <code>taurus_wms</code> se guarda en la
+        columna indicada. Son bases distintas, así que no es una clave foránea.</p>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Tabla de intercambio</th><th>Se aplica sobre (taurus_wms)</th><th>Columna con el id resultante</th></tr></thead>
+                <tbody>
+                    <tr><td><code>intercambio_materiales</code></td><td><code>materiales.id</code></td><td><code>id_material_wms</code></td></tr>
+                    <tr><td><code>intercambio_rutas</code></td><td><code>rutas.id_ruta</code></td><td><code>id_ruta_wms</code></td></tr>
+                    <tr><td><code>intercambio_transportes</code></td><td><code>transportes.id_transporte</code></td><td><code>id_transporte_wms</code></td></tr>
+                    <tr><td><code>intercambio_transporte_rutas</code></td><td><code>transporte_rutas</code></td><td>—</td></tr>
+                    <tr><td><code>intercambio_clientes</code></td><td><code>clientes.id_cliente</code></td><td><code>id_cliente_wms</code></td></tr>
+                    <tr><td><code>intercambio_pedidos</code></td><td><code>pedidos_cabecera.id_pedido</code></td><td><code>id_pedido_wms</code></td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Para tener en cuenta</h2>
+        <ul>
+            <li><strong>No hay relaciones entre estas tablas.</strong> Cada una es una cola independiente: un
+                registro es una operación (alta, modificación o baja) que el sistema externo deja para que el WMS
+                la aplique.</li>
+            <li><strong>Las referencias son por código, no por id.</strong> Un pedido indica su cliente con
+                <code>cliente_codigo</code>, su ruta con <code>ruta_nombre</code>, etc. El proceso los resuelve
+                contra <a href="diagrama-wms.html">taurus_wms</a> al aplicar el registro.</li>
+            <li><strong><code>tenant_codigo</code></strong> se resuelve contra <code>tenants.codigo</code> de
+                <a href="diagrama-admin.html">taurus_admin</a>.</li>
+            <li><code>intercambio_log</code> guarda el historial de ejecuciones del proceso.</li>
+        </ul>
+        <p>El funcionamiento completo está en <a href="../../integraciones/intercambio.html">Intercambio</a>.</p>
+
+        <h2>Mantener el diagrama al día</h2>
+        <p>Esta página se genera desde <code>modules/schema_generator.py</code>. Después de un cambio de schema:</p>
+<pre><code>python docs/generar_diagramas_bd.py</code></pre>
+        <p>Las relaciones sin clave foránea declarada no salen del schema: se mantienen a mano en <code>RELACIONES_LOGICAS</code>, dentro de ese script.</p>
+
+        <div id="pager"></div>
+    </main>
+</div>
+<script src="../../assets/docs.js"></script>
+</body>
+</html>

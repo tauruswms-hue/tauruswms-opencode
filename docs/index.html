@@ -35,6 +35,17 @@
         <p>Las tres comparten el mismo <code>.env</code>, el archivo de conexiones (<code>conexiones.json</code>) y
         la base administrativa <code>taurus_admin</code>.</p>
 
+        <h2>Cómo buscar</h2>
+        <ul>
+            <li><strong>En toda la documentación:</strong> el campo de la barra superior, disponible en todas las
+                páginas. La tecla <code>/</code> lleva el cursor ahí.</li>
+            <li><strong>En una sola sección:</strong> el campo de cada tarjeta del mapa de abajo, o la lupa que
+                está junto al nombre de cada sección en el menú lateral.</li>
+        </ul>
+        <p>Se puede escribir más de una palabra: aparecen los lugares donde están todas. No distingue mayúsculas
+        ni acentos. Cada resultado lleva al título de la página donde está el texto. Con las flechas se recorren
+        los resultados y <code>Esc</code> cierra la lista.</p>
+
         <h2>Mapa de la documentación</h2>
         <p>Cada página lleva su estado: <span class="estado completa">Completa</span>,
         <span class="estado borrador">Borrador</span> (contenido parcial) o
@@ -47,6 +58,8 @@
             <li>Ajustar <code>data-root</code> y <code>data-page</code> en el <code>&lt;body&gt;</code>.</li>
             <li>Registrar la página en <code>NAV</code>, dentro de <code>docs/assets/docs.js</code>, con su
                 estado. El menú lateral, este mapa y los enlaces anterior/siguiente se generan desde ahí.</li>
+            <li>Regenerar el índice del buscador: <code>python docs/generar_buscador.py</code>. Hay que hacerlo
+                también al cambiar el texto de una página existente.</li>
         </ol>
         <p>Son páginas HTML estáticas: se abren directamente desde el disco, sin servidor ni paso de
         compilación.</p>

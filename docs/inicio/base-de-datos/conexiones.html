@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Configuración de conexiones — Taurus WMS</title>
+    <link rel="stylesheet" href="../../assets/docs.css">
+</head>
+<body data-root="../../" data-page="inicio/base-de-datos/conexiones.html">
+<div class="layout">
+    <nav id="sidebar"></nav>
+    <main class="content">
+        <p class="migas">Primeros pasos · Instalación · Base de datos</p>
+        <h1>Configuración de conexiones</h1>
+        <p class="bajada"><code>conexiones.json</code> tiene el acceso a las tres bases, con una sección por base.
+        Lo leen el WMS, el panel admin, <code>migrate.py</code>, <code>generar_schema.py</code>,
+        <code>procesar_intercambio.py</code> y <code>superusuario.exe</code>. No se sube al repositorio.</p>
+
+        <p>Es el paso que sigue a la creación de las <a href="index.html">bases</a>. El resto de la configuración
+        (entorno y secretos de sesión) está en <a href="../configuracion.html">Configuración General</a>.</p>
+
+        <h2>El archivo</h2>
+        <p><code>conexiones.json</code> está en la raíz del proyecto. Hay que completar las credenciales de cada
+        base:</p>
+<pre><code>{
+  "admin": {
+    "engine": "mysql",
+    "host": "localhost",
+    "port": 3306,
+    "user": "taurus_admin",
+    "password": "...",
+    "database": "taurus_admin"
+  },
+  "wms": {
+    "engine": "mysql",
+    "host": "localhost",
+    "port": 3306,
+    "user": "taurus_wms",
+    "password": "...",
+    "database": "taurus_wms"
+  },
+  "intercambio": {
+    "engine": "mysql",
+    "host": "localhost",
+    "port": 3306,
+    "user": "taurus_intercambio",
+    "password": "...",
+    "database": "taurus_intercambio"
+  }
+}</code></pre>
+
+        <h2>Secciones</h2>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Sección</th><th>Base</th><th>Obligatoria</th></tr></thead>
+                <tbody>
+                    <tr><td><code>admin</code></td><td><code>taurus_admin</code></td><td>Sí</td></tr>
+                    <tr><td><code>wms</code></td><td><code>taurus_wms</code></td><td>Sí</td></tr>
+                    <tr><td><code>intercambio</code></td><td><code>taurus_intercambio</code></td>
+                        <td>Solo si se usa <a href="../../integraciones/intercambio.html">Intercambio</a>.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Claves de cada sección</h2>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Clave</th><th>Obligatoria</th><th>Valores</th></tr></thead>
+                <tbody>
+                    <tr><td><code>engine</code></td><td>No</td><td><code>mysql</code> (por defecto).</td></tr>
+                    <tr><td><code>host</code></td><td>Sí</td><td>Servidor de la base.</td></tr>
+                    <tr><td><code>port</code></td><td>No</td><td>Numérico. Por defecto, 3306.</td></tr>
+                    <tr><td><code>user</code></td><td>Sí</td><td>Usuario de la base.</td></tr>
+                    <tr><td><code>password</code></td><td>Sí</td><td>Contraseña de la base.</td></tr>
+                    <tr><td><code>database</code></td><td>Sí</td><td>Nombre de la base.</td></tr>
+                    <tr><td><code>charset</code></td><td>No</td><td>Por defecto, <code>utf8mb4</code>.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Comportamiento</h2>
+        <ul>
+            <li><strong>Es la única fuente.</strong> Las conexiones no se leen del <code>.env</code> ni de la base.</li>
+            <li><strong>Si el archivo falta o está incompleto</strong>, la aplicación informa qué falta. En producción
+                no arranca.</li>
+            <li><strong>Los cambios se toman sin reiniciar.</strong> El archivo se relee cada 30 segundos; si cambió,
+                la aplicación reconecta con los valores nuevos. Si en ese momento no se puede leer, sigue con las
+                conexiones que ya tenía.</li>
+            <li><strong>Otra ubicación.</strong> Para tenerlo fuera de la carpeta del proyecto, indicar la ruta en la
+                variable de entorno <code>TAURUS_CONEXIONES</code> (ver
+                <a href="../configuracion.html">Configuración General</a>).</li>
+        </ul>
+
+        <div class="aviso peligro">
+            <p><strong>Las contraseñas están en texto plano.</strong> Restringir la lectura del archivo a la cuenta
+            que ejecuta las aplicaciones, no copiarlo ni subirlo al repositorio (está en <code>.gitignore</code>), y
+            usar para cada base un usuario de MySQL propio con los permisos mínimos.</p>
+        </div>
+
+        <div class="aviso">
+            <p><strong>superusuario.exe usa este mismo archivo.</strong> El
+            <a href="superusuario.html">ejecutable de superusuario</a> se conecta con la sección
+            <code>admin</code> de <code>conexiones.json</code>.</p>
+        </div>
+
+        <div id="pager"></div>
+    </main>
+</div>
+<script src="../../assets/docs.js"></script>
+</body>
+</html>

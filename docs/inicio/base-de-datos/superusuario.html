@@ -10,16 +10,18 @@
 <div class="layout">
     <nav id="sidebar"></nav>
     <main class="content">
-        <p class="migas">Primeros pasos · Instalación · Base de datos</p>
+        <p class="migas">Primeros pasos · Instalación · Base de datos · Configuración de conexiones</p>
         <h1>Superusuario (exe)</h1>
-        <p class="bajada"><code>superusuario.exe</code> gestiona por consola los usuarios del panel admin. No
-        necesita Python instalado y es la forma de crear el primer SUPERADMIN en producción.</p>
+        <p class="bajada"><code>superusuario.exe</code> gestiona por consola los usuarios del panel admin y
+        limpia su auditoría. No necesita Python instalado y es la forma de crear el primer SUPERADMIN en
+        producción.</p>
 
         <p>Es el paso que sigue a la creación de <a href="taurus-admin.html">taurus_admin</a>: el script de la
         base no crea usuarios, así que el primero se da de alta con este programa.</p>
 
-        <p>Trabaja sobre la tabla <code>admin_usuarios</code> de <code>taurus_admin</code>. No toca los usuarios
-        del WMS (<code>taurus_admin.usuarios</code>), que se administran desde el panel.</p>
+        <p>Trabaja sobre las tablas <code>admin_usuarios</code> y <code>audit_logs</code> de
+        <code>taurus_admin</code>. No toca los usuarios del WMS (<code>taurus_admin.usuarios</code>), que se
+        administran desde el panel.</p>
 
         <h2>Archivos</h2>
         <div class="tabla-scroll">
@@ -27,27 +29,35 @@
                 <thead><tr><th>Archivo (<code>superusuario-dist/</code>)</th><th>Qué es</th></tr></thead>
                 <tbody>
                     <tr><td><code>superusuario.exe</code></td><td>El ejecutable.</td></tr>
-                    <tr><td><code>superusuario.json</code></td><td>Credenciales de la base. Viene con valores de ejemplo.</td></tr>
                     <tr><td><code>LEEME.txt</code></td><td>Instrucciones resumidas para quien recibe la carpeta.</td></tr>
                 </tbody>
             </table>
         </div>
 
         <h2>Configurar la conexión</h2>
-        <p>Editar <code>superusuario.json</code>, que debe estar en la misma carpeta que el <code>.exe</code>:</p>
+        <p>El ejecutable usa el mismo <a href="conexiones.html">archivo de conexiones</a> que las
+        aplicaciones, <code>conexiones.json</code>, y se conecta con los datos de su sección <code>admin</code>:</p>
 <pre><code>{
-  "engine": "mysql",
-  "host": "localhost",
-  "port": 3306,
-  "user": "taurus",
-  "password": "CAMBIAR",
-  "database": "taurus_admin"
+  "admin": {
+    "engine": "mysql",
+    "host": "localhost",
+    "port": 3306,
+    "user": "taurus",
+    "password": "...",
+    "database": "taurus_admin"
+  },
+  "wms": { ... },
+  "intercambio": { ... }
 }</code></pre>
+        <p>Con el <code>.exe</code> dentro de la instalación (<code>superusuario-dist/</code>) no hay que configurar
+        nada: toma el <code>conexiones.json</code> de la raíz. Para usarlo en otra carpeta o en otro equipo, copiar
+        <code>conexiones.json</code> junto al <code>.exe</code> o indicar su ruta con <code>--config</code>.</p>
+        <p>Claves de la sección <code>admin</code>:</p>
         <div class="tabla-scroll">
             <table>
                 <thead><tr><th>Clave</th><th>Obligatoria</th><th>Valores</th></tr></thead>
                 <tbody>
-                    <tr><td><code>engine</code></td><td>No</td><td><code>mysql</code> (default) | <code>postgresql</code> | <code>sqlserver</code></td></tr>
+                    <tr><td><code>engine</code></td><td>No</td><td><code>mysql</code> (default) | <code>postgresql</code> | <code>sqlserver</code> (<code>sqlite</code> no está soportado por el ejecutable)</td></tr>
                     <tr><td><code>host</code></td><td>Sí</td><td>Servidor de la base.</td></tr>
                     <tr><td><code>port</code></td><td>No</td><td>Numérico. Si falta, el del motor.</td></tr>
                     <tr><td><code>user</code></td><td>Sí</td><td>Usuario de la base.</td></tr>
@@ -57,17 +67,22 @@
                 </tbody>
             </table>
         </div>
-        <p>Una clave desconocida, una obligatoria vacía o un JSON mal formado detienen el programa con un mensaje
-        que indica el problema.</p>
-        <p>Para usar otro archivo de credenciales:</p>
-<pre><code>superusuario.exe --config C:\ruta\produccion.json</code></pre>
+        <p>El archivo se valida completo, igual que en las aplicaciones: una sección o clave desconocida, una
+        obligatoria vacía, la falta de la sección <code>wms</code> o un JSON mal formado detienen el programa con
+        un mensaje que indica el problema.</p>
+        <p>Para usar otro archivo de conexiones:</p>
+<pre><code>superusuario.exe --config C:\ruta\conexiones.json</code></pre>
 
-        <h3>Orden en que se busca la conexión</h3>
+        <h3>Orden en que se busca el archivo</h3>
         <ol>
-            <li>El archivo indicado con <code>--config</code>.</li>
-            <li><code>superusuario.json</code> junto al ejecutable.</li>
-            <li>Solo al ejecutar el script con Python: la sección <code>admin</code> de <code>conexiones.json</code>.</li>
+            <li>El indicado con <code>--config</code>.</li>
+            <li>El de la variable de entorno <code>TAURUS_CONEXIONES</code>.</li>
+            <li><code>conexiones.json</code> junto al ejecutable.</li>
+            <li><code>conexiones.json</code> en la carpeta que contiene a la del ejecutable (la raíz del proyecto,
+                si el <code>.exe</code> está en <code>superusuario-dist/</code>).</li>
         </ol>
+        <p>Al ejecutar el script con Python (<code>python scripts/admin_superusuario.py</code>), los pasos 3 y 4
+        se reemplazan por el <code>conexiones.json</code> de la raíz del proyecto.</p>
 
         <h2>Menú</h2>
         <div class="tabla-scroll">
@@ -80,12 +95,32 @@
                     <tr><td>2 — Dar de baja</td><td>Baja lógica: el usuario queda inactivo, no se borra.</td></tr>
                     <tr><td>3 — Activar</td><td>Revierte la baja.</td></tr>
                     <tr><td>4 — Listar</td><td>Todos los usuarios, o filtrados por usuario, nombre o email.</td></tr>
-                    <tr><td>5 — Salir</td><td>También con Ctrl+C.</td></tr>
+                    <tr><td>5 — Limpiar auditoría</td><td>Borra los registros de auditoría del panel hasta una fecha,
+                        inclusive. Ver <a href="#limpiar-auditoria">más abajo</a>.</td></tr>
+                    <tr><td>6 — Salir</td><td>También con Ctrl+C.</td></tr>
                 </tbody>
             </table>
         </div>
         <p>Toda escritura pide confirmación (S/N) y se guarda en el momento. Si la base falla, se deshace la
         operación, se informa el error y el menú sigue disponible.</p>
+
+        <h2 id="limpiar-auditoria">Limpiar la auditoría</h2>
+        <p>La opción 5 borra de <code>audit_logs</code> los registros de la
+        <a href="../../administracion/panel-admin.html">auditoría del panel</a> hasta la fecha que se indique,
+        inclusive. Sirve para que la tabla no crezca sin límite.</p>
+        <ol>
+            <li>Se ingresa la fecha con formato <code>DD/MM/AAAA</code>. No puede ser posterior a hoy.</li>
+            <li>El programa informa cuántos registros se van a borrar.</li>
+            <li>Pide el usuario y la contraseña de un <code>SUPERADMIN</code> activo, que autoriza la operación.</li>
+            <li>Pide una confirmación final (S/N) y borra.</li>
+        </ol>
+        <p>La limpieza queda registrada en la misma auditoría como una <strong>Baja</strong> en la sección
+        <strong>Auditoría</strong>, a nombre de quien la autorizó, con la fecha hasta la que se borró y la cantidad de
+        registros eliminados. Ese registro no se borra en la misma operación.</p>
+        <div class="aviso peligro">
+            <p><strong>El borrado es definitivo.</strong> Los registros eliminados no se pueden recuperar; si hay que
+            conservarlos, hacer antes una copia de la tabla <code>audit_logs</code>.</p>
+        </div>
 
         <h2>Validaciones</h2>
         <ul>
@@ -97,10 +132,9 @@
 
         <h2>Seguridad</h2>
         <div class="aviso peligro">
-            <p><strong><code>superusuario.json</code> guarda la contraseña de la base en texto plano.</strong> El
-            repositorio lo versiona solo con valores de ejemplo: no subir la versión con credenciales reales. En el
-            servidor, conviene una copia fuera del repositorio usada con <code>--config</code> y con permisos
-            restringidos al usuario que opera el sistema.</p>
+            <p><strong><code>conexiones.json</code> guarda las contraseñas de las bases en texto plano.</strong>
+            No copiarlo ni subirlo al repositorio (está en <code>.gitignore</code>). Si se lleva el ejecutable a
+            otro equipo, la copia del archivo debe tener permisos restringidos al usuario que opera el sistema.</p>
         </div>
         <p>Las contraseñas de los usuarios se guardan con hash <code>scrypt</code>, igual que en el login del panel.</p>
 

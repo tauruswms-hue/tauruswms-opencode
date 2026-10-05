@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Diagrama de taurus_admin — Taurus WMS</title>
+    <link rel="stylesheet" href="../../assets/docs.css">
+</head>
+<!-- Página generada por docs/generar_diagramas_bd.py: no editar a mano. -->
+<body data-root="../../" data-page="arquitectura/base-de-datos/diagrama-admin.html">
+<div class="layout">
+    <nav id="sidebar"></nav>
+    <main class="content">
+        <p class="migas">Arquitectura · Base de datos</p>
+        <h1>Diagrama de taurus_admin</h1>
+        <p class="bajada">Tablas de la base administrativa y cómo se relacionan: usuarios, tenants, roles y auditoría.</p>
+
+        <p>7 tablas, 1 relación declarada como clave foránea y 3 relaciones lógicas. El script completo, con todas las columnas, está en
+        <a href="../../inicio/base-de-datos/taurus-admin.html">taurus_admin</a>.</p>
+
+        <h2>Cómo leer los diagramas</h2>
+        <ul>
+            <li>Cada caja es una tabla. Se muestran su clave primaria (<strong>PK</strong>) y las columnas que
+                participan en una relación; el resto se resume en "+ N columnas más".</li>
+            <li>Cada línea es una relación, y <strong>la flecha apunta a la tabla referenciada</strong>: va de la
+                columna que guarda el dato a la clave que identifica al registro.</li>
+            <li><strong>FK</strong> y línea continua: clave foránea declarada en la base. <strong>REF</strong> y
+                línea punteada: relación que usa la aplicación pero que la base no controla.</li>
+            <li>Todas las líneas que llegan a una misma tabla tienen el mismo color, que es el de la franja a la
+                derecha de esa tabla.</li>
+            <li>Las tablas se leen de izquierda a derecha: cada una está a la derecha de las que referencia.</li>
+            <li>Al pasar el mouse sobre una línea se resalta y muestra qué columnas une.</li>
+        </ul>
+
+        <h2>Diagrama</h2>
+        <div class="diagrama ancho">
+<svg class="der ajustar" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 473" width="576" height="473" role="img" aria-label="Diagrama de tablas y relaciones de taurus_admin">
+<defs><marker id="flecha-admin-0" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="9" markerHeight="9" orient="auto"><path class="punta c0" d="M0,5 L10,1 L10,9 z"/></marker><marker id="flecha-admin-1" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="9" markerHeight="9" orient="auto"><path class="punta c1" d="M0,5 L10,1 L10,9 z"/></marker><marker id="flecha-admin-2" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="9" markerHeight="9" orient="auto"><path class="punta c2" d="M0,5 L10,1 L10,9 z"/></marker></defs>
+<path class="rel c0" d="M246,70 C288,70.5 288,89.5 330,89.5" marker-start="url(#flecha-admin-0)"><title>usuarios.tenant_id → tenants.id</title></path>
+<path class="rel c2 logica" d="M246,282 C288,281.5 288,70.5 330,70.5" marker-start="url(#flecha-admin-2)"><title>usuarios.rol → roles.nombre (sin clave foránea declarada)</title></path>
+<path class="rel c2 logica" d="M246,282 C288,281.5 288,300.5 330,300.5" marker-start="url(#flecha-admin-2)"><title>roles_rutas.rol → roles.nombre (sin clave foránea declarada)</title></path>
+<path class="rel c1 logica" d="M246,166 C288,166.5 288,204.5 330,204.5" marker-start="url(#flecha-admin-1)"><title>audit_logs.usuario_id → admin_usuarios.id (sin clave foránea declarada)</title></path>
+<g class="tabla">
+<rect class="caja" x="16" y="131" width="230" height="70" rx="5"/>
+<path class="titulo" d="M16,157 v-21 a5,5 0 0 1 5,-5 h220 a5,5 0 0 1 5,5 v21 z"/>
+<text class="nombre" x="26" y="148">admin_usuarios</text>
+<rect class="franja c1" x="240" y="160" width="4" height="38" rx="2"/>
+<text class="col" x="26" y="171">id</text>
+<text class="marca" x="232" y="171" text-anchor="end">PK</text>
+<text class="resto" x="26" y="190">+ 9 columnas más</text>
+</g>
+<g class="tabla">
+<rect class="caja" x="16" y="227" width="230" height="89" rx="5"/>
+<path class="titulo" d="M16,253 v-21 a5,5 0 0 1 5,-5 h220 a5,5 0 0 1 5,5 v21 z"/>
+<text class="nombre" x="26" y="244">roles</text>
+<rect class="franja c2" x="240" y="256" width="4" height="57" rx="2"/>
+<text class="col" x="26" y="267">id</text>
+<text class="marca" x="232" y="267" text-anchor="end">PK</text>
+<text class="col" x="26" y="286">nombre</text>
+<text class="resto" x="26" y="305">+ 4 columnas más</text>
+</g>
+<g class="tabla">
+<rect class="caja" x="16" y="35" width="230" height="70" rx="5"/>
+<path class="titulo" d="M16,61 v-21 a5,5 0 0 1 5,-5 h220 a5,5 0 0 1 5,5 v21 z"/>
+<text class="nombre" x="26" y="52">tenants</text>
+<rect class="franja c0" x="240" y="64" width="4" height="38" rx="2"/>
+<text class="col" x="26" y="75">id</text>
+<text class="marca" x="232" y="75" text-anchor="end">PK</text>
+<text class="resto" x="26" y="94">+ 21 columnas más</text>
+</g>
+<g class="tabla">
+<rect class="caja" x="330" y="16" width="230" height="108" rx="5"/>
+<path class="titulo" d="M330,42 v-21 a5,5 0 0 1 5,-5 h220 a5,5 0 0 1 5,5 v21 z"/>
+<text class="nombre" x="340" y="33">usuarios</text>
+<text class="col" x="340" y="56">id</text>
+<text class="marca" x="546" y="56" text-anchor="end">PK</text>
+<text class="col" x="340" y="75">rol</text>
+<text class="marca" x="546" y="75" text-anchor="end">REF</text>
+<text class="col" x="340" y="94">tenant_id</text>
+<text class="marca" x="546" y="94" text-anchor="end">FK</text>
+<text class="resto" x="340" y="113">+ 9 columnas más</text>
+</g>
+<g class="tabla">
+<rect class="caja" x="16" y="387" width="230" height="70" rx="5"/>
+<path class="titulo" d="M16,413 v-21 a5,5 0 0 1 5,-5 h220 a5,5 0 0 1 5,5 v21 z"/>
+<text class="nombre" x="26" y="404">configuracion</text>
+<text class="col" x="26" y="427">id</text>
+<text class="marca" x="232" y="427" text-anchor="end">PK</text>
+<text class="resto" x="26" y="446">+ 4 columnas más</text>
+</g>
+<g class="tabla">
+<rect class="caja" x="330" y="150" width="230" height="89" rx="5"/>
+<path class="titulo" d="M330,176 v-21 a5,5 0 0 1 5,-5 h220 a5,5 0 0 1 5,5 v21 z"/>
+<text class="nombre" x="340" y="167">audit_logs</text>
+<text class="col" x="340" y="190">id</text>
+<text class="marca" x="546" y="190" text-anchor="end">PK</text>
+<text class="col" x="340" y="209">usuario_id</text>
+<text class="marca" x="546" y="209" text-anchor="end">REF</text>
+<text class="resto" x="340" y="228">+ 7 columnas más</text>
+</g>
+<g class="tabla">
+<rect class="caja" x="330" y="265" width="230" height="70" rx="5"/>
+<path class="titulo" d="M330,291 v-21 a5,5 0 0 1 5,-5 h220 a5,5 0 0 1 5,5 v21 z"/>
+<text class="nombre" x="340" y="282">roles_rutas</text>
+<text class="col" x="340" y="305">rol</text>
+<text class="marca" x="546" y="305" text-anchor="end">PK REF</text>
+<text class="col" x="340" y="324">ruta</text>
+<text class="marca" x="546" y="324" text-anchor="end">PK</text>
+</g>
+</svg>
+        </div>
+
+        <h2>Todas las relaciones</h2>
+        <p>Las relaciones de los diagramas, en una tabla. Se lee: la columna guarda la clave de un registro de la
+        tabla referenciada.</p>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Columna</th><th>Referencia a</th><th>Tipo</th></tr></thead>
+                <tbody>
+                    <tr><td><code>audit_logs.usuario_id</code></td><td><code>admin_usuarios.id</code></td><td>Lógica (sin clave foránea)</td></tr>
+                    <tr><td><code>roles_rutas.rol</code></td><td><code>roles.nombre</code></td><td>Lógica (sin clave foránea)</td></tr>
+                    <tr><td><code>usuarios.rol</code></td><td><code>roles.nombre</code></td><td>Lógica (sin clave foránea)</td></tr>
+                    <tr><td><code>usuarios.tenant_id</code></td><td><code>tenants.id</code></td><td>Clave foránea</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Para tener en cuenta</h2>
+        <ul>
+            <li><strong>Dos tablas de usuarios.</strong> <code>admin_usuarios</code> son los que ingresan al panel
+                admin; <code>usuarios</code> son los del WMS y pertenecen a un tenant.</li>
+            <li><strong>Los roles se relacionan por nombre.</strong> <code>usuarios.rol</code> y
+                <code>roles_rutas.rol</code> guardan el nombre del rol, no su <code>id</code>. Por eso, al renombrar
+                un rol el panel actualiza también esas dos tablas.</li>
+            <li><strong><code>tenants.id</code> sale de esta base.</strong> Todas las tablas de
+                <a href="diagrama-wms.html">taurus_wms</a> lo guardan en su columna <code>tenant_id</code>. Como son
+                bases distintas, esa relación no puede declararse como clave foránea.</li>
+            <li><code>configuracion</code> no se relaciona con ninguna tabla.</li>
+        </ul>
+
+        <h2>Mantener el diagrama al día</h2>
+        <p>Esta página se genera desde <code>modules/schema_generator.py</code>. Después de un cambio de schema:</p>
+<pre><code>python docs/generar_diagramas_bd.py</code></pre>
+        <p>Las relaciones sin clave foránea declarada no salen del schema: se mantienen a mano en <code>RELACIONES_LOGICAS</code>, dentro de ese script.</p>
+
+        <div id="pager"></div>
+    </main>
+</div>
+<script src="../../assets/docs.js"></script>
+</body>
+</html>

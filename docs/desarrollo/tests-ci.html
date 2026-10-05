@@ -23,6 +23,9 @@
             <li>No dependen de los usuarios del seed. <code>tests/conftest.py</code> ofrece los fixtures
                 <code>usuario_wms</code> (en <code>taurus_admin.usuarios</code>) y <code>usuario_panel</code> (en
                 <code>taurus_admin.admin_usuarios</code>), que crean usuarios temporales y los eliminan al terminar.</li>
+            <li>Corren contra las bases de <code>conexiones.json</code>: usar una instalación de desarrollo, no una
+                con datos reales. Los tests que borran datos (por ejemplo la limpieza de auditoría) trabajan sobre
+                registros propios, creados con fechas del año 2000.</li>
         </ul>
 
         <h2>Lint</h2>
@@ -32,11 +35,14 @@
         <h2>Integración continua</h2>
         <p><code>.github/workflows/ci.yml</code> corre en GitHub Actions:</p>
         <ol>
-            <li>Lint con <code>ruff</code>.</li>
-            <li><code>pytest</code> contra un MySQL en contenedor.</li>
+            <li>Lint con <code>ruff</code> y control de que los <code>schema_*.sql</code> y
+                <code>create_*.sql</code> versionados coinciden con lo que genera
+                <code>python modules/schema_generator.py --all</code>.</li>
+            <li><code>pytest</code> contra un MySQL en contenedor. El workflow genera su propio
+                <code>conexiones.json</code>, con las tres bases apuntando a ese MySQL con el usuario
+                <code>root</code> (el único que existe en el contenedor), y crea el schema con
+                <code>generar_schema.py --execute</code>.</li>
             <li>Build de la imagen Docker.</li>
-            <li>Control de que los <code>schema_*.sql</code> y <code>create_*.sql</code> versionados coinciden con lo
-                que genera <code>python modules/schema_generator.py --all</code>.</li>
         </ol>
 
         <h2>Antes de subir un cambio</h2>
@@ -49,7 +55,9 @@
                 Ver <a href="../arquitectura/base-de-datos.html">Base de datos</a>.</li>
             <li>¿Cambió el script de superusuario o sus dependencias? Regenerar el ejecutable.
                 Ver <a href="../inicio/base-de-datos/superusuario.html">Superusuario</a>.</li>
-            <li>¿Cambió algo documentado acá? Actualizar la página correspondiente en <code>docs/</code>.</li>
+            <li>¿Cambió algo documentado acá? Actualizar la página correspondiente en <code>docs/</code> y
+                regenerar el índice del buscador con <code>python docs/generar_buscador.py</code>. Un test
+                (<code>tests/test_docs_buscador.py</code>) falla si el índice quedó desactualizado.</li>
         </ul>
 
         <div id="pager"></div>

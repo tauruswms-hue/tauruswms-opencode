@@ -50,6 +50,25 @@
             </table>
         </div>
 
+        <h2>Diagramas de tablas y relaciones</h2>
+        <p>Cada base tiene su diagrama, con las tablas, sus claves y las relaciones entre ellas:</p>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Diagrama</th><th>Tablas</th><th>Qué muestra</th></tr></thead>
+                <tbody>
+                    <tr><td><a href="base-de-datos/diagrama-admin.html">taurus_admin</a></td><td>7</td>
+                        <td>Usuarios del panel y del WMS, tenants, roles con sus rutas, configuración y auditoría.</td></tr>
+                    <tr><td><a href="base-de-datos/diagrama-wms.html">taurus_wms</a></td><td>24</td>
+                        <td>Maestros, stock, recepciones, pedidos, órdenes de movimiento e inventarios.</td></tr>
+                    <tr><td><a href="base-de-datos/diagrama-intercambio.html">taurus_intercambio</a></td><td>7</td>
+                        <td>Las colas de intercambio y a qué tabla del WMS se aplica cada una.</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p>Los diagramas distinguen las claves foráneas declaradas en la base de las relaciones que solo mantiene la
+        aplicación. Entre bases no hay claves foráneas: <code>tenant_id</code> (WMS → admin) y los ids que guarda
+        Intercambio (→ WMS) son relaciones lógicas.</p>
+
         <h2>Conexiones</h2>
         <div class="tabla-scroll">
             <table>
@@ -72,7 +91,7 @@
 
         <h2>Cambios de conexión sin reiniciar</h2>
         <p>Las conexiones se leen de <code>conexiones.json</code> (ver
-        <a href="../inicio/configuracion.html">Configuración</a>) y se cachean. El archivo se relee cada
+        <a href="../inicio/base-de-datos/conexiones.html">Configuración de conexiones</a>) y se cachean. El archivo se relee cada
         <code>CONFIG_CACHE_TTL</code> segundos (30 por defecto); si cambió, se reinician el motor y los pools. Si
         no se puede leer al refrescar, se conservan las conexiones conocidas.</p>
 

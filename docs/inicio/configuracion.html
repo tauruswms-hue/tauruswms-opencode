@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Configuración — Taurus WMS</title>
+    <title>Configuración General — Taurus WMS</title>
     <link rel="stylesheet" href="../assets/docs.css">
 </head>
 <body data-root="../" data-page="inicio/configuracion.html">
@@ -11,93 +11,13 @@
     <nav id="sidebar"></nav>
     <main class="content">
         <p class="migas">Primeros pasos</p>
-        <h1>Configuración</h1>
-        <p class="bajada">Dos archivos configuran la instalación: <code>conexiones.json</code>, con el acceso a las
-        tres bases, y <code>.env</code>, con el entorno y los secretos de sesión. Ninguno de los dos se sube al
-        repositorio.</p>
-
-        <h2>Conexiones a las bases (<code>conexiones.json</code>)</h2>
-        <p>Un único archivo con una sección por base. Lo leen el WMS, el panel admin,
-        <code>migrate.py</code>, <code>generar_schema.py</code> y <code>procesar_intercambio.py</code>.</p>
-        <p>El archivo está en la raíz del proyecto. Hay que completar las credenciales de cada base:</p>
-<pre><code>{
-  "admin": {
-    "engine": "mysql",
-    "host": "localhost",
-    "port": 3306,
-    "user": "taurus_admin",
-    "password": "...",
-    "database": "taurus_admin"
-  },
-  "wms": {
-    "engine": "mysql",
-    "host": "localhost",
-    "port": 3306,
-    "user": "taurus_wms",
-    "password": "...",
-    "database": "taurus_wms"
-  },
-  "intercambio": {
-    "engine": "mysql",
-    "host": "localhost",
-    "port": 3306,
-    "user": "taurus_intercambio",
-    "password": "...",
-    "database": "taurus_intercambio"
-  }
-}</code></pre>
-
-        <h3>Secciones</h3>
-        <div class="tabla-scroll">
-            <table>
-                <thead><tr><th>Sección</th><th>Base</th><th>Obligatoria</th></tr></thead>
-                <tbody>
-                    <tr><td><code>admin</code></td><td><code>taurus_admin</code></td><td>Sí</td></tr>
-                    <tr><td><code>wms</code></td><td><code>taurus_wms</code></td><td>Sí</td></tr>
-                    <tr><td><code>intercambio</code></td><td><code>taurus_intercambio</code></td>
-                        <td>Solo si se usa <a href="../integraciones/intercambio.html">Intercambio</a>.</td></tr>
-                </tbody>
-            </table>
-        </div>
-
-        <h3>Claves de cada sección</h3>
-        <div class="tabla-scroll">
-            <table>
-                <thead><tr><th>Clave</th><th>Obligatoria</th><th>Valores</th></tr></thead>
-                <tbody>
-                    <tr><td><code>engine</code></td><td>No</td><td><code>mysql</code> (por defecto).</td></tr>
-                    <tr><td><code>host</code></td><td>Sí</td><td>Servidor de la base.</td></tr>
-                    <tr><td><code>port</code></td><td>No</td><td>Numérico. Por defecto, 3306.</td></tr>
-                    <tr><td><code>user</code></td><td>Sí</td><td>Usuario de la base.</td></tr>
-                    <tr><td><code>password</code></td><td>Sí</td><td>Contraseña de la base.</td></tr>
-                    <tr><td><code>database</code></td><td>Sí</td><td>Nombre de la base.</td></tr>
-                    <tr><td><code>charset</code></td><td>No</td><td>Por defecto, <code>utf8mb4</code>.</td></tr>
-                </tbody>
-            </table>
-        </div>
-
-        <h3>Comportamiento</h3>
-        <ul>
-            <li><strong>Es la única fuente.</strong> Las conexiones no se leen del <code>.env</code> ni de la base.</li>
-            <li><strong>Si el archivo falta o está incompleto</strong>, la aplicación informa qué falta. En producción
-                no arranca.</li>
-            <li><strong>Los cambios se toman sin reiniciar.</strong> El archivo se relee cada 30 segundos; si cambió,
-                la aplicación reconecta con los valores nuevos. Si en ese momento no se puede leer, sigue con las
-                conexiones que ya tenía.</li>
-            <li><strong>Otra ubicación.</strong> Para tenerlo fuera de la carpeta del proyecto, indicar la ruta en la
-                variable de entorno <code>TAURUS_CONEXIONES</code>.</li>
-        </ul>
-
-        <div class="aviso peligro">
-            <p><strong>Las contraseñas están en texto plano.</strong> Restringir la lectura del archivo a la cuenta
-            que ejecuta las aplicaciones, no copiarlo ni subirlo al repositorio (está en <code>.gitignore</code>), y
-            usar para cada base un usuario de MySQL propio con los permisos mínimos.</p>
-        </div>
+        <h1>Configuración General</h1>
+        <p class="bajada">El archivo <code>.env</code> define el entorno y los secretos de sesión de las
+        aplicaciones. No se sube al repositorio.</p>
 
         <div class="aviso">
-            <p><strong>superusuario.exe usa su propio archivo.</strong> El
-            <a href="base-de-datos/superusuario.html">ejecutable de superusuario</a> lee
-            <code>superusuario.json</code>, que solo tiene la conexión a <code>taurus_admin</code>.</p>
+            <p><strong>Las conexiones a las bases no van acá.</strong> Se definen en <code>conexiones.json</code>.
+            Ver <a href="base-de-datos/conexiones.html">Configuración de conexiones</a>.</p>
         </div>
 
         <h2>Entorno y secretos (<code>.env</code>)</h2>
@@ -113,7 +33,8 @@
                     <tr><td><code>SECRET_KEY</code></td><td>Firma de la sesión del WMS.</td></tr>
                     <tr><td><code>ADMIN_SECRET_KEY</code></td><td>Firma de la sesión del panel admin.</td></tr>
                     <tr><td><code>SECRET_SALT</code></td><td>Salt de la aplicación.</td></tr>
-                    <tr><td><code>TAURUS_CONEXIONES</code></td><td>Opcional. Ruta del archivo de conexiones.</td></tr>
+                    <tr><td><code>TAURUS_CONEXIONES</code></td><td>Opcional. Ruta del <a href="base-de-datos/conexiones.html">archivo de conexiones</a>, si no está en
+                        la raíz del proyecto.</td></tr>
                     <tr><td><code>CONFIG_CACHE_TTL</code></td><td>Opcional. Cada cuántos segundos se relee el archivo de
                         conexiones (30 por defecto).</td></tr>
                     <tr><td><code>PERMISOS_CACHE_TTL</code></td><td>Opcional. Cuánto se cachean las rutas permitidas

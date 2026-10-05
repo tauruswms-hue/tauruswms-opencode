@@ -30,7 +30,7 @@
             <li><code>conexiones.json</code> con contraseñas propias para las tres bases, fuera del repositorio y
                 con lectura restringida a la cuenta que ejecuta las aplicaciones. Sin el archivo, o con las
                 contraseñas de ejemplo, las apps no arrancan en producción. Ver
-                <a href="../inicio/configuracion.html">Configuración</a>.</li>
+                <a href="../inicio/base-de-datos/conexiones.html">Configuración de conexiones</a>.</li>
             <li>HTTPS delante de las dos apps: en producción la cookie de sesión es <code>Secure</code> y no viaja
                 por HTTP.</li>
         </ul>
@@ -41,6 +41,11 @@
                 <code>migrate.py --baseline</code>. Ver <a href="../administracion/migraciones.html">Schema y migraciones</a>.</li>
             <li>No cargar los seeds de desarrollo ni ejecutar <code>scripts/crear_tablas.py</code>.</li>
             <li>Usuario de base con los permisos mínimos necesarios, no <code>root</code>.</li>
+            <li>Al actualizar una instalación existente, aplicar las migraciones pendientes con
+                <code>python migrate.py --db admin</code> (y <code>wms</code>, <code>intercambio</code>). Una de
+                ellas, <code>remove_conexiones_configuracion.sql</code>, borra de la tabla
+                <code>configuracion</code> las conexiones que antes se guardaban ahí con la contraseña en texto
+                plano: aplicarla después de crear <code>conexiones.json</code>.</li>
         </ul>
 
         <h2>Usuarios</h2>
@@ -55,6 +60,13 @@
         <ul>
             <li>Si se usa <a href="../integraciones/intercambio.html">Intercambio</a>, programar
                 <code>python procesar_intercambio.py</code> en cron o en el Programador de tareas.</li>
+        </ul>
+
+        <h2>Mantenimiento</h2>
+        <ul>
+            <li>La auditoría del panel (<code>audit_logs</code>) crece sin límite. Limpiarla cada tanto con la
+                opción <strong>Limpiar auditoría</strong> del
+                <a href="../inicio/base-de-datos/superusuario.html#limpiar-auditoria">ejecutable de superusuario</a>.</li>
         </ul>
 
         <div class="aviso pendiente">

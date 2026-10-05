@@ -52,7 +52,7 @@
 mysql -u root -p -e "source docs/migrations/create_wms_mysql.sql"
 mysql -u root -p -e "source docs/migrations/create_intercambio_mysql.sql"</code></pre></li>
             <li>Cargar las credenciales de las tres bases en <code>conexiones.json</code>. Ver
-                <a href="../configuracion.html">Configuración</a>.</li>
+                <a href="conexiones.html">Configuración de conexiones</a>.</li>
             <li>Registrar las migraciones existentes como aplicadas, para que el runner no intente ejecutarlas
                 sobre una base recién creada:
 <pre><code>python migrate.py --db admin --baseline
@@ -78,7 +78,10 @@ python migrate.py --db intercambio --baseline</code></pre></li>
         <p>Los scripts se generan desde <code>modules/schema_generator.py</code>. Después de un cambio de
         schema hay que regenerarlos y actualizar estas páginas:</p>
 <pre><code>python modules/schema_generator.py --all
-python docs/generar_scripts_bd.py</code></pre>
+python docs/generar_scripts_bd.py
+python docs/generar_diagramas_bd.py</code></pre>
+        <p>El último comando regenera los <a href="../../arquitectura/base-de-datos.html">diagramas de tablas y
+        relaciones</a>.</p>
         <p>Más detalle en <a href="../../administracion/migraciones.html">Schema y migraciones</a>.</p>
 
         <div id="pager"></div>
