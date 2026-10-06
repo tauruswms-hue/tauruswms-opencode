@@ -23,6 +23,7 @@ from modules.batch_utils import (
 from modules.context import get_tenant_filter
 from modules.cuit import cuit_para_guardar, cuit_para_mostrar
 from modules.db_config import get_db_connection
+from modules.sql_dialect import execute_insert
 
 clientes_bp = Blueprint('clientes', __name__)
 
@@ -62,6 +63,50 @@ def _sitio_web(datos):
     return valor
 
 
+# --- Contactos del cliente -------------------------------------------------
+# Un cliente puede tener varios contactos (tabla cliente_contactos). La columna
+# clientes.contacto_nombre se conserva con el nombre del primero, para la
+# exportación y el Intercambio, que manejan un solo contacto.
+_CONTACTO_CAMPOS = (('nombre', 'Nombre', 100), ('apellido', 'Apellido', 100),
+                    ('departamento', 'Departamento o sección', 100), ('rol', 'Rol', 100),
+                    ('telefono', 'Teléfono', 50), ('email', 'Mail', 100))
+
+
+def _contactos_del_formulario(form):
+    """Contactos cargados en el formulario, verificados. Las filas totalmente vacías se ignoran."""
+    listas = {campo: form.getlist(f'contacto_{campo}[]') for campo, _, _ in _CONTACTO_CAMPOS}
+    contactos = []
+    for i in range(max((len(v) for v in listas.values()), default=0)):
+        c = {campo: (listas[campo][i].strip() if i < len(listas[campo]) else '') for campo, _, _ in _CONTACTO_CAMPOS}
+        if not any(c.values()):
+            continue
+        rotulo_fila = f'Contacto {len(contactos) + 1}'
+        if not c['nombre']:
+            raise ValueError(f'{rotulo_fila}: falta el nombre.')
+        for campo, rotulo, largo in _CONTACTO_CAMPOS:
+            if len(c[campo]) > largo:
+                raise ValueError(f'{rotulo_fila}: {rotulo.lower()} admite hasta {largo} caracteres.')
+        if c['email'] and not re.fullmatch(r'[^@\s]+@[^@\s]+\.[^@\s]+', c['email']):
+            raise ValueError(f'{rotulo_fila}: el mail no tiene formato de dirección de correo.')
+        contactos.append({k: (v or None) for k, v in c.items()})
+    return contactos
+
+
+def _nombre_completo(contacto):
+    return ' '.join(p for p in (contacto.get('nombre'), contacto.get('apellido')) if p)[:100]
+
+
+def _guardar_contactos(cursor, id_cliente, contactos, tenant_id):
+    """Reemplaza los contactos del cliente por los dados."""
+    cursor.execute("DELETE FROM cliente_contactos WHERE id_cliente = %s", (id_cliente,))
+    for c in contactos:
+        cursor.execute("""INSERT INTO cliente_contactos
+                              (id_cliente, nombre, apellido, departamento, rol, telefono, email, tenant_id)
+                          VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+                       (id_cliente, c['nombre'], c.get('apellido'), c.get('departamento'), c.get('rol'),
+                        c.get('telefono'), c.get('email'), tenant_id))
+
+
 def _activo(valor, por_defecto=True):
     """Estado del cliente: True = Activo. Acepta 1/0 (lista Estado) y on (casilla, formularios anteriores)."""
     valor = str(valor if valor is not None else '').strip().lower()
@@ -99,11 +144,25 @@ def listar():
             cursor.execute("SELECT id_transporte, id_ruta FROM transporte_rutas WHERE (%s IS NULL OR tenant_id = %s)", (tenant_id, tenant_id))
             rel_transp_rutas = cursor.fetchall()
 
+            cursor.execute("""SELECT id_cliente, nombre, apellido, departamento, rol, telefono, email
+                              FROM cliente_contactos WHERE (%s IS NULL OR tenant_id = %s) ORDER BY id""",
+                           (tenant_id, tenant_id))
+            contactos = cursor.fetchall()
+            por_cliente = {}
+            for ct in contactos:
+                por_cliente.setdefault(ct['id_cliente'], []).append(ct)
+            for c in clientes:
+                propios = por_cliente.get(c['id_cliente'], [])
+                c['contactos_cantidad'] = len(propios)
+                c['contacto_principal'] = _nombre_completo(propios[0]) if propios else ''
+                c['contacto_principal_rol'] = (propios[0].get('rol') or '') if propios else ''
+
         return render_template('clientes.html',
                                clientes=clientes,
                                rutas=rutas,
                                transportes_all=transportes_all,
-                               rel_transp_rutas=rel_transp_rutas)
+                               rel_transp_rutas=rel_transp_rutas,
+                               contactos=contactos)
     finally:
         conn.close()
 
@@ -121,7 +180,7 @@ def guardar():
         sitio_web = _sitio_web(d)
         email = _email(d)
         direccion = _texto(d, 'direccion')
-        contacto = _texto(d, 'contacto_nombre')
+        contactos = _contactos_del_formulario(request.form)
     except ValueError as e:
         flash(str(e), "danger")
         return redirect(url_for('clientes.listar'))
@@ -138,7 +197,7 @@ def guardar():
                 d.get('provincia') or None,
                 d.get('telefono') or None,
                 email,
-                contacto,
+                _nombre_completo(contactos[0]) if contactos else None,
                 d.get('id_ruta') or None,
                 d.get('id_transporte_predeterminado') or None,
                 activo_val,
@@ -153,17 +212,26 @@ def guardar():
                          id_transporte_predeterminado=%s, activo=%s,
                          nombre_fantasia=%s, sitio_web=%s
                          WHERE id_cliente=%s AND (%s IS NULL OR tenant_id = %s)"""
+                cursor.execute("SELECT id_cliente FROM clientes WHERE id_cliente = %s AND (%s IS NULL OR tenant_id = %s)",
+                               (c_id, tenant_id, tenant_id))
+                if not cursor.fetchone():
+                    raise ValueError('El cliente que se intenta modificar no existe.')
                 cursor.execute(sql, (*params, c_id, tenant_id, tenant_id))
+                id_cliente = int(c_id)
             else:
                 sql = """INSERT INTO clientes (codigo, razonsocial, cuit, direccion,
                          localidad, provincia, telefono, email, contacto_nombre,
                          id_ruta, id_transporte_predeterminado, activo,
                          nombre_fantasia, sitio_web, tenant_id)
                          VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
-                cursor.execute(sql, (*params, tenant_id))
+                id_cliente = execute_insert(cursor, sql, (*params, tenant_id), id_col='id_cliente')
 
+            _guardar_contactos(cursor, id_cliente, contactos, tenant_id)
             conn.commit()
             flash("Cliente guardado correctamente", "success")
+    except ValueError as e:
+        conn.rollback()
+        flash(str(e), "danger")
     except Exception as e:
         conn.rollback()
         flash(f"Error: {e!s}", "danger")
@@ -264,7 +332,8 @@ def importar():
                         """, (id_ruta, id_transporte, existing['id_cliente']))
                         actualizados += 1
                         continue
-                    cursor.execute("""
+                    contacto = _texto(row, 'contacto_nombre')
+                    id_nuevo = execute_insert(cursor, """
                         INSERT INTO clientes
                             (codigo, razonsocial, cuit, direccion, localidad, provincia,
                              telefono, email, contacto_nombre,
@@ -279,14 +348,17 @@ def importar():
                         str(row.get('provincia', '') or '').strip() or None,
                         str(row.get('telefono', '') or '').strip() or None,
                         _email(row),
-                        _texto(row, 'contacto_nombre'),
+                        contacto,
                         id_ruta,
                         id_transporte,
                         _activo(row.get('activo')),
                         _texto(row, 'nombre_fantasia'),
                         _sitio_web(row),
                         tenant_id
-                    ))
+                    ), id_col='id_cliente')
+                    if contacto:
+                        # La importación trae un solo contacto: queda como el primero del cliente
+                        _guardar_contactos(cursor, id_nuevo, [{'nombre': contacto}], tenant_id)
                     insertados += 1
             except Exception as e:
                 errores.append({'fila': i, 'codigo': codigo, 'razon': str(e)})

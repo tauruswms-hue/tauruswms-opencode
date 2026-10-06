@@ -380,6 +380,28 @@ WMS_TABLES = [
         ],
     },
     {
+        # Contactos de un cliente: personas con las que se trata (compras, pagos, recepción...)
+        "name": "cliente_contactos",
+        "columns": [
+            {"name": "id",           "type": "int",          "pk": True, "autoincrement": True},
+            {"name": "id_cliente",   "type": "int",          "not_null": True},
+            {"name": "nombre",       "type": "varchar(100)", "not_null": True},
+            {"name": "apellido",     "type": "varchar(100)"},
+            {"name": "departamento", "type": "varchar(100)"},
+            {"name": "rol",          "type": "varchar(100)"},
+            {"name": "telefono",     "type": "varchar(50)"},
+            {"name": "email",        "type": "varchar(100)"},
+            {"name": "tenant_id",    "type": "int"},
+        ],
+        "indexes": [
+            {"columns": ["id_cliente"], "name": "idx_cliente_contactos_cliente"},
+            {"columns": ["tenant_id"],  "name": "idx_cliente_contactos_tenant"},
+        ],
+        "foreign_keys": [
+            {"columns": ["id_cliente"], "ref_table": "clientes", "ref_columns": ["id_cliente"], "on_delete": "CASCADE"},
+        ],
+    },
+    {
         "name": "materiales",
         "columns": [
             {"name": "id",               "type": "int",           "pk": True, "autoincrement": True},

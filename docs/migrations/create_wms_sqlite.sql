@@ -170,6 +170,22 @@ CREATE TABLE IF NOT EXISTS "clientes" (
 );
 CREATE INDEX IF NOT EXISTS "idx_clientes_tenant" ON "clientes" ("tenant_id");
 
+-- --- cliente_contactos ---;
+CREATE TABLE IF NOT EXISTS "cliente_contactos" (
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+    "id_cliente" INTEGER NOT NULL,
+    "nombre" TEXT NOT NULL,
+    "apellido" TEXT,
+    "departamento" TEXT,
+    "rol" TEXT,
+    "telefono" TEXT,
+    "email" TEXT,
+    "tenant_id" INTEGER,
+    FOREIGN KEY ("id_cliente") REFERENCES "clientes" ("id_cliente") ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS "idx_cliente_contactos_cliente" ON "cliente_contactos" ("id_cliente");
+CREATE INDEX IF NOT EXISTS "idx_cliente_contactos_tenant" ON "cliente_contactos" ("tenant_id");
+
 -- --- materiales ---;
 CREATE TABLE IF NOT EXISTS "materiales" (
     "id" INTEGER PRIMARY KEY AUTOINCREMENT,

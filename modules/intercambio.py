@@ -490,6 +490,7 @@ def _aplicar_registro_cliente(reg, conn_wms, cursor_wms, cursor_admin):
               campos['localidad'], campos['provincia'], campos['telefono'],
               campos['email'], campos['contacto_nombre'], campos['id_ruta'],
               campos['id_transporte_predeterminado'], campos['activo'], cliente_id))
+        _contacto_de_intercambio(cursor_wms, cliente_id, campos['contacto_nombre'], tenant_id)
         return True, 'actualizado', cliente_id
 
     cliente_id = execute_insert(cursor_wms, """
@@ -500,8 +501,24 @@ def _aplicar_registro_cliente(reg, conn_wms, cursor_wms, cursor_admin):
     """, (codigo, campos['razonsocial'], campos['cuit'], campos['direccion'],
           campos['localidad'], campos['provincia'], campos['telefono'],
           campos['email'], campos['contacto_nombre'], campos['id_ruta'],
-          campos['id_transporte_predeterminado'], campos['activo'], tenant_id))
+          campos['id_transporte_predeterminado'], campos['activo'], tenant_id), id_col='id_cliente')
+    _contacto_de_intercambio(cursor_wms, cliente_id, campos['contacto_nombre'], tenant_id)
     return True, 'insertado', cliente_id
+
+
+def _contacto_de_intercambio(cursor_wms, cliente_id, contacto_nombre, tenant_id):
+    """Carga el contacto que envía el sistema externo como contacto del cliente.
+
+    El Intercambio maneja un solo contacto por cliente. Se agrega solo si el
+    cliente todavía no tiene ninguno, para no pisar los que se cargaron en el WMS.
+    """
+    if not contacto_nombre:
+        return
+    cursor_wms.execute("SELECT COUNT(*) AS n FROM cliente_contactos WHERE id_cliente = %s", (cliente_id,))
+    if cursor_wms.fetchone()['n']:
+        return
+    cursor_wms.execute("INSERT INTO cliente_contactos (id_cliente, nombre, tenant_id) VALUES (%s, %s, %s)",
+                       (cliente_id, contacto_nombre[:100], tenant_id))
 
 
 def _parse_items_pedido(items_json, tenant_id, cursor_wms):

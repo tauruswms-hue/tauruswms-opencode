@@ -90,8 +90,9 @@ BASES = [
                         'material_proveedor']},
             {'id': 'distribucion', 'titulo': 'Clientes y distribución',
              'desc': 'A quién y cómo se entrega: los clientes tienen una ruta y un transporte predeterminado, y cada '
-                     'transporte cubre una o más rutas y sale por un muelle (una ubicación).',
-             'tablas': ['rutas', 'transportes', 'transporte_rutas', 'clientes']},
+                     'transporte cubre una o más rutas y sale por un muelle (una ubicación). Cada cliente puede '
+                     'tener varios contactos.',
+             'tablas': ['rutas', 'transportes', 'transporte_rutas', 'clientes', 'cliente_contactos']},
             {'id': 'stock', 'titulo': 'Stock',
              'desc': 'Cuánto hay y qué se movió: <code>stockcontable</code> es el saldo actual de cada material en '
                      'cada ubicación, y <code>stock_movimientos</code> el historial de ingresos y egresos.',

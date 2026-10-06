@@ -29,8 +29,8 @@
         <p>Después, registrar las migraciones como aplicadas:</p>
 <pre><code>python migrate.py --db wms --baseline</code></pre>
 
-        <h2>Tablas (24)</h2>
-        <p><code>zonas</code>, <code>tipoubicacion</code>, <code>categorias</code>, <code>proveedores</code>, <code>rutas</code>, <code>unidades_medida</code>, <code>ubicaciones</code>, <code>transportes</code>, <code>transporte_rutas</code>, <code>clientes</code>, <code>materiales</code>, <code>material_proveedor</code>, <code>material_presentaciones</code>, <code>stockcontable</code>, <code>stock_movimientos</code>, <code>clases_pedido</code>, <code>recepciones_cabecera</code>, <code>recepciones_detalle</code>, <code>pedidos_cabecera</code>, <code>pedidos_detalle</code>, <code>omc</code>, <code>omc_contenedores</code>, <code>inventarios_cabecera</code>, <code>inventarios_detalle</code></p>
+        <h2>Tablas (25)</h2>
+        <p><code>zonas</code>, <code>tipoubicacion</code>, <code>categorias</code>, <code>proveedores</code>, <code>rutas</code>, <code>unidades_medida</code>, <code>ubicaciones</code>, <code>transportes</code>, <code>transporte_rutas</code>, <code>clientes</code>, <code>cliente_contactos</code>, <code>materiales</code>, <code>material_proveedor</code>, <code>material_presentaciones</code>, <code>stockcontable</code>, <code>stock_movimientos</code>, <code>clases_pedido</code>, <code>recepciones_cabecera</code>, <code>recepciones_detalle</code>, <code>pedidos_cabecera</code>, <code>pedidos_detalle</code>, <code>omc</code>, <code>omc_contenedores</code>, <code>inventarios_cabecera</code>, <code>inventarios_detalle</code></p>
 
         <h2>Datos iniciales</h2>
         <p>El script solo carga las clases de pedido: Venta, Reposicion, Muestra y Devolucion. El resto de los
@@ -38,7 +38,7 @@
 
         <h2>Script</h2>
         <p>Archivo: <a href="../../migrations/create_wms_mysql.sql"><code>docs/migrations/create_wms_mysql.sql</code></a>
-        (489 líneas). Lo genera <code>modules/schema_generator.py</code>; no se edita a mano.</p>
+        (505 líneas). Lo genera <code>modules/schema_generator.py</code>; no se edita a mano.</p>
         <details class="script">
             <summary>Ver el script completo</summary>
 <pre><code>SET NAMES utf8mb4;
@@ -213,6 +213,22 @@ CREATE TABLE `clientes` (
     CONSTRAINT `fk_clientes_id_transporte_predeterminado` FOREIGN KEY (`id_transporte_predeterminado`) REFERENCES `transportes` (`id_transporte`) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE INDEX `idx_clientes_tenant` ON `clientes` (`tenant_id`);
+
+-- --- cliente_contactos ---;
+CREATE TABLE `cliente_contactos` (
+    `id` int AUTO_INCREMENT PRIMARY KEY,
+    `id_cliente` int NOT NULL,
+    `nombre` varchar(100) NOT NULL,
+    `apellido` varchar(100),
+    `departamento` varchar(100),
+    `rol` varchar(100),
+    `telefono` varchar(50),
+    `email` varchar(100),
+    `tenant_id` int,
+    CONSTRAINT `fk_cliente_contactos_id_cliente` FOREIGN KEY (`id_cliente`) REFERENCES `clientes` (`id_cliente`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE INDEX `idx_cliente_contactos_cliente` ON `cliente_contactos` (`id_cliente`);
+CREATE INDEX `idx_cliente_contactos_tenant` ON `cliente_contactos` (`tenant_id`);
 
 -- --- materiales ---;
 CREATE TABLE `materiales` (

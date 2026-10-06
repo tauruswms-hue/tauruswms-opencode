@@ -171,6 +171,22 @@ CREATE TABLE `clientes` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE INDEX `idx_clientes_tenant` ON `clientes` (`tenant_id`);
 
+-- --- cliente_contactos ---;
+CREATE TABLE `cliente_contactos` (
+    `id` int AUTO_INCREMENT PRIMARY KEY,
+    `id_cliente` int NOT NULL,
+    `nombre` varchar(100) NOT NULL,
+    `apellido` varchar(100),
+    `departamento` varchar(100),
+    `rol` varchar(100),
+    `telefono` varchar(50),
+    `email` varchar(100),
+    `tenant_id` int,
+    CONSTRAINT `fk_cliente_contactos_id_cliente` FOREIGN KEY (`id_cliente`) REFERENCES `clientes` (`id_cliente`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE INDEX `idx_cliente_contactos_cliente` ON `cliente_contactos` (`id_cliente`);
+CREATE INDEX `idx_cliente_contactos_tenant` ON `cliente_contactos` (`tenant_id`);
+
 -- --- materiales ---;
 CREATE TABLE `materiales` (
     `id` int AUTO_INCREMENT PRIMARY KEY,

@@ -9,6 +9,27 @@
 .cli-fila { display: flex; flex-wrap: wrap; gap: 12px 15px; margin-bottom: 14px; }
 .cli-campo { flex: 1 1 0; min-width: 160px; display: flex; flex-direction: column; }
 .cli-campo > label { font-size: 0.8rem; font-weight: bold; color: #666; margin-bottom: 4px; }
+/* Pestañas del formulario */
+.cli-tabs { display: flex; gap: 2px; border-bottom: 2px solid #eee; padding: 0 25px; background: #f8fafc; flex-shrink: 0; }
+.cli-tab-btn { background: none; border: none; border-bottom: 3px solid transparent; padding: 12px 14px; font-size: 0.85rem; font-weight: 600; color: #64748b; cursor: pointer; white-space: nowrap; }
+.cli-tab-btn:hover { color: #3498db; }
+.cli-tab-btn.active { color: #3498db; border-bottom-color: #3498db; }
+.cli-tab-panel { display: none; }
+.cli-tab-panel.active { display: block; }
+.cli-cuerpo { overflow-y: auto; flex: 1 1 auto; padding: 20px 25px; min-height: 350px; }
+.cli-cuenta { background: #e2e8f0; color: #475569; border-radius: 10px; padding: 0 7px; font-size: 0.75rem; margin-left: 2px; }
+.cli-cuenta:empty { display: none; }
+/* Tabla de contactos */
+.cli-tabla { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.cli-tabla th { padding: 8px 5px; text-align: left; font-size: 0.8rem; color: #666; border-bottom: 2px solid #eee; white-space: nowrap; }
+.cli-tabla td { padding: 5px; vertical-align: middle; }
+.cli-tabla input { width: 100%; padding: 7px 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; font-family: inherit; font-size: 0.88rem; }
+.cli-tabla .col-accion { width: 34px; text-align: center; }
+.cli-quitar { color: #e74c3c; background: none; border: none; cursor: pointer; padding: 4px; }
+.cli-vacio { color: #999; font-size: 0.88rem; padding: 12px 5px; }
+/* Listado: mail y sitio web en un renglón cada uno, recortados si son largos */
+.cli-enlace { display: block; max-width: 230px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #3498db; text-decoration: none; }
+#tablaClientes_wrapper th { white-space: normal; line-height: 1.2; vertical-align: bottom; }
 .cli-campo input, .cli-campo select { width: 100%; padding: 9px 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; font-family: inherit; font-size: 0.9rem; }
 </style>
 <style>
@@ -47,7 +68,8 @@
                     <th>Código</th>
                     <th>Razón Social</th>
                     <th>Mail y sitio web</th>
-                    <th>Ruta / Zona</th>
+                    <th>Contactos</th>
+                    <th>Ruta</th>
                     <th>Transporte</th>
                     <th>Estado</th>
                     <th>Acciones</th>
@@ -61,9 +83,17 @@
                         {% if c.nombre_fantasia %}<div title="Nombre de fantasía" style="font-size:0.8rem; color:#888;">{{ c.nombre_fantasia }}</div>{% endif %}
                     </td>
                     <td>
-                        {% if c.email %}<div><a href="mailto:{{ c.email }}" style="color:#3498db; text-decoration:none;"><i class="fas fa-envelope"></i> {{ c.email }}</a></div>{% endif %}
-                        {% if c.sitio_web %}<div><a href="{{ c.sitio_web }}" target="_blank" rel="noopener" style="color:#3498db; text-decoration:none;"><i class="fas fa-globe"></i> {{ c.sitio_web | replace('https://', '') | replace('http://', '') }}</a></div>{% endif %}
+                        {% if c.email %}<a class="cli-enlace" href="mailto:{{ c.email }}" title="{{ c.email }}"><i class="fas fa-envelope"></i> {{ c.email }}</a>{% endif %}
+                        {% if c.sitio_web %}<a class="cli-enlace" href="{{ c.sitio_web }}" target="_blank" rel="noopener" title="{{ c.sitio_web }}"><i class="fas fa-globe"></i> {{ c.sitio_web | replace('https://', '') | replace('http://', '') }}</a>{% endif %}
                         {% if not c.email and not c.sitio_web %}<span style="color:#ccc;">—</span>{% endif %}
+                    </td>
+                    <td>
+                        {% if c.contactos_cantidad %}
+                            <div><i class="fas fa-user" style="color:#94a3b8;"></i> {{ c.contacto_principal }}{% if c.contactos_cantidad > 1 %} <span title="{{ c.contactos_cantidad }} contactos en total" style="background:#e2e8f0; color:#475569; border-radius:10px; padding:0 6px; font-size:0.75rem;">+{{ c.contactos_cantidad - 1 }}</span>{% endif %}</div>
+                            {% if c.contacto_principal_rol %}<div style="font-size:0.8rem; color:#888;">{{ c.contacto_principal_rol }}</div>{% endif %}
+                        {% else %}
+                            <span style="color:#ccc;">—</span>
+                        {% endif %}
                     </td>
                     <td>{{ c.nombre_ruta or 'Sin asignar' }}</td>
                     <td>{{ c.nombre_transporte or '-' }}</td>
@@ -101,6 +131,7 @@
     // Variables globales para el JS externo
     const transportesDB = {{ transportes_all | tojson }};
     const relTransporteRutas = {{ rel_transp_rutas | tojson }};
+    const contactosClientes = {{ contactos | tojson }};
 </script>
 <script src="{{ url_for('static', filename='js/clientes.js') }}"></script>
 {% endblock %}
