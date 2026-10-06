@@ -4,6 +4,7 @@
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
 <link rel="stylesheet" href="https://cdn.datatables.net/fixedheader/3.4.0/css/fixedHeader.dataTables.min.css">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/tipoubicacion.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/materiales.css') }}">
 <style>
 #tablaMateriales_wrapper .dataTables_scrollHead thead th { background: #f8f9fa; }
         #tablaMateriales_wrapper .dataTables_scrollBody td,
@@ -50,21 +51,22 @@
                     <th>Nombre</th>
                     <th>Categoría</th>
                     <th>Cód. Barras</th>
-                    <th>Prov. Habitual</th>
-                    <th>Stock Min/Max</th>
-                    <th style="text-align:center;">Lote / Serie</th>
+                    <th>Proveedor<small>habitual</small></th>
+                    <th title="Stock mínimo / de reposición / máximo">Stock<small>mín / rep / máx</small></th>
+                    <th style="text-align:center;">Lote<small>o serie</small></th>
                     <th style="text-align:center;">Picking</th>
+                    <th style="text-align:center;">Estado</th>
                     <th>Acciones</th>
                 </tr>
             </thead>
             <tbody>
                 {% for m in materiales %}
                 <tr{% if not m.activo %} style="color:#999;"{% endif %}>
-                    <td><code>{{ m.codigo }}</code></td>
-                    <td><strong>{{ m.nombre }}</strong>
-                        {% if not m.activo %}
-                            <span title="Material inactivo: no se ofrece al cargar pedidos" style="background:#95a5a6; color:white; padding:1px 7px; border-radius:10px; font-size:0.75rem; margin-left:4px;">Inactivo</span>
-                        {% endif %}
+                    <td><code>{{ m.codigo }}</code>
+                        {% if m.codigo_alternativo and m.codigo_alternativo != m.codigo %}<div title="Código alternativo" style="font-size:0.78rem; color:#888;">Alt: {{ m.codigo_alternativo }}</div>{% endif %}
+                        {% if m.codigo_proveedor and m.codigo_proveedor != m.codigo %}<div title="Código proveedor" style="font-size:0.78rem; color:#888;">Prov: {{ m.codigo_proveedor }}</div>{% endif %}
+                    </td>
+                    <td>{% if m.imagen_ruta %}<a href="{{ m.imagen_ruta if m.imagen_es_url else url_for('materiales.imagen', id=m.id) }}" target="_blank" rel="noopener" title="Ver la imagen del producto" style="color:#3498db; margin-right:4px;"><i class="fas fa-image"></i></a>{% endif %}<strong>{{ m.nombre }}</strong>
                     </td>
                     <td>{{ m.categoria_nombre or '-' }}</td>
                     <td>
@@ -81,7 +83,7 @@
                             <span style="color:#ccc;">—</span>
                         {% endif %}
                     </td>
-                    <td>{{ m.stock_minimo }} / {{ m.stock_maximo }}</td>
+                    <td class="num" title="Mínimo / reposición / máximo">{{ m.stock_minimo_txt }} / {{ m.stock_reposicion_txt }} / {{ m.stock_maximo_txt }}</td>
                     <td style="text-align:center;">
                         {% if m.trazabilidad == 'lote' %}
                             <i class="fas fa-tags" style="color:#f39c12;" title="Por Lote"></i> Lote
@@ -93,18 +95,30 @@
                     </td>
                     <td style="text-align:center;">
                         {% set mp = m.metodo_picking or 'libre' %}
-                        {% if mp == 'libre' %}
+                        {% if mp not in picking_habilitados %}
+                            <span title="{{ picking_labels.get(mp, mp) }}: este método no está habilitado para la empresa. Editar el material para elegir uno habilitado." style="background:#fff; color:#c0392b; border:1px dashed #c0392b; padding:1px 7px; border-radius:10px; font-size:0.8rem;"><i class="fas fa-exclamation-triangle"></i> {{ 'Libre' if mp == 'libre' else mp|upper }}</span>
+                        {% elif mp == 'libre' %}
                             <span title="{{ picking_labels.get(mp, mp) }}" style="background:#3498db; color:white; padding:2px 8px; border-radius:10px; font-size:0.8rem;">Libre</span>
                         {% else %}
                             <span title="{{ picking_labels.get(mp, mp) }}" style="background:#8e44ad; color:white; padding:2px 8px; border-radius:10px; font-size:0.8rem;">{{ mp|upper }}</span>
                         {% endif %}
                     </td>
-                    <td class="actions-cell" style="text-align: center;">
-                        <button class="btn-icon edit" onclick='editMaterial({{ m | tojson }})' style="color: #3498db; border:none; background:none; cursor:pointer;">
+                    <td style="text-align:center;">
+                        {% if m.activo %}
+                            <span style="background:#27ae60; color:white; padding:2px 8px; border-radius:10px; font-size:0.8rem;">Activo</span>
+                        {% else %}
+                            <span title="No se ofrece al cargar pedidos" style="background:#95a5a6; color:white; padding:2px 8px; border-radius:10px; font-size:0.8rem;">Inactivo</span>
+                        {% endif %}
+                    </td>
+                    <td class="actions-cell" style="text-align: center; white-space: nowrap;">
+                        <button class="btn-icon" title="Distribución: stock de este material en cada posición" onclick="verDistribucion({{ m.id }})" style="color: #16a085; border:none; background:none; cursor:pointer;">
+                            <i class="fas fa-warehouse"></i>
+                        </button>
+                        <button class="btn-icon edit" title="Editar" onclick='editMaterial({{ m | tojson }})' style="color: #3498db; border:none; background:none; cursor:pointer;">
                             <i class="fas fa-edit"></i>
                         </button>
                         <form method="POST" action="{{ url_for('materiales.eliminar', id=m.id) }}" style="display:inline;" onsubmit="return confirm('¿Eliminar material?\n\nSi tiene stock o movimientos no se borra: queda inactivo.')">
-                            <button type="submit" class="btn-icon delete" style="color: #e74c3c; border:none; background:none; cursor:pointer;"><i class="fas fa-trash"></i></button>
+                            <button type="submit" class="btn-icon delete" title="Eliminar" style="color: #e74c3c; border:none; background:none; cursor:pointer;"><i class="fas fa-trash"></i></button>
                         </form>
                     </td>
                 </tr>
@@ -116,6 +130,7 @@
 
 {% include "partials/_modal_materiales.html" %}
 {% include "partials/_modal_importar_materiales.html" %}
+{% include "partials/_modal_distribucion_material.html" %}
 
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/fixedheader/3.4.0/js/dataTables.fixedHeader.min.js"></script>
@@ -124,6 +139,7 @@
     const relacionesExistentes = {{ relaciones | tojson }};
     const presentacionesExistentes = {{ presentaciones | tojson }};
     const metodoPickingDefault = {{ picking_metodo_default | tojson }};
+    const metodosPickingLabels = {{ picking_labels | tojson }};
 </script>
 <script src="{{ url_for('static', filename='js/materiales.js') }}"></script>
 <script src="{{ url_for('static', filename='js/batch_ui.js') }}"></script>

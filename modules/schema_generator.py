@@ -356,6 +356,7 @@ WMS_TABLES = [
             {"name": "id_cliente",                   "type": "int",          "pk": True, "autoincrement": True},
             {"name": "codigo",                       "type": "varchar(100)"},
             {"name": "razonsocial",                  "type": "varchar(200)", "not_null": True},
+            {"name": "nombre_fantasia",              "type": "varchar(200)"},
             {"name": "cuit",                         "type": "varchar(50)"},
             {"name": "direccion",                    "type": "varchar(255)"},
             {"name": "localidad",                    "type": "varchar(100)"},
@@ -363,6 +364,7 @@ WMS_TABLES = [
             {"name": "telefono",                     "type": "varchar(50)"},
             {"name": "email",                        "type": "varchar(100)"},
             {"name": "contacto_nombre",              "type": "varchar(100)"},
+            {"name": "sitio_web",                    "type": "varchar(255)"},
             {"name": "id_ruta",                      "type": "int"},
             {"name": "id_transporte_predeterminado", "type": "int"},
             {"name": "activo",                       "type": "boolean", "not_null": True, "default": True},
@@ -383,16 +385,25 @@ WMS_TABLES = [
             {"name": "id",               "type": "int",           "pk": True, "autoincrement": True},
             {"name": "codigo",           "type": "varchar(100)",  "not_null": True},
             {"name": "codigo_barras",    "type": "varchar(100)"},
+            {"name": "codigo_alternativo", "type": "varchar(100)"},
+            {"name": "codigo_proveedor", "type": "varchar(100)"},
             {"name": "nombre",           "type": "varchar(255)",  "not_null": True},
             {"name": "descripcion",      "type": "text"},
             {"name": "categoria_id",     "type": "int"},
             {"name": "stock_minimo",     "type": "decimal(12,3)", "default": 0},
             {"name": "stock_maximo",     "type": "decimal(12,3)", "default": 0},
+            # Punto de reposición: al llegar a este stock hay que reponer (entre el mínimo y el máximo)
+            {"name": "stock_reposicion", "type": "decimal(12,3)", "default": 0},
             {"name": "unidad_medida_id", "type": "int"},
             {"name": "trazabilidad",     "type": "enum('ninguna','lote','serie')", "not_null": True, "default": "'ninguna'"},
             {"name": "metodo_picking",   "type": "varchar(20)", "not_null": True, "default": "'libre'"},
             {"name": "peso_bruto",       "type": "decimal(10,3)"},
             {"name": "peso_neto",        "type": "decimal(10,3)"},
+            # Volumen del material y la unidad (de magnitud VOLUMEN) en que está expresado
+            {"name": "volumen",          "type": "decimal(12,4)"},
+            {"name": "volumen_unidad_id", "type": "int"},
+            # Imagen del producto: ruta en el servidor, ruta de red (UNC) o URL http(s)
+            {"name": "imagen_ruta",      "type": "varchar(500)"},
             {"name": "costo_promedio",   "type": "decimal(12,4)", "default": 0},
             {"name": "ultimo_costo",     "type": "decimal(12,4)", "default": 0},
             {"name": "activo",           "type": "boolean", "not_null": True, "default": True},
@@ -982,6 +993,7 @@ ROUTE_CATALOG = [
     {"grupo": "Materiales", "rutas": [
         "/materiales", "/materiales/guardar", "/materiales/importar",
         "/materiales/exportar/*", "/materiales/plantilla/*", "/materiales/eliminar/*",
+        "/materiales/imagen/*", "/materiales/distribucion/*",
     ]},
     {"grupo": "Ubicaciones", "rutas": [
         "/ubicaciones", "/ubicaciones/guardar", "/ubicaciones/eliminar/*",
@@ -1075,6 +1087,7 @@ ROUTE_CATALOG = [
 ROUTES_OPERADOR = [
     "/materiales", "/materiales/guardar", "/materiales/importar",
     "/materiales/exportar/*", "/materiales/plantilla/*", "/materiales/eliminar/*",
+    "/materiales/imagen/*", "/materiales/distribucion/*",
     "/ubicaciones", "/ubicaciones/guardar", "/ubicaciones/eliminar/*",
     "/ubicaciones/importar", "/ubicaciones/exportar/*", "/ubicaciones/plantilla/*",
     "/tipoubicacion", "/tipoubicacion/guardar", "/tipoubicacion/eliminar/*",
@@ -1113,7 +1126,7 @@ ROUTES_OPERADOR = [
 ]
 
 ROUTES_CONSULTA = [
-    "/materiales", "/ubicaciones", "/tipoubicacion", "/proveedores",
+    "/materiales", "/materiales/imagen/*", "/materiales/distribucion/*", "/ubicaciones", "/tipoubicacion", "/proveedores",
     "/clientes", "/categorias", "/unidades", "/transportes", "/rutas",
     "/zonas", "/clases-pedido",
     "/pedidos", "/pedidos/ver/*", "/pedidos/filtros/*",

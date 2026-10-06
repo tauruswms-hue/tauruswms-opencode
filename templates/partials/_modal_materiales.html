@@ -1,5 +1,5 @@
 <div id="modalMateriales" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: flex-start; overflow-y: auto; padding: 20px 0;">
-    <div class="modal-card" style="background: white; width: 90%; max-width: 700px; border-radius: 8px; box-sizing: border-box; margin: auto; display: flex; flex-direction: column; max-height: calc(100vh - 40px);">
+    <div class="modal-card" style="background: white; width: 94%; max-width: 860px; border-radius: 8px; box-sizing: border-box; margin: 0 auto; display: flex; flex-direction: column; max-height: calc(100vh - 40px);">
         <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; padding: 20px 25px 15px; border-bottom: 1px solid #eee; flex-shrink: 0;">
             <h3 id="modalTitle" style="margin:0;">Nuevo Material</h3>
             <button class="close-btn" onclick="closeModal()" style="background:none; border:none; font-size: 1.5rem; cursor:pointer;">&times;</button>
@@ -9,59 +9,66 @@
 
             <div class="mat-tabs">
                 <button type="button" class="mat-tab-btn active" data-tab="tab-mat-ident"><i class="fas fa-tag"></i> Identificación</button>
-                <button type="button" class="mat-tab-btn" data-tab="tab-mat-stock"><i class="fas fa-balance-scale"></i> Stock y Pesos</button>
+                <button type="button" class="mat-tab-btn" data-tab="tab-mat-stock"><i class="fas fa-balance-scale"></i> Stock, Pesos y Volumen</button>
                 <button type="button" class="mat-tab-btn" data-tab="tab-mat-control"><i class="fas fa-cogs"></i> Trazabilidad y Picking</button>
                 <button type="button" class="mat-tab-btn" data-tab="tab-mat-prov"><i class="fas fa-truck-loading"></i> Proveedores</button>
                 <button type="button" class="mat-tab-btn" data-tab="tab-mat-pres"><i class="fas fa-cubes"></i> Presentaciones</button>
             </div>
 
-            <div style="overflow-y: auto; flex: 1; padding: 20px 25px;">
+            <div class="mat-cuerpo">
 
             <div class="mat-tab-panel active" id="tab-mat-ident">
-                <div class="form-row" style="display: flex; gap: 15px; margin-bottom: 15px; flex-wrap: wrap;">
-                    <div class="form-group" style="flex: 1; min-width: 150px;">
-                        <label style="font-size:0.8rem; font-weight:bold; color:#666;">Código *</label>
-                        <input type="text" name="codigo" id="form_codigo" required style="width:100%; padding: 10px; border: 1px solid #ddd; border-radius:4px; box-sizing:border-box;">
+                <div class="mat-fila">
+                    <div class="mat-campo" style="flex: 1; min-width: 150px;">
+                        <label>Código *</label>
+                        <input type="text" name="codigo" id="form_codigo" required maxlength="100">
                     </div>
-                    <div class="form-group" style="flex: 2; min-width: 200px;">
-                        <label style="font-size:0.8rem; font-weight:bold; color:#666;">Nombre *</label>
-                        <input type="text" name="nombre" id="form_nombre" required style="width:100%; padding: 10px; border: 1px solid #ddd; border-radius:4px; box-sizing:border-box;">
+                    <div class="mat-campo" style="flex: 3; min-width: 200px;">
+                        <label>Nombre *</label>
+                        <input type="text" name="nombre" id="form_nombre" required maxlength="255">
                     </div>
-                </div>
-
-                <div class="form-row" id="fila_activo" style="display:none; margin-bottom: 15px;">
-                    <input type="hidden" name="activo" value="0" id="form_activo_base" disabled>
-                    <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.9rem;">
-                        <input type="checkbox" name="activo" value="1" id="form_activo" disabled style="cursor:pointer;">
-                        <span><strong>Activo</strong> — un material inactivo no se ofrece al cargar pedidos.</span>
-                    </label>
-                </div>
-
-                <div class="form-row" style="display: flex; gap: 15px; margin-bottom: 15px; flex-wrap: wrap;">
-                    <div class="form-group" style="flex: 1; min-width: 200px;">
-                        <label style="font-size:0.8rem; font-weight:bold; color:#666;">
-                            <i class="fas fa-barcode"></i> Código de Barras
-                        </label>
-                        <input type="text" name="codigo_barras" id="form_codigo_barras" maxlength="13"
-                               placeholder="EAN-8 o EAN-13 (8 o 13 dígitos)"
-                               style="width:100%; padding: 10px; border: 1px solid #ddd; border-radius:4px; box-sizing:border-box;">
-                        <small style="color:#888;">Si se completa, debe ser un código EAN-8 (8 dígitos) o EAN-13 (13 dígitos) válido.</small>
+                    <div class="mat-campo" style="flex: 0 0 130px; min-width: 130px;">
+                        <label title="Un material inactivo no se ofrece al cargar pedidos">Estado</label>
+                        <select name="activo" id="form_activo" title="Un material inactivo no se ofrece al cargar pedidos">
+                            <option value="1">Activo</option>
+                            <option value="0">Inactivo</option>
+                        </select>
                     </div>
                 </div>
 
-                <div class="form-row" style="display: flex; gap: 15px; margin-bottom: 15px; flex-wrap: wrap;">
-                    <div class="form-group" style="flex: 1;">
-                        <label style="font-size:0.8rem; font-weight:bold; color:#666;">Categoría</label>
-                        <select name="categoria_id" id="form_categoria" style="width:100%; padding: 10px; border: 1px solid #ddd; border-radius:4px;">
+                <div class="mat-fila">
+                    <div class="mat-campo">
+                        <label><i class="fas fa-barcode"></i> Código de Barras</label>
+                        <input type="text" name="codigo_barras" id="form_codigo_barras" maxlength="13" inputmode="numeric"
+                               placeholder="EAN-8 o EAN-13">
+                    </div>
+                    <div class="mat-campo">
+                        <label>Código Alternativo</label>
+                        <input type="text" name="codigo_alternativo" id="form_codigo_alternativo" maxlength="{{ codigo_max }}"
+                               placeholder="Por defecto, el código">
+                    </div>
+                    <div class="mat-campo">
+                        <label>Código Proveedor</label>
+                        <input type="text" name="codigo_proveedor" id="form_codigo_proveedor" maxlength="{{ codigo_max }}"
+                               placeholder="Por defecto, el código">
+                    </div>
+                    <small class="mat-ayuda">Código de barras: EAN-8 (8 dígitos) o EAN-13 (13 dígitos) válido, opcional.
+                        Alternativo y Proveedor: si no se cambian, toman el mismo valor que el Código.</small>
+                </div>
+
+                <div class="mat-fila">
+                    <div class="mat-campo">
+                        <label>Categoría</label>
+                        <select name="categoria_id" id="form_categoria">
                             <option value="">Seleccionar...</option>
                             {% for cat in categorias %}
                             <option value="{{ cat.id_categoria }}">{{ cat.nombre }}</option>
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="form-group" style="flex: 1;">
-                        <label style="font-size:0.8rem; font-weight:bold; color:#666;">Unidad Medida *</label>
-                        <select name="unidad_medida_id" id="form_unidad" required style="width:100%; padding: 10px; border: 1px solid #ddd; border-radius:4px; box-sizing:border-box;">
+                    <div class="mat-campo">
+                        <label>Unidad Medida *</label>
+                        <select name="unidad_medida_id" id="form_unidad" required>
                             <option value="">Seleccionar...</option>
                             {% for u in unidades %}
                             <option value="{{ u.id_unidad }}">{{ u.nombre }} ({{ u.simbolo }}){% if not u.activo %} — inactiva{% endif %}</option>
@@ -70,9 +77,27 @@
                     </div>
                 </div>
 
-                <div class="form-group" style="margin-bottom: 15px;">
-                    <label style="font-size:0.8rem; font-weight:bold; color:#666;">Descripción</label>
-                    <textarea name="descripcion" id="form_desc" style="width:100%; padding: 10px; border: 1px solid #ddd; border-radius:4px; box-sizing:border-box;" rows="2"></textarea>
+                <div class="mat-fila" style="margin-bottom:0;">
+                    <div class="mat-campo">
+                        <label>Descripción</label>
+                        <textarea name="descripcion" id="form_desc" rows="4"></textarea>
+                    </div>
+                    <div class="mat-campo">
+                        <label><i class="fas fa-image"></i> Imagen del producto</label>
+                        <div style="display:flex; gap:10px; align-items:flex-start;">
+                            <div style="flex:1; min-width:0;">
+                                <input type="text" name="imagen_ruta" id="form_imagen_ruta" maxlength="{{ imagen_max }}"
+                                       placeholder="Ruta del archivo o dirección web"
+                                       title="Ejemplos: C:\imagenes\producto.jpg — \\servidor\fotos\producto.jpg — https://sitio.com/producto.jpg">
+                                <small class="mat-ayuda">Ruta en el servidor, ruta de red o dirección web (http/https).
+                                    JPG, PNG, GIF, WEBP o BMP.</small>
+                                <small class="mat-ayuda" id="imagen_aviso"></small>
+                            </div>
+                            <a id="imagen_vista" href="#" target="_blank" rel="noopener" title="Abrir la imagen" style="display:none; flex:0 0 auto;">
+                                <img id="imagen_vista_img" alt="Imagen del producto" style="width:72px; height:72px; object-fit:contain; border:1px solid #ddd; border-radius:4px; background:#fafafa;">
+                            </a>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -80,24 +105,50 @@
                 <div class="form-row" style="display: flex; gap: 15px; margin-bottom: 15px; flex-wrap: wrap;">
                     <div class="form-group" style="flex: 1;">
                         <label style="font-size:0.8rem; font-weight:bold; color:#666;">Stock Mínimo</label>
-                        <input type="number" step="0.01" name="stock_minimo" id="form_stock_min" value="0.00" style="width:100%; padding: 10px; border: 1px solid #ddd; border-radius:4px; box-sizing:border-box;">
+                        <input type="number" step="0.01" name="stock_minimo" id="form_stock_min" value="0" min="0" style="width:100%; padding: 10px; border: 1px solid #ddd; border-radius:4px; box-sizing:border-box;">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label style="font-size:0.8rem; font-weight:bold; color:#666;">Stock de Reposición</label>
+                        <input type="number" step="0.01" name="stock_reposicion" id="form_stock_repo" value="0" min="0" style="width:100%; padding: 10px; border: 1px solid #ddd; border-radius:4px; box-sizing:border-box;">
                     </div>
                     <div class="form-group" style="flex: 1;">
                         <label style="font-size:0.8rem; font-weight:bold; color:#666;">Stock Máximo</label>
-                        <input type="number" step="0.01" name="stock_maximo" id="form_stock_max" value="0.00" style="width:100%; padding: 10px; border: 1px solid #ddd; border-radius:4px; box-sizing:border-box;">
+                        <input type="number" step="0.01" name="stock_maximo" id="form_stock_max" value="0" min="0" style="width:100%; padding: 10px; border: 1px solid #ddd; border-radius:4px; box-sizing:border-box;">
+                    </div>
+                </div>
+
+                <small style="color:#888; display:block; margin:-8px 0 15px;">Reposición: al bajar a esta cantidad hay que reponer el material. Va entre el mínimo y el máximo; 0 = sin definir.</small>
+
+                <div class="form-row" style="display: flex; gap: 15px; margin-bottom: 15px; flex-wrap: wrap;">
+                    <div class="form-group" style="flex: 1;">
+                        <label style="font-size:0.8rem; font-weight:bold; color:#666;">Peso Bruto (kg)</label>
+                        <input type="number" step="0.001" name="peso_bruto" id="form_peso_bruto" placeholder="0" min="0" style="width:100%; padding: 10px; border: 1px solid #ddd; border-radius:4px; box-sizing:border-box;">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label style="font-size:0.8rem; font-weight:bold; color:#666;">Peso Neto (kg)</label>
+                        <input type="number" step="0.001" name="peso_neto" id="form_peso_neto" placeholder="0" min="0" style="width:100%; padding: 10px; border: 1px solid #ddd; border-radius:4px; box-sizing:border-box;">
                     </div>
                 </div>
 
                 <div class="form-row" style="display: flex; gap: 15px; margin-bottom: 15px; flex-wrap: wrap;">
                     <div class="form-group" style="flex: 1;">
-                        <label style="font-size:0.8rem; font-weight:bold; color:#666;">Peso Bruto (kg)</label>
-                        <input type="number" step="0.001" name="peso_bruto" id="form_peso_bruto" placeholder="0.000" style="width:100%; padding: 10px; border: 1px solid #ddd; border-radius:4px; box-sizing:border-box;">
+                        <label style="font-size:0.8rem; font-weight:bold; color:#666;">Volumen</label>
+                        <input type="number" step="0.0001" name="volumen" id="form_volumen" placeholder="0" min="0" style="width:100%; padding: 10px; border: 1px solid #ddd; border-radius:4px; box-sizing:border-box;">
                     </div>
                     <div class="form-group" style="flex: 1;">
-                        <label style="font-size:0.8rem; font-weight:bold; color:#666;">Peso Neto (kg)</label>
-                        <input type="number" step="0.001" name="peso_neto" id="form_peso_neto" placeholder="0.000" style="width:100%; padding: 10px; border: 1px solid #ddd; border-radius:4px; box-sizing:border-box;">
+                        <label style="font-size:0.8rem; font-weight:bold; color:#666;">Unidad del Volumen</label>
+                        <select name="volumen_unidad_id" id="form_volumen_unidad" style="width:100%; padding: 10px; border: 1px solid #ddd; border-radius:4px; box-sizing:border-box;">
+                            <option value="">Seleccionar...</option>
+                            {% for u in unidades_volumen %}
+                            <option value="{{ u.id_unidad }}">{{ u.nombre }} ({{ u.simbolo }}){% if not u.activo %} — inactiva{% endif %}</option>
+                            {% endfor %}
+                        </select>
                     </div>
                 </div>
+                <small style="color:#888; display:block;">
+                    {% if unidades_volumen %}El volumen se carga junto con su unidad de medida. Se ofrecen las unidades de magnitud Volumen.
+                    {% else %}Para cargar el volumen primero hay que crear una unidad de medida de magnitud Volumen (por ejemplo litro o metro cúbico) en el Maestro de Unidades.{% endif %}
+                </small>
             </div>
 
             <div class="mat-tab-panel" id="tab-mat-control">
@@ -126,24 +177,27 @@
                         <option value="{{ mp.value }}" {% if mp.value == (picking_metodo_default or 'libre') %}selected{% endif %}>{{ mp.label }}</option>
                         {% endfor %}
                     </select>
-                    <small style="color:#888;">Define el método de picking que se aplica a este material al preparar pedidos.</small>
+                    <small style="color:#888;">Define el método de picking que se aplica a este material al preparar pedidos. Se ofrecen los métodos habilitados para la empresa.</small>
+                    <small id="aviso_metodo_picking" style="color:#c0392b; display:none; margin-top:4px;"></small>
                 </div>
             </div>
 
             <div class="mat-tab-panel" id="tab-mat-prov">
                 <div class="form-section" style="margin-bottom: 20px;">
                     <h4><i class="fas fa-truck-loading"></i> Proveedores Autorizados</h4>
-                <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                <small style="color:#888; display:block; margin-bottom:10px;">
+                    Proveedores a los que se les compra este material. Es opcional; el habitual se muestra en el listado.
+                </small>
+                <table class="mat-tabla">
                     <thead>
-                        <tr style="border-bottom: 2px solid #eee;">
-                            <th style="text-align:left; padding: 8px;">Proveedor</th>
-                            <th style="text-align:left; padding: 8px;">Código Ref. Proveedor</th>
-                            <th style="text-align:center; padding: 8px; width: 70px;" title="Marcar como proveedor habitual"><i class="fas fa-star" style="color:#f39c12;"></i> Habitual</th>
-                            <th style="width: 40px; padding: 8px;"></th>
+                        <tr>
+                            <th>Proveedor</th>
+                            <th>Código del material para el proveedor</th>
+                            <th class="col-habitual centro" title="Marcar como proveedor habitual"><i class="fas fa-star" style="color:#f39c12;"></i> Habitual</th>
+                            <th class="col-accion"></th>
                         </tr>
                     </thead>
-                    <tbody id="listaProveedoresCuerpo">
-                        </tbody>
+                    <tbody id="listaProveedoresCuerpo"></tbody>
                 </table>
                 <button type="button" class="btn-sec" onclick="agregarFilaProveedor()" style="margin-top:10px; background: #95a5a6; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">
                     <i class="fas fa-plus"></i> Agregar Proveedor
@@ -157,15 +211,15 @@
                     <small style="color:#888; display:block; margin-bottom:10px;">
                         Defina los embalajes (caja, pallet, display…) con su GTIN-14 (14 dígitos, único) y la cantidad de unidades base que contienen.
                     </small>
-                    <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                    <table class="mat-tabla">
                         <thead>
-                            <tr style="border-bottom: 2px solid #eee;">
-                                <th style="text-align:left; padding: 8px;">Nombre</th>
-                                <th style="text-align:left; padding: 8px;">GTIN-14 (indicador + código + dígito verificador)</th>
-                                <th style="text-align:center; padding: 8px; width: 70px;">Unidades</th>
-                                <th style="text-align:center; padding: 8px; width: 90px;">P. Bruto (kg)</th>
-                                <th style="text-align:center; padding: 8px; width: 90px;">P. Neto (kg)</th>
-                                <th style="width: 40px; padding: 8px;"></th>
+                            <tr>
+                                <th>Nombre</th>
+                                <th class="col-gtin" title="Indicador de nivel de embalaje (1 a 8) + código + dígito verificador. El botón lo genera a partir del EAN-13 del material.">GTIN-14 <i class="fas fa-circle-info" style="color:#aaa;"></i></th>
+                                <th class="col-num num">Unidades</th>
+                                <th class="col-num num">P. Bruto (kg)</th>
+                                <th class="col-num num">P. Neto (kg)</th>
+                                <th class="col-accion"></th>
                             </tr>
                         </thead>
                         <tbody id="listaPresentacionesCuerpo"></tbody>

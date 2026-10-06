@@ -137,6 +137,8 @@ INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/materiale
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/materiales/exportar/*');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/materiales/plantilla/*');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/materiales/eliminar/*');
+INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/materiales/imagen/*');
+INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/materiales/distribucion/*');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/ubicaciones');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/ubicaciones/guardar');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/ubicaciones/eliminar/*');
@@ -235,6 +237,8 @@ INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/movil');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/movil/*');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/sidebar-preferences');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('CONSULTA', '/materiales');
+INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('CONSULTA', '/materiales/imagen/*');
+INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('CONSULTA', '/materiales/distribucion/*');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('CONSULTA', '/ubicaciones');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('CONSULTA', '/tipoubicacion');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('CONSULTA', '/proveedores');
@@ -425,6 +429,7 @@ CREATE TABLE `clientes` (
     `id_cliente` int AUTO_INCREMENT PRIMARY KEY,
     `codigo` varchar(100),
     `razonsocial` varchar(200) NOT NULL,
+    `nombre_fantasia` varchar(200),
     `cuit` varchar(50),
     `direccion` varchar(255),
     `localidad` varchar(100),
@@ -432,6 +437,7 @@ CREATE TABLE `clientes` (
     `telefono` varchar(50),
     `email` varchar(100),
     `contacto_nombre` varchar(100),
+    `sitio_web` varchar(255),
     `id_ruta` int,
     `id_transporte_predeterminado` int,
     `activo` TINYINT(1) NOT NULL DEFAULT TRUE,
@@ -447,16 +453,22 @@ CREATE TABLE `materiales` (
     `id` int AUTO_INCREMENT PRIMARY KEY,
     `codigo` varchar(100) NOT NULL,
     `codigo_barras` varchar(100),
+    `codigo_alternativo` varchar(100),
+    `codigo_proveedor` varchar(100),
     `nombre` varchar(255) NOT NULL,
     `descripcion` text,
     `categoria_id` int,
     `stock_minimo` decimal(12,3) DEFAULT 0,
     `stock_maximo` decimal(12,3) DEFAULT 0,
+    `stock_reposicion` decimal(12,3) DEFAULT 0,
     `unidad_medida_id` int,
     `trazabilidad` ENUM('NINGUNA','LOTE','SERIE') NOT NULL DEFAULT 'ninguna',
     `metodo_picking` varchar(20) NOT NULL DEFAULT 'libre',
     `peso_bruto` decimal(10,3),
     `peso_neto` decimal(10,3),
+    `volumen` decimal(12,4),
+    `volumen_unidad_id` int,
+    `imagen_ruta` varchar(500),
     `costo_promedio` decimal(12,4) DEFAULT 0,
     `ultimo_costo` decimal(12,4) DEFAULT 0,
     `activo` TINYINT(1) NOT NULL DEFAULT TRUE,

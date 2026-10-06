@@ -6,6 +6,60 @@ function esc(valor) {
         .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+// Número sin ceros de relleno: "100.000" -> "100", "0.500" -> "0.5", vacío -> "".
+function numeroLimpio(valor) {
+    if (valor === null || valor === undefined || valor === '') return '';
+    var n = parseFloat(valor);
+    return isNaN(n) ? '' : String(n);
+}
+
+// Códigos alternativo y del proveedor: por defecto valen lo mismo que el código del
+// material. Mientras no se los cambie a mano, acompañan lo que se escribe en Código.
+var codigoPrevio = '';
+function seguirCodigo() {
+    var codigo = $('#form_codigo').val();
+    ['#form_codigo_alternativo', '#form_codigo_proveedor'].forEach(function(campo) {
+        var actual = $(campo).val();
+        if (actual === '' || actual === codigoPrevio) $(campo).val(codigo);
+    });
+    codigoPrevio = codigo;
+}
+$(document).on('input', '#form_codigo', seguirCodigo);
+
+// ─── Imagen del producto ─────────────────────────────────────────────────────
+// Una dirección web se puede mostrar al instante. Una ruta del servidor o de red
+// la tiene que leer el servidor: se ve recién cuando el material está guardado.
+var imagenGuardada = { id: null, ruta: '' };
+
+function actualizarVistaImagen() {
+    var ruta = ($('#form_imagen_ruta').val() || '').trim();
+    var $vista = $('#imagen_vista'), $aviso = $('#imagen_aviso');
+    var origen = '';
+    $aviso.text('');
+    if (/^https?:\/\//i.test(ruta)) {
+        origen = ruta;
+    } else if (ruta && imagenGuardada.id && ruta === imagenGuardada.ruta) {
+        origen = '/materiales/imagen/' + imagenGuardada.id + '?v=' + encodeURIComponent(ruta);
+    } else if (ruta) {
+        $aviso.text('La vista previa de una ruta del servidor o de red aparece después de guardar.');
+    }
+    if (!origen) { $vista.hide(); return; }
+    $('#imagen_vista_img').off('error').on('error', function() {
+        $vista.hide();
+        $aviso.text('No se pudo cargar la imagen: revisar que la ruta exista y que el servidor pueda leerla.');
+    }).attr('src', origen);
+    $vista.attr('href', origen).show();
+}
+$(document).on('change blur', '#form_imagen_ruta', actualizarVistaImagen);
+
+// Muestra una pestaña del formulario
+function mostrarPestana(idTab) {
+    $('.mat-tab-btn').removeClass('active');
+    $('.mat-tab-panel').removeClass('active');
+    $('.mat-tab-btn[data-tab="' + idTab + '"]').addClass('active');
+    $('#' + idTab).addClass('active');
+}
+
 function validarEAN(barcode) {
     if (!barcode || barcode.trim() === '') return { valido: true };
     barcode = barcode.trim();
@@ -26,13 +80,7 @@ function validarEAN(barcode) {
 }
 
 $(document).ready(function() {
-    $('.mat-tab-btn').on('click', function() {
-        var idTab = $(this).data('tab');
-        $('.mat-tab-btn').removeClass('active');
-        $('.mat-tab-panel').removeClass('active');
-        $(this).addClass('active');
-        $('#' + idTab).addClass('active');
-    });
+    $('.mat-tab-btn').on('click', function() { mostrarPestana($(this).data('tab')); });
 
     $('#tablaMateriales').DataTable({
         "paging": false,                    // todas las filas en el cuerpo; el scroll lo maneja la grilla
@@ -79,6 +127,15 @@ $(document).ready(function() {
         if (proveedorRepetido) {
             e.preventDefault();
             alert('Hay un proveedor repetido en la lista de proveedores.');
+            return;
+        }
+
+        // El volumen se carga con su unidad
+        if (parseFloat($('#form_volumen').val()) > 0 && !$('#form_volumen_unidad').val()) {
+            e.preventDefault();
+            mostrarPestana('tab-mat-stock');
+            alert('Indique la unidad de medida del volumen.');
+            $('#form_volumen_unidad').focus();
             return;
         }
 
@@ -137,12 +194,12 @@ function agregarFilaProveedor(idProv = '', codigoProv = '', esHabitual = 0) {
     let checked = esHabitual ? 'checked' : '';
     let fila = `
         <tr>
-            <td style="padding: 5px;"><select name="prov_ids[]" required style="width:100%; padding: 5px; border:1px solid #ddd; border-radius:4px;">${options}</select></td>
-            <td style="padding: 5px;"><input type="text" name="prov_codigos[]" value="${esc(codigoProv)}" style="width:100%; padding: 5px; border:1px solid #ddd; border-radius:4px;"></td>
-            <td style="padding: 5px; text-align:center;">
+            <td><select name="prov_ids[]" required>${options}</select></td>
+            <td><input type="text" name="prov_codigos[]" value="${esc(codigoProv)}" maxlength="100"></td>
+            <td class="centro">
                 <input type="radio" name="prov_habitual" value="_idx_" ${checked} title="Marcar como habitual" style="cursor:pointer; accent-color:#f39c12; width:16px; height:16px;">
             </td>
-            <td style="padding: 5px; text-align:center;"><button type="button" class="btn-icon delete" onclick="$(this).closest('tr').remove()" style="color: #e74c3c; background:none; border:none; cursor:pointer;"><i class="fas fa-times"></i></button></td>
+            <td class="centro"><button type="button" class="mat-quitar" title="Quitar" onclick="$(this).closest('tr').remove(); reindexHabitual();"><i class="fas fa-times"></i></button></td>
         </tr>`;
 
     let tbody = $('#listaProveedoresCuerpo');
@@ -204,7 +261,7 @@ function agregarFilaPresentacion(nombre, codigoBarras, cantidadUnidades, indicad
     indicador = indicador || 1;
     pesoBruto = pesoBruto || '';
     var pesoNetoMaterial = parseFloat($('#form_peso_neto').val()) || 0;
-    pesoNeto = pesoNeto || (pesoNetoMaterial * cantidadUnidades).toFixed(3);
+    pesoNeto = pesoNeto || (pesoNetoMaterial ? (pesoNetoMaterial * cantidadUnidades).toFixed(3) : '');
 
     var indicadorOptions = '';
     for (var i = 1; i <= 8; i++) {
@@ -214,43 +271,18 @@ function agregarFilaPresentacion(nombre, codigoBarras, cantidadUnidades, indicad
 
     var fila = `
         <tr>
-            <td style="padding:5px;">
-                <input type="text" name="pres_nombres[]" value="${esc(nombre)}" placeholder="Ej: Caja x12"
-                       required style="width:100%; padding:5px; border:1px solid #ddd; border-radius:4px;">
+            <td><input type="text" name="pres_nombres[]" value="${esc(nombre)}" placeholder="Ej: Caja x12" required maxlength="100"></td>
+            <td>
+                <div class="mat-gtin">
+                    <select name="pres_indicadores[]" title="Indicador GTIN (nivel de embalaje)">${indicadorOptions}</select>
+                    <input type="text" name="pres_barcodes[]" value="${esc(codigoBarras)}" maxlength="14" inputmode="numeric" placeholder="14 dígitos">
+                    <button type="button" title="Generar el GTIN-14 a partir del EAN-13 del material" onclick="autoGTIN14(this)"><i class="fas fa-magic"></i></button>
+                </div>
             </td>
-            <td style="padding:5px; display:flex; gap:4px; align-items:center;">
-                <select name="pres_indicadores[]" title="Indicador GTIN (nivel de embalaje)" 
-                        style="padding:5px; border:1px solid #ddd; border-radius:4px; width:50px;">
-                    ${indicadorOptions}
-                </select>
-                <input type="text" name="pres_barcodes[]" value="${esc(codigoBarras)}" maxlength="14"
-                       placeholder="GTIN-14"
-                       style="flex:1; padding:5px; border:1px solid #ddd; border-radius:4px;">
-                <button type="button" title="Generar GTIN-14 desde EAN-13 del material"
-                        onclick="autoGTIN14(this)"
-                        style="white-space:nowrap; background:#16a085; color:white; border:none; padding:5px 7px; border-radius:4px; cursor:pointer; font-size:0.75rem;">
-                    <i class="fas fa-magic"></i>
-                </button>
-            </td>
-            <td style="padding:5px;">
-                <input type="number" name="pres_cantidades[]" value="${esc(cantidadUnidades)}" min="0.001" step="0.001"
-                       style="width:100%; padding:5px; border:1px solid #ddd; border-radius:4px; text-align:right;"
-                       onchange="actualizarPesoNetoPresentacion(this)">
-            </td>
-            <td style="padding:5px;">
-                <input type="number" name="pres_pesos_brutos[]" value="${esc(pesoBruto)}" step="0.001" min="0"
-                       placeholder="0.000" style="width:100%; padding:5px; border:1px solid #ddd; border-radius:4px; text-align:right;">
-            </td>
-            <td style="padding:5px;">
-                <input type="number" name="pres_pesos_netos[]" value="${esc(pesoNeto)}" step="0.001" min="0"
-                       placeholder="0.000" style="width:100%; padding:5px; border:1px solid #ddd; border-radius:4px; text-align:right;">
-            </td>
-            <td style="padding:5px; text-align:center;">
-                <button type="button" onclick="$(this).closest('tr').remove()"
-                        style="color:#e74c3c; background:none; border:none; cursor:pointer;">
-                    <i class="fas fa-times"></i>
-                </button>
-            </td>
+            <td><input type="number" class="num" name="pres_cantidades[]" value="${esc(numeroLimpio(cantidadUnidades))}" min="0.001" step="0.001" onchange="actualizarPesoNetoPresentacion(this)"></td>
+            <td><input type="number" class="num" name="pres_pesos_brutos[]" value="${esc(numeroLimpio(pesoBruto))}" step="0.001" min="0" placeholder="0"></td>
+            <td><input type="number" class="num" name="pres_pesos_netos[]" value="${esc(numeroLimpio(pesoNeto))}" step="0.001" min="0" placeholder="0"></td>
+            <td class="centro"><button type="button" class="mat-quitar" title="Quitar" onclick="$(this).closest('tr').remove()"><i class="fas fa-times"></i></button></td>
         </tr>`;
     $('#listaPresentacionesCuerpo').append(fila);
 }
@@ -259,7 +291,8 @@ function actualizarPesoNetoPresentacion(inputCantidad) {
     var tr = $(inputCantidad).closest('tr');
     var cantidad = parseFloat($(inputCantidad).val()) || 0;
     var pesoNetoMaterial = parseFloat($('#form_peso_neto').val()) || 0;
-    var nuevoPesoNeto = (pesoNetoMaterial * cantidad).toFixed(3);
+    if (!pesoNetoMaterial) return;   // sin peso neto del material no hay nada que calcular
+    var nuevoPesoNeto = numeroLimpio((pesoNetoMaterial * cantidad).toFixed(3));
     tr.find('input[name="pres_pesos_netos[]"]').val(nuevoPesoNeto);
 }
 
@@ -291,8 +324,12 @@ function openModal() {
         }
         $selMetodo.val(valorDefault);
     }
-    $('#fila_activo').hide();
-    $('#form_activo, #form_activo_base').prop('disabled', true);
+    mostrarPestana('tab-mat-ident');
+    codigoPrevio = '';
+    imagenGuardada = { id: null, ruta: '' };
+    actualizarVistaImagen();
+    $('#aviso_metodo_picking').hide().text('');
+    $('#form_activo').val('1');   // un material nuevo se propone Activo
     $('#modalMateriales').css('display', 'flex').hide().fadeIn(150);
 }
 
@@ -303,25 +340,40 @@ function editMaterial(data) {
     $('#modalTitle').text('Editar: ' + data.nombre);
 
     $('#form_id_material').val(data.id);
-    // "Activo" solo se muestra y se envía al editar
-    $('#fila_activo').show();
-    $('#form_activo, #form_activo_base').prop('disabled', false);
-    $('#form_activo').prop('checked', !!data.activo);
+    $('#form_activo').val(data.activo ? '1' : '0');
     $('#form_codigo').val(data.codigo);
     $('#form_nombre').val(data.nombre);
     $('#form_desc').val(data.descripcion);
     $('#form_codigo_barras').val(data.codigo_barras || '');
+    // Sin valor guardado (materiales anteriores), se muestra el código del material
+    $('#form_codigo_alternativo').val(data.codigo_alternativo || data.codigo);
+    $('#form_codigo_proveedor').val(data.codigo_proveedor || data.codigo);
+    codigoPrevio = data.codigo;
+    $('#form_volumen').val(numeroLimpio(data.volumen));
+    $('#form_volumen_unidad').val(data.volumen_unidad_id || '');
+    $('#form_imagen_ruta').val(data.imagen_ruta || '');
+    imagenGuardada = { id: data.id, ruta: data.imagen_ruta || '' };
+    actualizarVistaImagen();
     $('#form_categoria').val(data.categoria_id);
     $('#form_unidad').val(data.unidad_medida_id);
-    $('#form_stock_min').val(data.stock_minimo);
-    $('#form_stock_max').val(data.stock_maximo);
-    $('#form_peso_bruto').val(data.peso_bruto || '');
-    $('#form_peso_neto').val(data.peso_neto || '');
+    $('#form_stock_min').val(numeroLimpio(data.stock_minimo) || '0');
+    $('#form_stock_max').val(numeroLimpio(data.stock_maximo) || '0');
+    $('#form_stock_repo').val(numeroLimpio(data.stock_reposicion) || '0');
+    $('#form_peso_bruto').val(numeroLimpio(data.peso_bruto));
+    $('#form_peso_neto').val(numeroLimpio(data.peso_neto));
     $('input[name="trazabilidad"][value="' + (data.trazabilidad || 'ninguna') + '"]').prop('checked', true);
     var $selMetodo = $('#form_metodo_picking');
     if ($selMetodo.length) {
-        $selMetodo.val(data.metodo_picking || 'libre');
-        if (!$selMetodo.val()) $selMetodo.val($selMetodo.find('option').first().val());
+        var guardado = data.metodo_picking || 'libre';
+        $selMetodo.val(guardado);
+        if (!$selMetodo.val()) {
+            // El método que tenía el material ya no está habilitado para la empresa:
+            // se propone el método por defecto y se avisa, para que el cambio no pase inadvertido.
+            $selMetodo.val(metodoPickingDefault);
+            if (!$selMetodo.val()) $selMetodo.val($selMetodo.find('option').first().val());
+            $('#aviso_metodo_picking').text('Este material tenía el método "' + (metodosPickingLabels[guardado] || guardado) +
+                '", que no está habilitado para la empresa. Al guardar quedará con el método seleccionado.').show();
+        }
     }
 
     let misProvs = relacionesExistentes.filter(r => r.id_material == data.id);
@@ -344,3 +396,56 @@ function editMaterial(data) {
 }
 
 // toggleDropdownExportar y funciones de importación viven en batch_ui.js
+
+// ─── DISTRIBUCIÓN ─────────────────────────────────────────────────────────────
+// Stock del material en cada posición (ubicación + contenedor + lote + tipo de stock).
+function cerrarDistribucion() { $('#modalDistribucion').fadeOut(150); }
+
+function verDistribucion(idMaterial) {
+    $('#distMaterial').text('');
+    $('#distResumen').empty();
+    $('#distTabla').hide();
+    $('#distMensaje').text('Consultando el stock…').show();
+    $('#modalDistribucion').css('display', 'flex').hide().fadeIn(150);
+
+    $.getJSON('/materiales/distribucion/' + idMaterial)
+        .done(function(datos) {
+            var unidad = datos.material.unidad ? ' ' + datos.material.unidad : '';
+            $('#distMaterial').text(datos.material.codigo + ' — ' + datos.material.nombre);
+            if (!datos.posiciones.length) {
+                $('#distMensaje').text('Este material no tiene stock en ninguna posición.').show();
+                return;
+            }
+            var cuerpo = datos.posiciones.map(function(p) {
+                return '<tr>' +
+                    '<td><strong>' + esc(p.ubicacion) + '</strong>' +
+                        (p.ubicacion_descripcion ? '<div class="dist-sub">' + esc(p.ubicacion_descripcion) + '</div>' : '') + '</td>' +
+                    '<td>' + esc(p.zona || '—') + (p.tipo_ubicacion ? '<div class="dist-sub">' + esc(p.tipo_ubicacion) + '</div>' : '') + '</td>' +
+                    '<td>' + esc(p.contenedor || '—') + '</td>' +
+                    '<td>' + esc(p.lote || '—') + '</td>' +
+                    '<td>' + esc(p.tipo_stock || '—') + '</td>' +
+                    '<td>' + esc(p.vencimiento || '—') + '</td>' +
+                    '<td class="num"><strong>' + numeroLimpio(p.total) + '</strong></td>' +
+                    '<td class="num">' + numeroLimpio(p.disponible) + '</td>' +
+                    '<td class="num">' + numeroLimpio(p.entrando) + '</td>' +
+                    '<td class="num">' + numeroLimpio(p.saliendo) + '</td>' +
+                    '</tr>';
+            }).join('');
+            $('#distCuerpo').html(cuerpo);
+            $('#distTotTotal').text(numeroLimpio(datos.totales.total) + unidad);
+            $('#distTotDisponible').text(numeroLimpio(datos.totales.disponible) + unidad);
+            $('#distTotEntrando').text(numeroLimpio(datos.totales.entrando) + unidad);
+            $('#distTotSaliendo').text(numeroLimpio(datos.totales.saliendo) + unidad);
+            $('#distResumen').html(
+                '<span><strong>' + numeroLimpio(datos.totales.total) + esc(unidad) + '</strong> en total</span>' +
+                '<span><strong>' + numeroLimpio(datos.totales.disponible) + esc(unidad) + '</strong> disponible</span>' +
+                '<span><strong>' + datos.ubicaciones + '</strong> ' + (datos.ubicaciones === 1 ? 'ubicación' : 'ubicaciones') + '</span>' +
+                '<span><strong>' + datos.posiciones.length + '</strong> ' + (datos.posiciones.length === 1 ? 'posición' : 'posiciones') + '</span>');
+            $('#distMensaje').hide();
+            $('#distTabla').show();
+        })
+        .fail(function(xhr) {
+            var motivo = (xhr.responseJSON && xhr.responseJSON.error) || 'No se pudo consultar el stock.';
+            $('#distMensaje').text(motivo).show();
+        });
+}

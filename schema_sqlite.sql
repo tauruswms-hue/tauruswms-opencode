@@ -136,6 +136,8 @@ INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/materi
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/materiales/exportar/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/materiales/plantilla/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/materiales/eliminar/*');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/materiales/imagen/*');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/materiales/distribucion/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/ubicaciones');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/ubicaciones/guardar');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/ubicaciones/eliminar/*');
@@ -234,6 +236,8 @@ INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/movil'
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/movil/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/sidebar-preferences');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/materiales');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/materiales/imagen/*');
+INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/materiales/distribucion/*');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/ubicaciones');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/tipoubicacion');
 INSERT OR IGNORE INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/proveedores');
@@ -423,6 +427,7 @@ CREATE TABLE IF NOT EXISTS "clientes" (
     "id_cliente" INTEGER PRIMARY KEY AUTOINCREMENT,
     "codigo" TEXT,
     "razonsocial" TEXT NOT NULL,
+    "nombre_fantasia" TEXT,
     "cuit" TEXT,
     "direccion" TEXT,
     "localidad" TEXT,
@@ -430,6 +435,7 @@ CREATE TABLE IF NOT EXISTS "clientes" (
     "telefono" TEXT,
     "email" TEXT,
     "contacto_nombre" TEXT,
+    "sitio_web" TEXT,
     "id_ruta" INTEGER,
     "id_transporte_predeterminado" INTEGER,
     "activo" INTEGER NOT NULL DEFAULT 1,
@@ -445,16 +451,22 @@ CREATE TABLE IF NOT EXISTS "materiales" (
     "id" INTEGER PRIMARY KEY AUTOINCREMENT,
     "codigo" TEXT NOT NULL,
     "codigo_barras" TEXT,
+    "codigo_alternativo" TEXT,
+    "codigo_proveedor" TEXT,
     "nombre" TEXT NOT NULL,
     "descripcion" text,
     "categoria_id" INTEGER,
     "stock_minimo" REAL DEFAULT 0,
     "stock_maximo" REAL DEFAULT 0,
+    "stock_reposicion" REAL DEFAULT 0,
     "unidad_medida_id" INTEGER,
     "trazabilidad" TEXT NOT NULL DEFAULT 'ninguna',
     "metodo_picking" TEXT NOT NULL DEFAULT 'libre',
     "peso_bruto" REAL,
     "peso_neto" REAL,
+    "volumen" REAL,
+    "volumen_unidad_id" INTEGER,
+    "imagen_ruta" TEXT,
     "costo_promedio" REAL DEFAULT 0,
     "ultimo_costo" REAL DEFAULT 0,
     "activo" INTEGER NOT NULL DEFAULT 1,

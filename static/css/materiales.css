@@ -1,57 +1,11 @@
-.materiales-container { padding: 20px; }
-.header-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-.btn-add { background: #27ae60; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; }
-
-.table-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-bottom: 50px; }
-.badge-ubi { background: #f1f5f9; color: #475569; padding: 4px 8px; border-radius: 4px; font-family: monospace; font-weight: bold; border: 1px solid #e2e8f0; }
-
-/* AJUSTE PIE DE GRILLA */
-.bottom {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding-top: 15px;
-    margin-top: 10px;
-    border-top: 1px solid #eee;
-    font-size: 0.9rem;
-    color: #666;
-}
-
-.dataTables_info { padding-top: 0 !important; font-weight: 600; }
-.dataTables_paginate { padding-top: 0 !important; }
-
-/* Modal y Checkboxes */
-.modal-overlay {
-    display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center;
-}
-.modal-card {
-    background: white; width: 95%; max-width: 750px; max-height: 85vh;
-    border-radius: 8px; padding: 25px; overflow-y: auto; box-sizing: border-box;
-}
-
-.form-section { border-bottom: 1px solid #f1f1f1; margin-bottom: 20px; padding-bottom: 15px; }
-.form-section h4 { color: #3498db; margin-bottom: 15px; font-size: 0.85rem; text-transform: uppercase; }
-
-.form-row { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 15px; }
-.form-group { flex: 1; min-width: 200px; display: flex; flex-direction: column; }
-.form-group label { font-size: 0.8rem; font-weight: bold; margin-bottom: 5px; color: #666; }
-.form-group input, .form-group select, .form-group textarea {
-    padding: 10px; border: 1px solid #d1d5db; border-radius: 4px;
-}
-
-.check-group { display: flex; gap: 30px; align-items: center; padding: 5px 0; }
-.check-group label { display: flex; align-items: center; gap: 10px; font-weight: bold; cursor: pointer; }
-.check-group input { width: 18px; height: 18px; margin: 0; cursor: pointer; }
-
-.readonly-input { background: #f8fafc !important; color: #64748b !important; border: 1px dashed #cbd5e1 !important; }
-
-.modal-footer { display: flex; justify-content: flex-end; gap: 10px; padding-top: 15px; }
+/* Estilos propios de la pantalla de Materiales.
+   La base (tabla, modal, botones) sale de tipoubicacion.css, que la plantilla carga antes. */
 
 /* Pestañas del formulario de materiales */
 .mat-tabs {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;          /* las cinco pestañas en un solo renglón */
+    overflow-x: auto;
     gap: 2px;
     border-bottom: 2px solid #eee;
     padding: 0 25px;
@@ -62,16 +16,76 @@
     background: none;
     border: none;
     border-bottom: 3px solid transparent;
-    padding: 12px 16px;
+    padding: 12px 13px;
     font-size: 0.85rem;
     font-weight: 600;
     color: #64748b;
     cursor: pointer;
+    white-space: nowrap;
     transition: color 0.15s, border-color 0.15s;
 }
 .mat-tab-btn:hover { color: #3498db; }
 .mat-tab-btn.active { color: #3498db; border-bottom-color: #3498db; }
 .mat-tab-panel { display: none; }
 .mat-tab-panel.active { display: block; }
-.btn-pri { background: #3498db; color: white; border: none; padding: 12px 25px; border-radius: 4px; cursor: pointer; font-weight: bold; }
-.btn-sec { background: #94a3b8; color: white; border: none; padding: 12px 25px; border-radius: 4px; cursor: pointer; }
+
+/* Formulario: mismo tamaño en todas las pestañas, para que no salte al cambiar de una a otra */
+#modalMateriales .mat-cuerpo {
+    overflow-y: auto;
+    flex: 1 1 auto;
+    padding: 20px 25px;
+    min-height: 475px;
+}
+#modalMateriales input,
+#modalMateriales select,
+#modalMateriales textarea { font-family: inherit; font-size: 0.9rem; box-sizing: border-box; }
+#modalMateriales textarea { resize: vertical; }
+
+/* Tablas de proveedores y presentaciones dentro del formulario */
+.mat-tabla { width: 100%; border-collapse: collapse; font-size: 0.9rem; table-layout: fixed; }
+.mat-tabla th { padding: 8px 6px; text-align: left; font-size: 0.8rem; color: #666; border-bottom: 2px solid #eee; white-space: nowrap; }
+.mat-tabla td { padding: 5px 6px; vertical-align: middle; }
+.mat-tabla input[type="text"],
+.mat-tabla input[type="number"],
+.mat-tabla select { width: 100%; padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; }
+.mat-tabla .num { text-align: right; }
+.mat-tabla .centro { text-align: center; }
+.mat-tabla .col-accion { width: 36px; }
+.mat-tabla .col-habitual { width: 80px; }
+.mat-tabla .col-num { width: 96px; }
+.mat-tabla .col-gtin { width: 245px; }
+.mat-gtin { display: flex; gap: 4px; align-items: center; }
+.mat-gtin select { width: 52px; flex: 0 0 52px; padding-left: 4px; padding-right: 2px; }
+.mat-gtin input { flex: 1 1 auto; min-width: 0; }
+.mat-gtin button { flex: 0 0 auto; background: #16a085; color: white; border: none; padding: 7px 8px; border-radius: 4px; cursor: pointer; font-size: 0.75rem; }
+.mat-quitar { color: #e74c3c; background: none; border: none; cursor: pointer; padding: 4px; }
+.mat-vacio { color: #999; font-size: 0.85rem; padding: 10px 6px; }
+
+/* Listado */
+/* La grilla tiene muchas columnas: encabezados en dos renglones y celdas compactas para que entre sin desplazarse */
+#tablaMateriales_wrapper th { white-space: normal; line-height: 1.2; vertical-align: bottom; }
+#tablaMateriales_wrapper th small { display: block; font-weight: normal; color: #888; }
+#tablaMateriales td.num { text-align: right; white-space: nowrap; }
+#tablaMateriales td code { white-space: nowrap; }
+
+/* Renglones y campos del formulario (pestaña Identificación) */
+.mat-fila { display: flex; flex-wrap: wrap; gap: 12px 15px; margin-bottom: 14px; }
+.mat-campo { flex: 1 1 0; min-width: 180px; display: flex; flex-direction: column; }
+.mat-campo > label { font-size: 0.8rem; font-weight: bold; color: #666; margin-bottom: 4px; }
+.mat-campo input[type="text"],
+.mat-campo select,
+.mat-campo textarea { width: 100%; padding: 9px 10px; border: 1px solid #ddd; border-radius: 4px; }
+.mat-ayuda { display: block; color: #888; font-size: 0.78rem; line-height: 1.35; margin-top: 3px; }
+.mat-fila > .mat-ayuda { flex-basis: 100%; margin-top: -6px; }
+
+/* Ventana de Distribución: stock del material por posición */
+.dist-resumen { display: flex; flex-wrap: wrap; gap: 8px 12px; margin-bottom: 12px; }
+.dist-resumen span { background: #f1f5f9; border-radius: 6px; padding: 6px 12px; font-size: 0.88rem; color: #475569; }
+.dist-resumen strong { color: #1e293b; font-size: 1rem; }
+.dist-tabla { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.dist-tabla th { background: #f8fafc; text-align: left; padding: 8px 10px; border-bottom: 2px solid #e2e8f0; white-space: nowrap; font-size: 0.8rem; color: #475569; }
+.dist-tabla td { padding: 7px 10px; border-bottom: 1px solid #eef2f6; vertical-align: top; }
+.dist-tabla tbody tr:hover { background: #f8fafc; }
+.dist-tabla .num { text-align: right; white-space: nowrap; }
+.dist-tabla tfoot th { border-top: 2px solid #e2e8f0; border-bottom: none; background: #f8fafc; font-size: 0.88rem; color: #1e293b; }
+.dist-sub { font-size: 0.76rem; color: #94a3b8; }

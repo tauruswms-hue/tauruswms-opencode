@@ -15,7 +15,7 @@
         <h1>Diagrama de taurus_wms</h1>
         <p class="bajada">Tablas de la base operativa y cómo se relacionan, divididas en áreas: depósito, materiales, distribución, stock, recepciones, pedidos, órdenes de movimiento e inventarios.</p>
 
-        <p>24 tablas, 30 relaciones declaradas como clave foránea y 6 relaciones lógicas. El script completo, con todas las columnas, está en
+        <p>24 tablas, 30 relaciones declaradas como clave foránea y 7 relaciones lógicas. El script completo, con todas las columnas, está en
         <a href="../../inicio/base-de-datos/taurus-wms.html">taurus_wms</a>.</p>
 
         <h2>Cómo leer los diagramas</h2>
@@ -187,72 +187,75 @@
         <h3 id="area-materiales">Materiales y proveedores</h3>
         <p>El catálogo de lo que se almacena: cada material tiene una categoría y una unidad de medida, puede tener varias presentaciones y varios proveedores habituales.</p>
         <div class="diagrama ancho">
-<svg class="der ajustar" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 890 236" width="890" height="236" role="img" aria-label="Diagrama del área Materiales y proveedores de taurus_wms">
+<svg class="der ajustar" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 890 255" width="890" height="255" role="img" aria-label="Diagrama del área Materiales y proveedores de taurus_wms">
 <defs><marker id="flecha-wms-materiales-0" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="9" markerHeight="9" orient="auto"><path class="punta c0" d="M0,5 L10,1 L10,9 z"/></marker><marker id="flecha-wms-materiales-1" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="9" markerHeight="9" orient="auto"><path class="punta c1" d="M0,5 L10,1 L10,9 z"/></marker><marker id="flecha-wms-materiales-2" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="9" markerHeight="9" orient="auto"><path class="punta c2" d="M0,5 L10,1 L10,9 z"/></marker><marker id="flecha-wms-materiales-3" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="9" markerHeight="9" orient="auto"><path class="punta c3" d="M0,5 L10,1 L10,9 z"/></marker></defs>
-<path class="rel c0" d="M246,70 L330,70" marker-start="url(#flecha-wms-materiales-0)"><title>materiales.categoria_id → categorias.id_categoria</title></path>
-<path class="rel c2" d="M560,52 C602,51.5 602,166.5 644,166.5" marker-start="url(#flecha-wms-materiales-2)"><title>material_proveedor.id_material → materiales.id</title></path>
-<path class="rel c3" d="M560,186 L644,186" marker-start="url(#flecha-wms-materiales-3)"><title>material_proveedor.id_proveedor → proveedores.id</title></path>
-<path class="rel c2" d="M560,52 C602,51.5 602,70.5 644,70.5" marker-start="url(#flecha-wms-materiales-2)"><title>material_presentaciones.id_material → materiales.id</title></path>
-<path class="rel c1 logica" d="M246,166 C288,166.5 288,89.5 330,89.5" marker-start="url(#flecha-wms-materiales-1)"><title>materiales.unidad_medida_id → unidades_medida.id_unidad (sin clave foránea declarada)</title></path>
+<path class="rel c0" d="M246,80 C288,80.0 288,70.5 330,70.5" marker-start="url(#flecha-wms-materiales-0)"><title>materiales.categoria_id → categorias.id_categoria</title></path>
+<path class="rel c2" d="M560,52 C602,51.5 602,176.0 644,176.0" marker-start="url(#flecha-wms-materiales-2)"><title>material_proveedor.id_material → materiales.id</title></path>
+<path class="rel c3" d="M560,204 C602,204.5 602,195.0 644,195.0" marker-start="url(#flecha-wms-materiales-3)"><title>material_proveedor.id_proveedor → proveedores.id</title></path>
+<path class="rel c2" d="M560,52 C602,51.5 602,80.0 644,80.0" marker-start="url(#flecha-wms-materiales-2)"><title>material_presentaciones.id_material → materiales.id</title></path>
+<path class="rel c1 logica" d="M246,176 C288,176.0 288,89.5 330,89.5" marker-start="url(#flecha-wms-materiales-1)"><title>materiales.unidad_medida_id → unidades_medida.id_unidad (sin clave foránea declarada)</title></path>
+<path class="rel c1 logica" d="M246,176 C288,176.0 288,108.5 330,108.5" marker-start="url(#flecha-wms-materiales-1)"><title>materiales.volumen_unidad_id → unidades_medida.id_unidad (sin clave foránea declarada)</title></path>
 <g class="tabla">
-<rect class="caja" x="16" y="35" width="230" height="70" rx="5"/>
-<path class="titulo" d="M16,61 v-21 a5,5 0 0 1 5,-5 h220 a5,5 0 0 1 5,5 v21 z"/>
-<text class="nombre" x="26" y="52">categorias</text>
-<rect class="franja c0" x="240" y="64" width="4" height="38" rx="2"/>
-<text class="col" x="26" y="75">id_categoria</text>
-<text class="marca" x="232" y="75" text-anchor="end">PK</text>
-<text class="resto" x="26" y="94">+ 6 columnas más</text>
+<rect class="caja" x="16" y="44" width="230" height="70" rx="5"/>
+<path class="titulo" d="M16,70 v-21 a5,5 0 0 1 5,-5 h220 a5,5 0 0 1 5,5 v21 z"/>
+<text class="nombre" x="26" y="62">categorias</text>
+<rect class="franja c0" x="240" y="74" width="4" height="38" rx="2"/>
+<text class="col" x="26" y="84">id_categoria</text>
+<text class="marca" x="232" y="84" text-anchor="end">PK</text>
+<text class="resto" x="26" y="104">+ 6 columnas más</text>
 </g>
 <g class="tabla">
-<rect class="caja" x="16" y="131" width="230" height="70" rx="5"/>
-<path class="titulo" d="M16,157 v-21 a5,5 0 0 1 5,-5 h220 a5,5 0 0 1 5,5 v21 z"/>
-<text class="nombre" x="26" y="148">unidades_medida</text>
-<rect class="franja c1" x="240" y="160" width="4" height="38" rx="2"/>
-<text class="col" x="26" y="171">id_unidad</text>
-<text class="marca" x="232" y="171" text-anchor="end">PK</text>
-<text class="resto" x="26" y="190">+ 9 columnas más</text>
+<rect class="caja" x="16" y="140" width="230" height="70" rx="5"/>
+<path class="titulo" d="M16,166 v-21 a5,5 0 0 1 5,-5 h220 a5,5 0 0 1 5,5 v21 z"/>
+<text class="nombre" x="26" y="158">unidades_medida</text>
+<rect class="franja c1" x="240" y="170" width="4" height="38" rx="2"/>
+<text class="col" x="26" y="180">id_unidad</text>
+<text class="marca" x="232" y="180" text-anchor="end">PK</text>
+<text class="resto" x="26" y="200">+ 9 columnas más</text>
 </g>
 <g class="tabla">
-<rect class="caja" x="330" y="16" width="230" height="108" rx="5"/>
+<rect class="caja" x="330" y="16" width="230" height="127" rx="5"/>
 <path class="titulo" d="M330,42 v-21 a5,5 0 0 1 5,-5 h220 a5,5 0 0 1 5,5 v21 z"/>
 <text class="nombre" x="340" y="33">materiales</text>
-<rect class="franja c2" x="554" y="45" width="4" height="76" rx="2"/>
+<rect class="franja c2" x="554" y="45" width="4" height="95" rx="2"/>
 <text class="col" x="340" y="56">id</text>
 <text class="marca" x="546" y="56" text-anchor="end">PK</text>
 <text class="col" x="340" y="75">categoria_id</text>
 <text class="marca" x="546" y="75" text-anchor="end">FK</text>
 <text class="col" x="340" y="94">unidad_medida_id</text>
 <text class="marca" x="546" y="94" text-anchor="end">REF</text>
-<text class="resto" x="340" y="113">+ 16 columnas más</text>
+<text class="col" x="340" y="113">volumen_unidad_id</text>
+<text class="marca" x="546" y="113" text-anchor="end">REF</text>
+<text class="resto" x="340" y="132">+ 21 columnas más</text>
 </g>
 <g class="tabla">
-<rect class="caja" x="644" y="16" width="230" height="89" rx="5"/>
-<path class="titulo" d="M644,42 v-21 a5,5 0 0 1 5,-5 h220 a5,5 0 0 1 5,5 v21 z"/>
-<text class="nombre" x="654" y="33">material_presentaciones</text>
-<text class="col" x="654" y="56">id</text>
-<text class="marca" x="860" y="56" text-anchor="end">PK</text>
-<text class="col" x="654" y="75">id_material</text>
-<text class="marca" x="860" y="75" text-anchor="end">FK</text>
-<text class="resto" x="654" y="94">+ 7 columnas más</text>
+<rect class="caja" x="644" y="26" width="230" height="89" rx="5"/>
+<path class="titulo" d="M644,52 v-21 a5,5 0 0 1 5,-5 h220 a5,5 0 0 1 5,5 v21 z"/>
+<text class="nombre" x="654" y="42">material_presentaciones</text>
+<text class="col" x="654" y="66">id</text>
+<text class="marca" x="860" y="66" text-anchor="end">PK</text>
+<text class="col" x="654" y="84">id_material</text>
+<text class="marca" x="860" y="84" text-anchor="end">FK</text>
+<text class="resto" x="654" y="104">+ 7 columnas más</text>
 </g>
 <g class="tabla">
-<rect class="caja" x="330" y="150" width="230" height="70" rx="5"/>
-<path class="titulo" d="M330,176 v-21 a5,5 0 0 1 5,-5 h220 a5,5 0 0 1 5,5 v21 z"/>
-<text class="nombre" x="340" y="167">proveedores</text>
-<rect class="franja c3" x="554" y="179" width="4" height="38" rx="2"/>
-<text class="col" x="340" y="190">id</text>
-<text class="marca" x="546" y="190" text-anchor="end">PK</text>
-<text class="resto" x="340" y="209">+ 9 columnas más</text>
+<rect class="caja" x="330" y="169" width="230" height="70" rx="5"/>
+<path class="titulo" d="M330,195 v-21 a5,5 0 0 1 5,-5 h220 a5,5 0 0 1 5,5 v21 z"/>
+<text class="nombre" x="340" y="186">proveedores</text>
+<rect class="franja c3" x="554" y="198" width="4" height="38" rx="2"/>
+<text class="col" x="340" y="209">id</text>
+<text class="marca" x="546" y="209" text-anchor="end">PK</text>
+<text class="resto" x="340" y="228">+ 9 columnas más</text>
 </g>
 <g class="tabla">
-<rect class="caja" x="644" y="131" width="230" height="89" rx="5"/>
-<path class="titulo" d="M644,157 v-21 a5,5 0 0 1 5,-5 h220 a5,5 0 0 1 5,5 v21 z"/>
-<text class="nombre" x="654" y="148">material_proveedor</text>
-<text class="col" x="654" y="171">id_material</text>
-<text class="marca" x="860" y="171" text-anchor="end">PK FK</text>
-<text class="col" x="654" y="190">id_proveedor</text>
-<text class="marca" x="860" y="190" text-anchor="end">PK FK</text>
-<text class="resto" x="654" y="209">+ 3 columnas más</text>
+<rect class="caja" x="644" y="140" width="230" height="89" rx="5"/>
+<path class="titulo" d="M644,166 v-21 a5,5 0 0 1 5,-5 h220 a5,5 0 0 1 5,5 v21 z"/>
+<text class="nombre" x="654" y="158">material_proveedor</text>
+<text class="col" x="654" y="180">id_material</text>
+<text class="marca" x="860" y="180" text-anchor="end">PK FK</text>
+<text class="col" x="654" y="200">id_proveedor</text>
+<text class="marca" x="860" y="200" text-anchor="end">PK FK</text>
+<text class="resto" x="654" y="218">+ 3 columnas más</text>
 </g>
 </svg>
         </div>
@@ -308,7 +311,7 @@
 <text class="marca" x="860" y="190" text-anchor="end">FK</text>
 <text class="col" x="654" y="209">id_transporte_predeterminado</text>
 <text class="marca" x="860" y="209" text-anchor="end">FK</text>
-<text class="resto" x="654" y="228">+ 11 columnas más</text>
+<text class="resto" x="654" y="228">+ 13 columnas más</text>
 </g>
 <a href="#area-deposito"><g class="tabla externa">
 <rect class="caja" x="16" y="92" width="230" height="70" rx="5"/>
@@ -667,42 +670,43 @@
             <div class="diagrama">
 <svg class="der" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2146 1021" width="2146" height="1021" role="img" aria-label="Diagrama completo de tablas y relaciones de taurus_wms">
 <defs><marker id="flecha-wms-todo-0" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="9" markerHeight="9" orient="auto"><path class="punta c0" d="M0,5 L10,1 L10,9 z"/></marker><marker id="flecha-wms-todo-1" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="9" markerHeight="9" orient="auto"><path class="punta c1" d="M0,5 L10,1 L10,9 z"/></marker><marker id="flecha-wms-todo-2" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="9" markerHeight="9" orient="auto"><path class="punta c2" d="M0,5 L10,1 L10,9 z"/></marker><marker id="flecha-wms-todo-3" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="9" markerHeight="9" orient="auto"><path class="punta c3" d="M0,5 L10,1 L10,9 z"/></marker><marker id="flecha-wms-todo-4" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="9" markerHeight="9" orient="auto"><path class="punta c4" d="M0,5 L10,1 L10,9 z"/></marker><marker id="flecha-wms-todo-5" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="9" markerHeight="9" orient="auto"><path class="punta c5" d="M0,5 L10,1 L10,9 z"/></marker><marker id="flecha-wms-todo-6" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="9" markerHeight="9" orient="auto"><path class="punta c6" d="M0,5 L10,1 L10,9 z"/></marker><marker id="flecha-wms-todo-7" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="9" markerHeight="9" orient="auto"><path class="punta c7" d="M0,5 L10,1 L10,9 z"/></marker><marker id="flecha-wms-todo-8" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="9" markerHeight="9" orient="auto"><path class="punta c8" d="M0,5 L10,1 L10,9 z"/></marker><marker id="flecha-wms-todo-9" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="9" markerHeight="9" orient="auto"><path class="punta c9" d="M0,5 L10,1 L10,9 z"/></marker></defs>
-<path class="rel c0" d="M246,367 L330,367" marker-start="url(#flecha-wms-todo-0)"><title>ubicaciones.id_zona → zonas.id</title></path>
-<path class="rel c4" d="M560,329 C602,329.0 602,338.5 644,338.5" marker-start="url(#flecha-wms-todo-4)"><title>transportes.id_muelle_salida → ubicaciones.id</title></path>
+<path class="rel c0" d="M246,367 C288,367.0 288,357.5 330,357.5" marker-start="url(#flecha-wms-todo-0)"><title>ubicaciones.id_zona → zonas.id</title></path>
+<path class="rel c4" d="M560,320 C602,319.5 602,338.5 644,338.5" marker-start="url(#flecha-wms-todo-4)"><title>transportes.id_muelle_salida → ubicaciones.id</title></path>
 <path class="rel c8" d="M874,320 C916,319.5 916,549.5 958,549.5" marker-start="url(#flecha-wms-todo-8)"><title>transporte_rutas.id_transporte → transportes.id_transporte</title></path>
 <path class="rel c9" d="M874,434 C916,434.5 916,568.5 958,568.5" marker-start="url(#flecha-wms-todo-9)"><title>transporte_rutas.id_ruta → rutas.id_ruta</title></path>
 <path class="rel c9" d="M874,434 L958,434" marker-start="url(#flecha-wms-todo-9)"><title>clientes.id_ruta → rutas.id_ruta</title></path>
 <path class="rel c8" d="M874,320 C916,319.5 916,453.5 958,453.5" marker-start="url(#flecha-wms-todo-8)"><title>clientes.id_transporte_predeterminado → transportes.id_transporte</title></path>
-<path class="rel c2" d="M246,559 C288,559.0 288,482.0 330,482.0" marker-start="url(#flecha-wms-todo-2)"><title>materiales.categoria_id → categorias.id_categoria</title></path>
-<path class="rel c5" d="M560,463 C602,463.0 602,951.5 644,951.5" marker-start="url(#flecha-wms-todo-5)"><title>material_proveedor.id_material → materiales.id</title></path>
-<path class="rel c7" d="M560,693 C602,693.0 602,970.5 644,970.5" marker-start="url(#flecha-wms-todo-7)"><title>material_proveedor.id_proveedor → proveedores.id</title></path>
-<path class="rel c5" d="M560,463 C602,463.0 602,549.5 644,549.5" marker-start="url(#flecha-wms-todo-5)"><title>material_presentaciones.id_material → materiales.id</title></path>
-<path class="rel c4" d="M560,329 C602,329.0 602,70.5 644,70.5" marker-start="url(#flecha-wms-todo-4)"><title>stockcontable.Ubicacion → ubicaciones.id</title></path>
-<path class="rel c5" d="M560,463 C602,463.0 602,89.5 644,89.5" marker-start="url(#flecha-wms-todo-5)"><title>stockcontable.Material → materiales.id</title></path>
-<path class="rel c7" d="M560,693 C602,693.0 602,817.5 644,817.5" marker-start="url(#flecha-wms-todo-7)"><title>recepciones_cabecera.id_proveedor → proveedores.id</title></path>
-<path class="rel c4" d="M560,329 C602,329.0 602,836.5 644,836.5" marker-start="url(#flecha-wms-todo-4)"><title>recepciones_cabecera.id_ubicacion_recep → ubicaciones.id</title></path>
-<path class="rel c4" d="M560,329 C602,329.0 602,855.5 644,855.5" marker-start="url(#flecha-wms-todo-4)"><title>recepciones_cabecera.id_ubicacion_destino → ubicaciones.id</title></path>
+<path class="rel c2" d="M246,559 C288,559.0 288,472.5 330,472.5" marker-start="url(#flecha-wms-todo-2)"><title>materiales.categoria_id → categorias.id_categoria</title></path>
+<path class="rel c5" d="M560,454 C602,453.5 602,951.5 644,951.5" marker-start="url(#flecha-wms-todo-5)"><title>material_proveedor.id_material → materiales.id</title></path>
+<path class="rel c7" d="M560,702 C602,702.5 602,970.5 644,970.5" marker-start="url(#flecha-wms-todo-7)"><title>material_proveedor.id_proveedor → proveedores.id</title></path>
+<path class="rel c5" d="M560,454 C602,453.5 602,549.5 644,549.5" marker-start="url(#flecha-wms-todo-5)"><title>material_presentaciones.id_material → materiales.id</title></path>
+<path class="rel c4" d="M560,320 C602,319.5 602,70.5 644,70.5" marker-start="url(#flecha-wms-todo-4)"><title>stockcontable.Ubicacion → ubicaciones.id</title></path>
+<path class="rel c5" d="M560,454 C602,453.5 602,89.5 644,89.5" marker-start="url(#flecha-wms-todo-5)"><title>stockcontable.Material → materiales.id</title></path>
+<path class="rel c7" d="M560,702 C602,702.5 602,817.5 644,817.5" marker-start="url(#flecha-wms-todo-7)"><title>recepciones_cabecera.id_proveedor → proveedores.id</title></path>
+<path class="rel c4" d="M560,320 C602,319.5 602,836.5 644,836.5" marker-start="url(#flecha-wms-todo-4)"><title>recepciones_cabecera.id_ubicacion_recep → ubicaciones.id</title></path>
+<path class="rel c4" d="M560,320 C602,319.5 602,855.5 644,855.5" marker-start="url(#flecha-wms-todo-4)"><title>recepciones_cabecera.id_ubicacion_destino → ubicaciones.id</title></path>
 <path class="rel c0" d="M874,798 C916,798.5 916,683.5 958,683.5" marker-start="url(#flecha-wms-todo-0)"><title>recepciones_detalle.id_recepcion → recepciones_cabecera.id_recepcion</title></path>
-<path class="rel c5" d="M560,463 C598,463.0 598,597.0 636,597.0 L882,597 C920,597.0 920,702.5 958,702.5" marker-start="url(#flecha-wms-todo-5)"><title>recepciones_detalle.id_material → materiales.id</title></path>
+<path class="rel c5" d="M560,454 C598,453.5 598,597.0 636,597.0 L882,597 C920,597.0 920,702.5 958,702.5" marker-start="url(#flecha-wms-todo-5)"><title>recepciones_detalle.id_material → materiales.id</title></path>
 <path class="rel c2" d="M1188,416 C1230,415.5 1230,492.0 1272,492.0" marker-start="url(#flecha-wms-todo-2)"><title>pedidos_cabecera.id_cliente → clientes.id_cliente</title></path>
 <path class="rel c1" d="M1188,320 C1230,319.5 1230,511.0 1272,511.0" marker-start="url(#flecha-wms-todo-1)"><title>pedidos_cabecera.id_clase → clases_pedido.id_clase</title></path>
 <path class="rel c9" d="M874,434 C912,434.5 912,491.0 950,491.0 L1196,491 C1234,491.0 1234,530.0 1272,530.0" marker-start="url(#flecha-wms-todo-9)"><title>pedidos_cabecera.id_ruta → rutas.id_ruta</title></path>
 <path class="rel c8" d="M874,320 C912,319.5 912,496.0 950,496.0 L1196,496 C1234,496.0 1234,549.0 1272,549.0" marker-start="url(#flecha-wms-todo-8)"><title>pedidos_cabecera.id_transporte → transportes.id_transporte</title></path>
 <path class="rel c3" d="M1502,473 C1544,473.0 1544,425.0 1586,425.0" marker-start="url(#flecha-wms-todo-3)"><title>pedidos_detalle.id_pedido → pedidos_cabecera.id_pedido</title></path>
-<path class="rel c5" d="M560,463 C598,463.0 598,482.0 636,482.0 L882,482 C916,482.0 916,501.0 950,501.0 L1196,501 C1230,501.0 1230,419.5 1264,419.5 L1510,420 C1548,419.5 1548,444.0 1586,444.0" marker-start="url(#flecha-wms-todo-5)"><title>pedidos_detalle.id_material → materiales.id</title></path>
-<path class="rel c4" d="M560,329 C598,329.0 598,381.0 636,381.0 L882,381 C916,381.0 916,506.0 950,506.0 L1196,506 C1230,506.0 1230,424.5 1264,424.5 L1510,424 C1548,424.5 1548,559.0 1586,559.0" marker-start="url(#flecha-wms-todo-4)"><title>omc.id_ubicacion_origen → ubicaciones.id</title></path>
-<path class="rel c4" d="M560,329 C598,329.0 598,386.0 636,386.0 L882,386 C916,386.0 916,511.0 950,511.0 L1196,511 C1230,511.0 1230,594.0 1264,594.0 L1510,594 C1548,594.0 1548,578.0 1586,578.0" marker-start="url(#flecha-wms-todo-4)"><title>omc.id_ubicacion_destino → ubicaciones.id</title></path>
+<path class="rel c5" d="M560,454 C598,453.5 598,482.0 636,482.0 L882,482 C916,482.0 916,501.0 950,501.0 L1196,501 C1230,501.0 1230,419.5 1264,419.5 L1510,420 C1548,419.5 1548,444.0 1586,444.0" marker-start="url(#flecha-wms-todo-5)"><title>pedidos_detalle.id_material → materiales.id</title></path>
+<path class="rel c4" d="M560,320 C598,319.5 598,381.0 636,381.0 L882,381 C916,381.0 916,506.0 950,506.0 L1196,506 C1230,506.0 1230,424.5 1264,424.5 L1510,424 C1548,424.5 1548,559.0 1586,559.0" marker-start="url(#flecha-wms-todo-4)"><title>omc.id_ubicacion_origen → ubicaciones.id</title></path>
+<path class="rel c4" d="M560,320 C598,319.5 598,386.0 636,386.0 L882,386 C916,386.0 916,511.0 950,511.0 L1196,511 C1230,511.0 1230,594.0 1264,594.0 L1510,594 C1548,594.0 1548,578.0 1586,578.0" marker-start="url(#flecha-wms-todo-4)"><title>omc.id_ubicacion_destino → ubicaciones.id</title></path>
 <path class="rel c0" d="M874,798 C912,798.5 912,750.0 950,750.0 L1196,750 C1230,750.0 1230,599.0 1264,599.0 L1510,599 C1548,599.0 1548,597.0 1586,597.0" marker-start="url(#flecha-wms-todo-0)"><title>omc.id_recepcion → recepciones_cabecera.id_recepcion</title></path>
 <path class="rel c3" d="M1502,473 C1544,473.0 1544,616.0 1586,616.0" marker-start="url(#flecha-wms-todo-3)"><title>omc.id_pedido → pedidos_cabecera.id_pedido</title></path>
 <path class="rel c4" d="M1816,540 C1858,540.0 1858,511.0 1900,511.0" marker-start="url(#flecha-wms-todo-4)"><title>omc_contenedores.id_omc → omc.id_omc</title></path>
-<path class="rel c4" d="M560,329 C598,329.0 598,391.0 636,391.0 L882,391 C916,391.0 916,367.0 950,367.0 L1196,367 C1230,367.0 1230,429.5 1264,429.5 L1510,430 C1544,429.5 1544,491.5 1578,491.5 L1824,492 C1862,491.5 1862,530.0 1900,530.0" marker-start="url(#flecha-wms-todo-4)"><title>omc_contenedores.id_ubicacion_origen → ubicaciones.id</title></path>
-<path class="rel c6" d="M560,597 C602,597.0 602,664.5 644,664.5" marker-start="url(#flecha-wms-todo-6)"><title>inventarios_detalle.id_inventario → inventarios_cabecera.id</title></path>
-<path class="rel c1 logica" d="M246,463 C288,463.0 288,348.0 330,348.0" marker-start="url(#flecha-wms-todo-1)"><title>ubicaciones.tipoubicacion → tipoubicacion.id (sin clave foránea declarada)</title></path>
-<path class="rel c3 logica" d="M246,655 C288,655.0 288,501.0 330,501.0" marker-start="url(#flecha-wms-todo-3)"><title>materiales.unidad_medida_id → unidades_medida.id_unidad (sin clave foránea declarada)</title></path>
-<path class="rel c4 logica" d="M560,329 C602,329.0 602,204.5 644,204.5" marker-start="url(#flecha-wms-todo-4)"><title>stock_movimientos.id_ubicacion → ubicaciones.id (sin clave foránea declarada)</title></path>
-<path class="rel c5 logica" d="M560,463 C602,463.0 602,223.5 644,223.5" marker-start="url(#flecha-wms-todo-5)"><title>stock_movimientos.id_material → materiales.id (sin clave foránea declarada)</title></path>
-<path class="rel c4 logica" d="M560,329 C602,329.0 602,683.5 644,683.5" marker-start="url(#flecha-wms-todo-4)"><title>inventarios_detalle.id_ubicacion → ubicaciones.id (sin clave foránea declarada)</title></path>
-<path class="rel c5 logica" d="M560,463 C602,463.0 602,702.5 644,702.5" marker-start="url(#flecha-wms-todo-5)"><title>inventarios_detalle.id_material → materiales.id (sin clave foránea declarada)</title></path>
+<path class="rel c4" d="M560,320 C598,319.5 598,391.0 636,391.0 L882,391 C916,391.0 916,367.0 950,367.0 L1196,367 C1230,367.0 1230,429.5 1264,429.5 L1510,430 C1544,429.5 1544,491.5 1578,491.5 L1824,492 C1862,491.5 1862,530.0 1900,530.0" marker-start="url(#flecha-wms-todo-4)"><title>omc_contenedores.id_ubicacion_origen → ubicaciones.id</title></path>
+<path class="rel c6" d="M560,606 C602,606.5 602,664.5 644,664.5" marker-start="url(#flecha-wms-todo-6)"><title>inventarios_detalle.id_inventario → inventarios_cabecera.id</title></path>
+<path class="rel c1 logica" d="M246,463 C288,463.0 288,338.5 330,338.5" marker-start="url(#flecha-wms-todo-1)"><title>ubicaciones.tipoubicacion → tipoubicacion.id (sin clave foránea declarada)</title></path>
+<path class="rel c3 logica" d="M246,655 C288,655.0 288,491.5 330,491.5" marker-start="url(#flecha-wms-todo-3)"><title>materiales.unidad_medida_id → unidades_medida.id_unidad (sin clave foránea declarada)</title></path>
+<path class="rel c3 logica" d="M246,655 C288,655.0 288,510.5 330,510.5" marker-start="url(#flecha-wms-todo-3)"><title>materiales.volumen_unidad_id → unidades_medida.id_unidad (sin clave foránea declarada)</title></path>
+<path class="rel c4 logica" d="M560,320 C602,319.5 602,204.5 644,204.5" marker-start="url(#flecha-wms-todo-4)"><title>stock_movimientos.id_ubicacion → ubicaciones.id (sin clave foránea declarada)</title></path>
+<path class="rel c5 logica" d="M560,454 C602,453.5 602,223.5 644,223.5" marker-start="url(#flecha-wms-todo-5)"><title>stock_movimientos.id_material → materiales.id (sin clave foránea declarada)</title></path>
+<path class="rel c4 logica" d="M560,320 C602,319.5 602,683.5 644,683.5" marker-start="url(#flecha-wms-todo-4)"><title>inventarios_detalle.id_ubicacion → ubicaciones.id (sin clave foránea declarada)</title></path>
+<path class="rel c5 logica" d="M560,454 C602,453.5 602,702.5 644,702.5" marker-start="url(#flecha-wms-todo-5)"><title>inventarios_detalle.id_material → materiales.id (sin clave foránea declarada)</title></path>
 <g class="tabla">
 <rect class="caja" x="16" y="332" width="230" height="70" rx="5"/>
 <path class="titulo" d="M16,358 v-21 a5,5 0 0 1 5,-5 h220 a5,5 0 0 1 5,5 v21 z"/>
@@ -731,13 +735,13 @@
 <text class="resto" x="26" y="582">+ 6 columnas más</text>
 </g>
 <g class="tabla">
-<rect class="caja" x="330" y="658" width="230" height="70" rx="5"/>
-<path class="titulo" d="M330,684 v-21 a5,5 0 0 1 5,-5 h220 a5,5 0 0 1 5,5 v21 z"/>
-<text class="nombre" x="340" y="674">proveedores</text>
-<rect class="franja c7" x="554" y="686" width="4" height="38" rx="2"/>
-<text class="col" x="340" y="698">id</text>
-<text class="marca" x="546" y="698" text-anchor="end">PK</text>
-<text class="resto" x="340" y="716">+ 9 columnas más</text>
+<rect class="caja" x="330" y="667" width="230" height="70" rx="5"/>
+<path class="titulo" d="M330,693 v-21 a5,5 0 0 1 5,-5 h220 a5,5 0 0 1 5,5 v21 z"/>
+<text class="nombre" x="340" y="684">proveedores</text>
+<rect class="franja c7" x="554" y="696" width="4" height="38" rx="2"/>
+<text class="col" x="340" y="707">id</text>
+<text class="marca" x="546" y="707" text-anchor="end">PK</text>
+<text class="resto" x="340" y="726">+ 9 columnas más</text>
 </g>
 <g class="tabla">
 <rect class="caja" x="644" y="399" width="230" height="70" rx="5"/>
@@ -758,17 +762,17 @@
 <text class="resto" x="26" y="678">+ 9 columnas más</text>
 </g>
 <g class="tabla">
-<rect class="caja" x="330" y="294" width="230" height="108" rx="5"/>
-<path class="titulo" d="M330,320 v-21 a5,5 0 0 1 5,-5 h220 a5,5 0 0 1 5,5 v21 z"/>
-<text class="nombre" x="340" y="310">ubicaciones</text>
-<rect class="franja c4" x="554" y="322" width="4" height="76" rx="2"/>
-<text class="col" x="340" y="334">id</text>
-<text class="marca" x="546" y="334" text-anchor="end">PK</text>
-<text class="col" x="340" y="352">tipoubicacion</text>
-<text class="marca" x="546" y="352" text-anchor="end">REF</text>
-<text class="col" x="340" y="372">id_zona</text>
-<text class="marca" x="546" y="372" text-anchor="end">FK</text>
-<text class="resto" x="340" y="390">+ 20 columnas más</text>
+<rect class="caja" x="330" y="284" width="230" height="108" rx="5"/>
+<path class="titulo" d="M330,310 v-21 a5,5 0 0 1 5,-5 h220 a5,5 0 0 1 5,5 v21 z"/>
+<text class="nombre" x="340" y="301">ubicaciones</text>
+<rect class="franja c4" x="554" y="313" width="4" height="76" rx="2"/>
+<text class="col" x="340" y="324">id</text>
+<text class="marca" x="546" y="324" text-anchor="end">PK</text>
+<text class="col" x="340" y="343">tipoubicacion</text>
+<text class="marca" x="546" y="343" text-anchor="end">REF</text>
+<text class="col" x="340" y="362">id_zona</text>
+<text class="marca" x="546" y="362" text-anchor="end">FK</text>
+<text class="resto" x="340" y="381">+ 20 columnas más</text>
 </g>
 <g class="tabla">
 <rect class="caja" x="644" y="284" width="230" height="89" rx="5"/>
@@ -802,20 +806,22 @@
 <text class="marca" x="1174" y="439" text-anchor="end">FK</text>
 <text class="col" x="968" y="458">id_transporte_predeterminado</text>
 <text class="marca" x="1174" y="458" text-anchor="end">FK</text>
-<text class="resto" x="968" y="477">+ 11 columnas más</text>
+<text class="resto" x="968" y="477">+ 13 columnas más</text>
 </g>
 <g class="tabla">
-<rect class="caja" x="330" y="428" width="230" height="108" rx="5"/>
-<path class="titulo" d="M330,454 v-21 a5,5 0 0 1 5,-5 h220 a5,5 0 0 1 5,5 v21 z"/>
-<text class="nombre" x="340" y="444">materiales</text>
-<rect class="franja c5" x="554" y="456" width="4" height="76" rx="2"/>
-<text class="col" x="340" y="468">id</text>
-<text class="marca" x="546" y="468" text-anchor="end">PK</text>
-<text class="col" x="340" y="486">categoria_id</text>
-<text class="marca" x="546" y="486" text-anchor="end">FK</text>
-<text class="col" x="340" y="506">unidad_medida_id</text>
-<text class="marca" x="546" y="506" text-anchor="end">REF</text>
-<text class="resto" x="340" y="524">+ 16 columnas más</text>
+<rect class="caja" x="330" y="418" width="230" height="127" rx="5"/>
+<path class="titulo" d="M330,444 v-21 a5,5 0 0 1 5,-5 h220 a5,5 0 0 1 5,5 v21 z"/>
+<text class="nombre" x="340" y="435">materiales</text>
+<rect class="franja c5" x="554" y="447" width="4" height="95" rx="2"/>
+<text class="col" x="340" y="458">id</text>
+<text class="marca" x="546" y="458" text-anchor="end">PK</text>
+<text class="col" x="340" y="477">categoria_id</text>
+<text class="marca" x="546" y="477" text-anchor="end">FK</text>
+<text class="col" x="340" y="496">unidad_medida_id</text>
+<text class="marca" x="546" y="496" text-anchor="end">REF</text>
+<text class="col" x="340" y="515">volumen_unidad_id</text>
+<text class="marca" x="546" y="515" text-anchor="end">REF</text>
+<text class="resto" x="340" y="534">+ 21 columnas más</text>
 </g>
 <g class="tabla">
 <rect class="caja" x="644" y="916" width="230" height="89" rx="5"/>
@@ -956,13 +962,13 @@
 <text class="resto" x="1910" y="554">+ 3 columnas más</text>
 </g>
 <g class="tabla">
-<rect class="caja" x="330" y="562" width="230" height="70" rx="5"/>
-<path class="titulo" d="M330,588 v-21 a5,5 0 0 1 5,-5 h220 a5,5 0 0 1 5,5 v21 z"/>
-<text class="nombre" x="340" y="578">inventarios_cabecera</text>
-<rect class="franja c6" x="554" y="590" width="4" height="38" rx="2"/>
-<text class="col" x="340" y="602">id</text>
-<text class="marca" x="546" y="602" text-anchor="end">PK</text>
-<text class="resto" x="340" y="620">+ 10 columnas más</text>
+<rect class="caja" x="330" y="571" width="230" height="70" rx="5"/>
+<path class="titulo" d="M330,597 v-21 a5,5 0 0 1 5,-5 h220 a5,5 0 0 1 5,5 v21 z"/>
+<text class="nombre" x="340" y="588">inventarios_cabecera</text>
+<rect class="franja c6" x="554" y="600" width="4" height="38" rx="2"/>
+<text class="col" x="340" y="611">id</text>
+<text class="marca" x="546" y="611" text-anchor="end">PK</text>
+<text class="resto" x="340" y="630">+ 10 columnas más</text>
 </g>
 <g class="tabla">
 <rect class="caja" x="644" y="610" width="230" height="127" rx="5"/>
@@ -1004,6 +1010,7 @@
                     <tr><td>Materiales y proveedores</td><td><code>material_proveedor.id_proveedor</code></td><td><code>proveedores.id</code></td><td>Clave foránea</td></tr>
                     <tr><td>Materiales y proveedores</td><td><code>materiales.categoria_id</code></td><td><code>categorias.id_categoria</code></td><td>Clave foránea</td></tr>
                     <tr><td>Materiales y proveedores</td><td><code>materiales.unidad_medida_id</code></td><td><code>unidades_medida.id_unidad</code></td><td>Lógica (sin clave foránea)</td></tr>
+                    <tr><td>Materiales y proveedores</td><td><code>materiales.volumen_unidad_id</code></td><td><code>unidades_medida.id_unidad</code></td><td>Lógica (sin clave foránea)</td></tr>
                     <tr><td>Pedidos</td><td><code>pedidos_cabecera.id_clase</code></td><td><code>clases_pedido.id_clase</code></td><td>Clave foránea</td></tr>
                     <tr><td>Pedidos</td><td><code>pedidos_cabecera.id_cliente</code></td><td><code>clientes.id_cliente</code></td><td>Clave foránea</td></tr>
                     <tr><td>Pedidos</td><td><code>pedidos_cabecera.id_ruta</code></td><td><code>rutas.id_ruta</code></td><td>Clave foránea</td></tr>

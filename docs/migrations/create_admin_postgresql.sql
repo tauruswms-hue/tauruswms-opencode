@@ -137,6 +137,8 @@ INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/materiales/impor
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/materiales/exportar/*') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/materiales/plantilla/*') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/materiales/eliminar/*') ON CONFLICT DO NOTHING;
+INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/materiales/imagen/*') ON CONFLICT DO NOTHING;
+INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/materiales/distribucion/*') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/ubicaciones') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/ubicaciones/guardar') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/ubicaciones/eliminar/*') ON CONFLICT DO NOTHING;
@@ -235,6 +237,8 @@ INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/movil') ON CONFL
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/movil/*') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/sidebar-preferences') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/materiales') ON CONFLICT DO NOTHING;
+INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/materiales/imagen/*') ON CONFLICT DO NOTHING;
+INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/materiales/distribucion/*') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/ubicaciones') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/tipoubicacion') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/proveedores') ON CONFLICT DO NOTHING;

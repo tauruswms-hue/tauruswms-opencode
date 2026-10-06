@@ -137,6 +137,8 @@ INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/materiales/impor
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/materiales/exportar/*') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/materiales/plantilla/*') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/materiales/eliminar/*') ON CONFLICT DO NOTHING;
+INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/materiales/imagen/*') ON CONFLICT DO NOTHING;
+INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/materiales/distribucion/*') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/ubicaciones') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/ubicaciones/guardar') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/ubicaciones/eliminar/*') ON CONFLICT DO NOTHING;
@@ -235,6 +237,8 @@ INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/movil') ON CONFL
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/movil/*') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('OPERADOR', '/sidebar-preferences') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/materiales') ON CONFLICT DO NOTHING;
+INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/materiales/imagen/*') ON CONFLICT DO NOTHING;
+INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/materiales/distribucion/*') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/ubicaciones') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/tipoubicacion') ON CONFLICT DO NOTHING;
 INSERT INTO "roles_rutas" ("rol", "ruta") VALUES ('CONSULTA', '/proveedores') ON CONFLICT DO NOTHING;
@@ -425,6 +429,7 @@ CREATE TABLE "clientes" (
     "id_cliente" SERIAL,
     "codigo" VARCHAR(100),
     "razonsocial" VARCHAR(200) NOT NULL,
+    "nombre_fantasia" VARCHAR(200),
     "cuit" VARCHAR(50),
     "direccion" VARCHAR(255),
     "localidad" VARCHAR(100),
@@ -432,6 +437,7 @@ CREATE TABLE "clientes" (
     "telefono" VARCHAR(50),
     "email" VARCHAR(100),
     "contacto_nombre" VARCHAR(100),
+    "sitio_web" VARCHAR(255),
     "id_ruta" INTEGER,
     "id_transporte_predeterminado" INTEGER,
     "activo" BOOLEAN NOT NULL DEFAULT TRUE,
@@ -447,16 +453,22 @@ CREATE TABLE "materiales" (
     "id" SERIAL,
     "codigo" VARCHAR(100) NOT NULL,
     "codigo_barras" VARCHAR(100),
+    "codigo_alternativo" VARCHAR(100),
+    "codigo_proveedor" VARCHAR(100),
     "nombre" VARCHAR(255) NOT NULL,
     "descripcion" text,
     "categoria_id" INTEGER,
     "stock_minimo" decimal(12,3) DEFAULT 0,
     "stock_maximo" decimal(12,3) DEFAULT 0,
+    "stock_reposicion" decimal(12,3) DEFAULT 0,
     "unidad_medida_id" INTEGER,
     "trazabilidad" VARCHAR(50) NOT NULL DEFAULT 'ninguna' CHECK ("trazabilidad" IN ('ninguna','lote','serie')),
     "metodo_picking" VARCHAR(20) NOT NULL DEFAULT 'libre',
     "peso_bruto" decimal(10,3),
     "peso_neto" decimal(10,3),
+    "volumen" decimal(12,4),
+    "volumen_unidad_id" INTEGER,
+    "imagen_ruta" VARCHAR(500),
     "costo_promedio" decimal(12,4) DEFAULT 0,
     "ultimo_costo" decimal(12,4) DEFAULT 0,
     "activo" BOOLEAN NOT NULL DEFAULT TRUE,

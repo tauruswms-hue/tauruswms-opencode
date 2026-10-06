@@ -139,6 +139,8 @@ IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('OPERADOR', '/materiales/exportar/*');
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('OPERADOR', '/materiales/plantilla/*');
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('OPERADOR', '/materiales/eliminar/*');
+IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('OPERADOR', '/materiales/imagen/*');
+IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('OPERADOR', '/materiales/distribucion/*');
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('OPERADOR', '/ubicaciones');
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('OPERADOR', '/ubicaciones/guardar');
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('OPERADOR', '/ubicaciones/eliminar/*');
@@ -237,6 +239,8 @@ IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('OPERADOR', '/movil/*');
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'OPERADOR') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('OPERADOR', '/sidebar-preferences');
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'CONSULTA') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('CONSULTA', '/materiales');
+IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'CONSULTA') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('CONSULTA', '/materiales/imagen/*');
+IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'CONSULTA') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('CONSULTA', '/materiales/distribucion/*');
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'CONSULTA') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('CONSULTA', '/ubicaciones');
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'CONSULTA') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('CONSULTA', '/tipoubicacion');
 IF NOT EXISTS (SELECT 1 FROM [roles_rutas] WHERE [rol] = 'CONSULTA') INSERT INTO [roles_rutas] ([rol], [ruta]) VALUES ('CONSULTA', '/proveedores');
@@ -429,6 +433,7 @@ CREATE TABLE [clientes] (
     [id_cliente] INT IDENTITY(1,1) PRIMARY KEY,
     [codigo] NVARCHAR(100),
     [razonsocial] NVARCHAR(200) NOT NULL,
+    [nombre_fantasia] NVARCHAR(200),
     [cuit] NVARCHAR(50),
     [direccion] NVARCHAR(255),
     [localidad] NVARCHAR(100),
@@ -436,6 +441,7 @@ CREATE TABLE [clientes] (
     [telefono] NVARCHAR(50),
     [email] NVARCHAR(100),
     [contacto_nombre] NVARCHAR(100),
+    [sitio_web] NVARCHAR(255),
     [id_ruta] INT,
     [id_transporte_predeterminado] INT,
     [activo] BIT NOT NULL DEFAULT 1,
@@ -451,16 +457,22 @@ CREATE TABLE [materiales] (
     [id] INT IDENTITY(1,1) PRIMARY KEY,
     [codigo] NVARCHAR(100) NOT NULL,
     [codigo_barras] NVARCHAR(100),
+    [codigo_alternativo] NVARCHAR(100),
+    [codigo_proveedor] NVARCHAR(100),
     [nombre] NVARCHAR(255) NOT NULL,
     [descripcion] NVARCHAR(MAX),
     [categoria_id] INT,
     [stock_minimo] decimal(12,3) DEFAULT 0,
     [stock_maximo] decimal(12,3) DEFAULT 0,
+    [stock_reposicion] decimal(12,3) DEFAULT 0,
     [unidad_medida_id] INT,
     [trazabilidad] NVARCHAR(50) NOT NULL DEFAULT 'ninguna',
     [metodo_picking] NVARCHAR(20) NOT NULL DEFAULT 'libre',
     [peso_bruto] decimal(10,3),
     [peso_neto] decimal(10,3),
+    [volumen] decimal(12,4),
+    [volumen_unidad_id] INT,
+    [imagen_ruta] NVARCHAR(500),
     [costo_promedio] decimal(12,4) DEFAULT 0,
     [ultimo_costo] decimal(12,4) DEFAULT 0,
     [activo] BIT NOT NULL DEFAULT 1,

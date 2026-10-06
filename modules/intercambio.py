@@ -259,11 +259,12 @@ def _aplicar_registro_material(reg, conn_wms, cursor_wms, cursor_admin):
         return True, 'actualizado', material_id
 
     material_id = execute_insert(cursor_wms, """
-        INSERT INTO materiales (codigo, codigo_barras, nombre, descripcion, categoria_id,
+        INSERT INTO materiales (codigo, codigo_alternativo, codigo_proveedor, codigo_barras, nombre, descripcion,
+            categoria_id,
             stock_minimo, stock_maximo, unidad_medida_id, trazabilidad, metodo_picking,
             peso_bruto, peso_neto, costo_promedio, ultimo_costo, activo, tenant_id)
-        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-    """, (codigo, campos['codigo_barras'], nombre, campos['descripcion'], campos['categoria_id'],
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+    """, (codigo, codigo, codigo, campos['codigo_barras'], nombre, campos['descripcion'], campos['categoria_id'],
           campos['stock_minimo'], campos['stock_maximo'], campos['unidad_medida_id'],
           campos['trazabilidad'], campos['metodo_picking'], campos['peso_bruto'], campos['peso_neto'],
           campos['costo_promedio'], campos['ultimo_costo'], campos['activo'], tenant_id))

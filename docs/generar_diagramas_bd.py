@@ -43,6 +43,7 @@ RELACIONES_LOGICAS = {
     'wms': [
         ('ubicaciones', 'tipoubicacion', 'tipoubicacion', 'id'),
         ('materiales', 'unidad_medida_id', 'unidades_medida', 'id_unidad'),
+        ('materiales', 'volumen_unidad_id', 'unidades_medida', 'id_unidad'),
         ('stock_movimientos', 'id_ubicacion', 'ubicaciones', 'id'),
         ('stock_movimientos', 'id_material', 'materiales', 'id'),
         ('inventarios_detalle', 'id_ubicacion', 'ubicaciones', 'id'),
