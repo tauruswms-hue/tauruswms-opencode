@@ -1,0 +1,6 @@
+﻿codigo,razonsocial,nombre_fantasia,cuit,direccion,localidad,provincia,telefono,email,sitio_web,contacto_nombre,id_ruta,id_transporte_predeterminado,activo
+CLI001,Distribuidora del Litoral S.A.,Litoral Mayorista,30-71234567-8,Bv. Pellegrini 2850,Santa Fe,Santa Fe,0342-455-1200,compras@litoralmayorista.com.ar,www.litoralmayorista.com.ar,Marta Giménez,Zona Centro,TRA001,1
+CLI002,Ferretería El Tornillo S.R.L.,El Tornillo,30709876543,Av. Aristóbulo del Valle 6120,Santa Fe,Santa Fe,0342-460-3311,eltornillo@gmail.com,,Jorge Sosa,Zona Norte,TRA003,1
+CLI003,Construcciones Paraná S.A.,,30-68111222-3,Av. Almafuerte 1450,Paraná,Entre Ríos,0343-431-7000,administracion@construccionesparana.com.ar,https://construccionesparana.com.ar,Lucía Benítez,Interior,TRA001,1
+CLI004,Pinturería Colores,Colores,27-25333444-5,San Martín 3320,Santo Tomé,Santa Fe,,,,,Zona Sur,,1
+CLI005,Corralón San José S.H.,Corralón San José,,Ruta 1 Km 4,San José del Rincón,Santa Fe,0342-497-1010,ventas@corralonsanjose.com.ar,corralonsanjose.com.ar,Pablo Ríos,,,0

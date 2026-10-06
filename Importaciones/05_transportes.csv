@@ -1,0 +1,5 @@
+﻿codigo,razonsocial,cuit,telefono,email,activo
+TRA001,Expreso Litoral S.A.,30-70555111-2,0342-455-8800,logistica@expresolitoral.com.ar,1
+TRA002,Transportes El Rápido S.R.L.,30705552223,0341-430-1122,despachos@elrapido.com.ar,1
+TRA003,Flota propia,30-71234567-8,,,1
+TRA004,Cargas del Interior S.A.,33-70999888-9,0343-422-9090,cargas@cdinterior.com.ar,0

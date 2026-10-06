@@ -1,0 +1,9 @@
+﻿codigo,nombre,simbolo,tipo_magnitud,conversion_a_base,unidad_base_referencia,decimales_permitidos,activo
+XKG,Kilo de prueba (correcta),xkg,MASA,1,,3,1
+XGR,Base inexistente,xg,MASA,0.001,NOEXISTE,0,1
+XLT,Base de otra magnitud,xl,VOLUMEN,1,XKG,0,1
+XMG,Magnitud inventada,xm,INVENTADA,1,,0,1
+XCV,Conversión en cero,xc,MASA,0,XKG,0,1
+XDC,Decimales fuera de rango,xd,MASA,2,XKG,9,1
+XKG,Código repetido (se omite),xkg,MASA,1,,3,1
+,Sin código,x,MASA,1,,0,1

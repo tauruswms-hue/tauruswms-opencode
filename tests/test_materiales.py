@@ -308,7 +308,8 @@ def test_importar_csv(logged_client, wms):
     resultado = r.get_json()
     assert resultado['insertados'] == 1 and resultado['omitidos'] == [bueno]
     assert sorted(e['razon'] for e in resultado['errores']) == [
-        'Código y Nombre son obligatorios', 'categoria_id: el valor elegido no existe.']
+        'Código y Nombre son obligatorios',
+        'categoria_id: no existe "999999999" (se puede indicar el id o el código).']
     assert _material(wms, bueno)['nombre'] == 'Importado'
     assert _material(wms, sin_categoria) is None
 

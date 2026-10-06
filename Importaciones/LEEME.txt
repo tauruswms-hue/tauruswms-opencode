@@ -1,0 +1,87 @@
+IMPORTACIONES DE PRUEBA - Taurus WMS
+====================================
+
+Archivos CSV para probar las importaciones de los maestros desde las pantallas
+del WMS (botón "Importar" de cada maestro). Los datos son inventados: una
+ferretería mayorista de ejemplo.
+
+
+ORDEN DE IMPORTACIÓN
+--------------------
+Hay que respetar el orden, porque unos archivos hacen referencia a otros:
+
+  Archivo               Pantalla (menú Maestros)   Filas   Depende de
+  --------------------  -------------------------  -----   ----------------------------
+  01_unidades.csv       Unidades de Medida           14    -
+  02_categorias.csv     Categorías                    6    -
+  03_proveedores.csv    Proveedores                   5    -
+  04_rutas.csv          Rutas                         4    -
+  05_transportes.csv    Transportes                   4    -
+  06_clientes.csv       Clientes                      5    rutas y transportes
+  07_materiales.csv     Materiales                   13    unidades, categorías, proveedores
+
+Todos se tienen que importar sin errores. Si un código ya existe en la
+empresa, esa fila se omite y no se pisa lo que ya está cargado (en Clientes,
+a los que ya existen solo se les actualiza la ruta y el transporte).
+
+
+QUÉ PERMITE VER CADA ARCHIVO
+----------------------------
+01_unidades.csv
+  - Unidades base (sin unidad base, conversión 1): UN, KG, L, M, HS.
+  - Múltiplos y submúltiplos sobre su unidad base: DOC y CEN sobre UN; G y TN
+    sobre KG; ML y M3 sobre L; CM y MM sobre M (1 MM = 0,001 M).
+  - Una unidad inactiva (PAR): aparece en el listado marcada como "Inactiva".
+
+03_proveedores.csv
+  - CUIT con guiones y sin guiones (PROV002): se guarda siempre con guiones.
+  - Un proveedor sin CUIT (PROV005), que además tiene una dirección de más de
+    255 caracteres (el campo admite 500).
+
+05_transportes.csv
+  - CUIT con y sin guiones, y un transporte inactivo (TRA004).
+
+06_clientes.csv
+  - Nombre de fantasía, sitio web (escrito con y sin "https://"), mail
+    principal, domicilio y estado.
+  - Ruta indicada por su nombre y transporte por su código.
+  - La persona de contacto del archivo queda como primer contacto del cliente;
+    los demás contactos se agregan desde la pestaña "Contactos" de la ficha.
+  - Un cliente inactivo (CLI005) y uno sin CUIT ni ruta.
+
+07_materiales.csv
+  - Categoría, unidad, unidad del volumen y proveedor habitual indicados por
+    CÓDIGO (también se puede usar el id numérico).
+  - Código alternativo y código de proveedor: cargados en algunos materiales y
+    vacíos en otros (en ese caso toman el valor del código del material).
+  - Stock mínimo, de reposición y máximo.
+  - Volumen con su unidad (L, ML y M3).
+  - Trazabilidad por lote y por serie. El método de picking va vacío: se usa
+    el método por defecto de la empresa.
+  - Una imagen por dirección web (TAL-PER-13) y un material inactivo (CAS-SEG-BL).
+  - Códigos de barras EAN-13 válidos.
+
+
+CARPETA con_errores
+-------------------
+Archivos con filas mal armadas a propósito, para ver los mensajes de las
+validaciones. En cada uno, la primera fila es correcta y se importa; las demás
+se rechazan con su motivo.
+
+  unidades_con_errores.csv     1 se importa, 1 se omite (código repetido), 6 con error
+  proveedores_con_errores.csv  1 se importa, 4 con error
+  clientes_con_errores.csv     1 se importa, 3 con error
+  materiales_con_errores.csv   1 se importa, 8 con error
+
+No dependen de los archivos numerados. Los códigos empiezan con "X" para
+poder reconocerlos y borrarlos después.
+
+
+NOTAS
+-----
+- Los archivos están en UTF-8. Excel los abre con los acentos bien.
+- Las importaciones agregan registros nuevos; no sirven para modificar los
+  existentes (salvo la ruta y el transporte de los clientes).
+- Un test automático (tests/test_importaciones.py) importa todos estos
+  archivos y verifica el resultado, así que si cambia una importación y un
+  archivo deja de servir, el test lo avisa. Ese test borra lo que inserta.

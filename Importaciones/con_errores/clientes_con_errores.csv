@@ -1,0 +1,5 @@
+﻿codigo,razonsocial,nombre_fantasia,cuit,email,sitio_web,activo
+XCLI1,Cliente correcto S.A.,Correcto,30-70000002-2,bien@cliente.com,www.cliente.com,1
+XCLI2,CUIT inválido,,20-1234,,,1
+XCLI3,Mail inválido,,,sin-arroba,,1
+XCLI4,Sitio web inválido,,,,esto no es una web,1

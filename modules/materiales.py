@@ -3,6 +3,7 @@ import csv
 import io
 import json
 import os
+import re
 from urllib.parse import urlparse
 
 import openpyxl
@@ -26,7 +27,6 @@ from modules.batch_utils import (
     export_json,
     export_xlsx,
     float_or_zero,
-    int_or_none,
     parse_file,
 )
 from modules.context import get_tenant_filter
@@ -98,6 +98,30 @@ def _metodo_picking_valido(metodo, default='libre', habilitados=None):
 
 
 TRAZABILIDADES = ('ninguna', 'lote', 'serie')
+
+
+def _referencia(cursor, tabla, columna_id, columna_codigo, valor, tenant_id, rotulo):
+    """Id de un registro de otra tabla indicado, en un archivo importado, por su id o por su código.
+
+    Un valor numérico se busca primero como id y, si no existe, como código
+    (hay códigos numéricos). Devuelve None si el valor está vacío.
+    """
+    valor = str(valor if valor is not None else '').strip()
+    if not valor:
+        return None
+    filtro = "(%s IS NULL OR tenant_id = %s)"
+    if re.fullmatch(r'\d+(\.0+)?', valor):
+        cursor.execute(f"SELECT {columna_id} AS id FROM {tabla} WHERE {columna_id} = %s AND {filtro}",
+                       (int(float(valor)), tenant_id, tenant_id))
+        fila = cursor.fetchone()
+        if fila:
+            return fila['id']
+    cursor.execute(f"SELECT {columna_id} AS id FROM {tabla} WHERE {columna_codigo} = %s AND {filtro}",
+                   (valor, tenant_id, tenant_id))
+    fila = cursor.fetchone()
+    if not fila:
+        raise DatoInvalido(f'{rotulo}: no existe "{valor}" (se puede indicar el id o el código).')
+    return fila['id']
 
 
 def _stocks(minimo, reposicion, maximo):
@@ -611,16 +635,20 @@ def importar():
                     metodo_picking = _metodo_picking_valido(str(row.get('metodo_picking', '') or '').strip().lower(),
                                                             metodo_default, metodos_habilitados)
                     try:
-                        categoria_id = _id_del_tenant(cursor, 'categorias', 'id_categoria',
-                                                      int_or_none(row.get('categoria_id')), tenant_id, 'categoria_id')
-                        unidad_id = _id_del_tenant(cursor, 'unidades_medida', 'id_unidad',
-                                                   int_or_none(row.get('unidad_medida_id')), tenant_id,
-                                                   'unidad_medida_id')
+                        # Las referencias a otros maestros se pueden indicar por id o por código
+                        categoria_id = _referencia(cursor, 'categorias', 'id_categoria', 'codigo',
+                                                   row.get('categoria_id'), tenant_id, 'categoria_id')
+                        unidad_id = _referencia(cursor, 'unidades_medida', 'id_unidad', 'codigo',
+                                                row.get('unidad_medida_id'), tenant_id, 'unidad_medida_id')
+                        id_prov_hab = _referencia(cursor, 'proveedores', 'id', 'codigo',
+                                                  row.get('id_proveedor_habitual'), tenant_id, 'id_proveedor_habitual')
                         codigo_alternativo = _codigo_secundario(row.get('codigo_alternativo'), 'codigo_alternativo',
                                                                 codigo)
                         codigo_proveedor = _codigo_secundario(row.get('codigo_proveedor'), 'codigo_proveedor', codigo)
-                        volumen, volumen_unidad_id = _volumen(cursor, str(row.get('volumen') or '').replace(',', '.'),
-                                                              int_or_none(row.get('volumen_unidad_id')), tenant_id)
+                        volumen, volumen_unidad_id = _volumen(
+                            cursor, str(row.get('volumen') or '').replace(',', '.'),
+                            _referencia(cursor, 'unidades_medida', 'id_unidad', 'codigo',
+                                        row.get('volumen_unidad_id'), tenant_id, 'volumen_unidad_id'), tenant_id)
                         imagen_ruta = _imagen_ruta(row.get('imagen_ruta'))
                         stock_min, stock_repo, stock_max = _stocks(
                             *(str(row.get(c) or '').replace(',', '.')
@@ -669,15 +697,12 @@ def importar():
                         tenant_id,
                     ))
 
-                    id_prov_hab = int_or_none(row.get('id_proveedor_habitual'))
                     if id_prov_hab:
-                        cursor.execute("SELECT id FROM proveedores WHERE id = %s AND (%s IS NULL OR tenant_id = %s)", (id_prov_hab, tenant_id, tenant_id))
-                        if cursor.fetchone():
-                            cod_ref_prov = str(row.get('codigo_referencia_prov', '') or '').strip() or None
-                            cursor.execute("""
-                                INSERT INTO material_proveedor (id_material, id_proveedor, codigo_referencia_prov, es_habitual, tenant_id)
-                                VALUES (%s, %s, %s, 1, %s)
-                            """, (material_id, id_prov_hab, cod_ref_prov, tenant_id))
+                        cod_ref_prov = str(row.get('codigo_referencia_prov', '') or '').strip() or None
+                        cursor.execute("""
+                            INSERT INTO material_proveedor (id_material, id_proveedor, codigo_referencia_prov, es_habitual, tenant_id)
+                            VALUES (%s, %s, %s, 1, %s)
+                        """, (material_id, id_prov_hab, cod_ref_prov, tenant_id))
 
                     insertados += 1
             except Exception as e:

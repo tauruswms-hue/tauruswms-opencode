@@ -1,0 +1,10 @@
+﻿codigo,nombre,descripcion,codigo_barras,codigo_alternativo,codigo_proveedor,categoria_id,stock_minimo,stock_reposicion,stock_maximo,unidad_medida_id,trazabilidad,metodo_picking,peso_bruto,peso_neto,volumen,volumen_unidad_id,imagen_ruta,activo,id_proveedor_habitual,codigo_referencia_prov
+XMAT1,Material correcto,,,,,,1,5,10,,,,,,,,,1,,
+XMAT2,Código de barras con dígito verificador mal,,7790001000010,,,,,,,,,,,,,,,,,
+XMAT3,Categoría inexistente,,,,,NOEXISTE,,,,,,,,,,,,,,
+XMAT4,Reposición mayor que el máximo,,,,,,10,500,100,,,,,,,,,,,
+XMAT5,Mínimo mayor que el máximo,,,,,,200,,100,,,,,,,,,,,
+XMAT6,Volumen sin unidad,,,,,,,,,,,,,,3,,,,,
+XMAT7,Imagen que no es una imagen,,,,,,,,,,,,,,,,C:\datos\claves.txt,,,
+XMAT8,Proveedor inexistente,,,,,,,,,,,,,,,,,,NOEXISTE,
+,Sin código,,,,,,,,,,,,,,,,,,,
