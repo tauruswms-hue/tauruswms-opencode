@@ -583,7 +583,8 @@ CREATE TABLE IF NOT EXISTS "clases_pedido" (
     "id_clase" INTEGER PRIMARY KEY AUTOINCREMENT,
     "nombre" TEXT NOT NULL,
     "activo" INTEGER NOT NULL DEFAULT 1,
-    "tenant_id" INTEGER
+    "tenant_id" INTEGER,
+    UNIQUE ("nombre", "tenant_id")
 );
 CREATE INDEX IF NOT EXISTS "idx_clases_pedido_tenant" ON "clases_pedido" ("tenant_id");
 

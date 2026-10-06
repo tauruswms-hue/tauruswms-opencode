@@ -137,7 +137,7 @@ def nuevo():
             rel_transp_rutas = cursor.fetchall()
             cursor.execute("SELECT id, codigo, nombre FROM materiales WHERE activo = 1 AND (%s IS NULL OR tenant_id = %s)", (tenant_id, tenant_id))
             materiales = cursor.fetchall()
-            cursor.execute("SELECT id_clase, nombre FROM clases_pedido WHERE activo = 1 AND (%s IS NULL OR tenant_id = %s)", (tenant_id, tenant_id))
+            cursor.execute("SELECT id_clase, nombre, activo FROM clases_pedido WHERE activo = 1 AND (%s IS NULL OR tenant_id = %s) ORDER BY nombre", (tenant_id, tenant_id))
             clases = cursor.fetchall()
 
             cursor.execute("SELECT id_transporte, id_muelle_salida FROM transportes WHERE activo = 1 AND (%s IS NULL OR tenant_id = %s)", (tenant_id, tenant_id))
@@ -181,7 +181,10 @@ def editar(id_pedido):
             materiales = cursor.fetchall()
             cursor.execute("SELECT * FROM pedidos_detalle WHERE id_pedido = %s AND (%s IS NULL OR tenant_id = %s)", (id_pedido, tenant_id, tenant_id))
             detalle = cursor.fetchall()
-            cursor.execute("SELECT id_clase, nombre FROM clases_pedido WHERE activo = 1 AND (%s IS NULL OR tenant_id = %s)", (tenant_id, tenant_id))
+            # Las activas, más la que ya tiene el pedido aunque esté inactiva (si no, se perdería al guardar)
+            cursor.execute("""SELECT id_clase, nombre, activo FROM clases_pedido
+                              WHERE (activo = 1 OR id_clase = %s) AND (%s IS NULL OR tenant_id = %s)
+                              ORDER BY nombre""", (pedido['id_clase'] or 0, tenant_id, tenant_id))
             clases = cursor.fetchall()
 
         return render_template('pedidos_form.html', pedido=pedido, detalle=detalle,

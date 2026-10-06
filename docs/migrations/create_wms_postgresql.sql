@@ -311,6 +311,7 @@ CREATE TABLE "clases_pedido" (
     "tenant_id" INTEGER
 );
 CREATE INDEX "idx_clases_pedido_tenant" ON "clases_pedido" ("tenant_id");
+CREATE UNIQUE INDEX "uk_clases_pedido_nombre_tenant" ON "clases_pedido" ("nombre", "tenant_id");
 
 -- --- recepciones_cabecera ---;
 CREATE TABLE "recepciones_cabecera" (

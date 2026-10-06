@@ -38,20 +38,30 @@
             <thead>
                 <tr>
                     <th>Nombre</th>
+                    <th>Estado</th>
                     <th>Acciones</th>
                 </tr>
             </thead>
             <tbody>
                 {% for c in clases %}
-                <tr>
+                <tr{% if not c.activo %} style="color:#999;"{% endif %}>
                     <td><strong>{{ c.nombre }}</strong></td>
+                    <td style="text-align:center;">
+                        {% if c.activo %}
+                            <span style="background:#27ae60; color:white; padding:2px 8px; border-radius:10px; font-size:0.8rem;">Activa</span>
+                        {% else %}
+                            <span title="No se ofrece al cargar pedidos" style="background:#95a5a6; color:white; padding:2px 8px; border-radius:10px; font-size:0.8rem;">Inactiva</span>
+                        {% endif %}
+                    </td>
                     <td class="actions-cell" style="text-align: center;">
-                        <button class="btn-icon edit" onclick='editClase({{ c | tojson }})' style="color: #3498db; background: none; border: none; cursor: pointer; font-size: 1.1rem;">
+                        <button class="btn-icon edit" title="Editar" onclick='editClase({{ c | tojson }})' style="color: #3498db; background: none; border: none; cursor: pointer; font-size: 1.1rem;">
                             <i class="fas fa-edit"></i>
                         </button>
-                        <form method="POST" action="{{ url_for('clases_pedido.eliminar', id_clase=c.id_clase) }}" style="display:inline;" onsubmit="return confirm('¿Inactivar esta clase de pedido?')">
-                            <button type="submit" class="btn-icon delete" style="color: #e74c3c; background: none; border: none; cursor: pointer; font-size: 1.1rem;"><i class="fas fa-trash"></i></button>
+                        {% if c.activo %}
+                        <form method="POST" action="{{ url_for('clases_pedido.eliminar', id_clase=c.id_clase) }}" style="display:inline;" onsubmit="return confirm('¿Inactivar esta clase de pedido?\n\nNo se borra: deja de ofrecerse al cargar pedidos y se puede reactivar desde su edición.')">
+                            <button type="submit" class="btn-icon delete" title="Inactivar" style="color: #e74c3c; background: none; border: none; cursor: pointer; font-size: 1.1rem;"><i class="fas fa-trash"></i></button>
                         </form>
+                        {% endif %}
                     </td>
                 </tr>
                 {% endfor %}

@@ -12,12 +12,17 @@
                     <div class="form-row">
                         <div class="form-group">
                             <label>Nombre *</label>
-                            <input type="text" name="nombre" id="form_clase_nombre" required maxlength="100">
+                            <input type="text" name="nombre" id="form_clase_nombre" required maxlength="{{ nombre_max }}">
+                            <small style="color:#888;">Identifica a la clase: no puede repetirse. El Intercambio y la importación de pedidos la buscan por este nombre.</small>
                         </div>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
-                            <label><input type="checkbox" name="activo" id="form_clase_activo" checked> Activa</label>
+                            <label for="form_clase_activo">Estado</label>
+                            <select name="activo" id="form_clase_activo" title="Una clase inactiva no se ofrece al cargar pedidos" style="padding:10px; border:1px solid #d1d5db; border-radius:4px; max-width:180px;">
+                                <option value="1">Activa</option>
+                                <option value="0">Inactiva</option>
+                            </select>
                         </div>
                     </div>
                 </div>

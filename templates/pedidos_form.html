@@ -92,7 +92,7 @@
                         <option value="">-- Seleccionar --</option>
                         {% for cl in clases %}
                         <option value="{{ cl.id_clase }}" {% if edit_mode and pedido.id_clase == cl.id_clase %}selected{% endif %}>
-                            {{ cl.nombre }}
+                            {{ cl.nombre }}{% if not cl.activo %} (inactiva){% endif %}
                         </option>
                         {% endfor %}
                     </select>

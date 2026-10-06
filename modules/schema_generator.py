@@ -557,6 +557,7 @@ WMS_TABLES = [
         ],
         "indexes": [
             {"columns": ["tenant_id"], "name": "idx_clases_pedido_tenant"},
+            {"columns": ["nombre", "tenant_id"], "name": "uk_clases_pedido_nombre_tenant", "unique": True},
         ],
     },
     {
@@ -1056,6 +1057,7 @@ ROUTE_CATALOG = [
     {"grupo": "Clases de pedido", "rutas": [
         "/clases-pedido", "/clases-pedido/guardar", "/clases-pedido/eliminar/*",
         "/clases-pedido/importar", "/clases-pedido/exportar/*", "/clases-pedido/plantilla/*",
+        "/clases-pedido/plantilla-datos/*",
     ]},
     {"grupo": "Pedidos", "rutas": [
         "/pedidos", "/pedidos/nuevo", "/pedidos/ver/*", "/pedidos/editar/*",

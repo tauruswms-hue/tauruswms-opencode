@@ -585,7 +585,8 @@ CREATE TABLE `clases_pedido` (
     `id_clase` int AUTO_INCREMENT PRIMARY KEY,
     `nombre` varchar(100) NOT NULL,
     `activo` TINYINT(1) NOT NULL DEFAULT TRUE,
-    `tenant_id` int
+    `tenant_id` int,
+    UNIQUE KEY `uk_clases_pedido_nombre_tenant` (`nombre`, `tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE INDEX `idx_clases_pedido_tenant` ON `clases_pedido` (`tenant_id`);
 

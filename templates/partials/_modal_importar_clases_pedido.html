@@ -15,7 +15,7 @@
                     </tr></thead>
                     <tbody>
                         <tr><td style="padding:3px 8px;"><code>nombre</code></td><td style="padding:3px 8px; color:#e74c3c;">Sí</td><td style="padding:3px 8px;">Único</td></tr>
-                        <tr style="background:#f9f9f9;"><td style="padding:3px 8px;"><code>activo</code></td><td style="padding:3px 8px; color:#27ae60;">No</td><td style="padding:3px 8px;">1 = sí, 0 = no (default 1)</td></tr>
+                        <tr style="background:#f9f9f9;"><td style="padding:3px 8px;"><code>activo</code></td><td style="padding:3px 8px; color:#27ae60;">No</td><td style="padding:3px 8px;">Estado: 1 = Activa, 0 = Inactiva. Default 1</td></tr>
                     </tbody>
                 </table>
                 <p style="margin:10px 0 0; color:#555;">Las clases con <strong>nombre duplicado</strong> serán omitidas.</p>
@@ -27,10 +27,14 @@
                     <a href="{{ url_for('clases_pedido.plantilla', formato='xlsx') }}" style="background:#217346; color:white; text-decoration:none; padding:6px 12px; border-radius:4px; font-size:0.82rem;"><i class="fas fa-file-excel"></i> XLSX</a>
                     <a href="{{ url_for('clases_pedido.plantilla', formato='json') }}" style="background:#e67e22; color:white; text-decoration:none; padding:6px 12px; border-radius:4px; font-size:0.82rem;"><i class="fas fa-file-code"></i> JSON</a>
                 </div>
-                <p style="margin:10px 0 0; font-size:0.85rem;">
-                    <i class="fas fa-database" style="color:#8e44ad;"></i>
-                    <a href="{{ url_for('clases_pedido.plantilla_datos', formato='xlsx') }}" style="color:#8e44ad; font-weight:bold;">Descargar XLSX con las clases de pedido actuales</a> (datos reales, listo para importar/editar).
-                </p>
+                <div style="margin:12px 0 0; padding:10px 12px; background:#f6f0fb; border:1px solid #e0cdf0; border-radius:6px; font-size:0.85rem; color:#444;">
+                    <p style="margin:0 0 6px;"><i class="fas fa-database" style="color:#8e44ad;"></i>
+                        <strong>Clases sugeridas.</strong> La instalación trae un juego de clases de uso común
+                        (Venta, Reposición, Muestra, Devolución). No están cargadas en la empresa: para usarlas hay
+                        que descargar este archivo e importarlo. Trae además las clases que la empresa ya tiene,
+                        que al importar se omiten.</p>
+                    <a href="{{ url_for('clases_pedido.plantilla_datos', formato='xlsx') }}" style="color:#8e44ad; font-weight:bold;"><i class="fas fa-download"></i> Descargar XLSX con las clases sugeridas</a>
+                </div>
             </div>
             <div style="margin-bottom:16px;">
                 <label style="font-size:0.88rem; font-weight:bold; color:#555; display:block; margin-bottom:8px;"><i class="fas fa-folder-open"></i> Seleccionar archivo</label>
