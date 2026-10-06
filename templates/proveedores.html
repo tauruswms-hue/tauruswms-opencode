@@ -82,14 +82,7 @@
 
     function closeModal() { $('#modalProveedor').fadeOut(150); }
 
-    // CUIT con formato 99-99999999-9: los guiones se agregan al escribir
-    function formatCuit(input) {
-        const d = input.value.replace(/[^0-9]/g, '').substring(0, 11);
-        input.value = d.length > 10 ? d.substring(0, 2) + '-' + d.substring(2, 10) + '-' + d.substring(10)
-            : d.length > 2 ? d.substring(0, 2) + '-' + d.substring(2) : d;
-    }
     function contarDireccion() { $('#form_dir_cuenta').text($('#form_dir').val().length); }
-    $(document).on('input', '#form_cuit', function() { formatCuit(this); });
     $(document).on('input', '#form_dir', contarDireccion);
 
     function editProveedor(data) {

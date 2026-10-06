@@ -1,6 +1,4 @@
-﻿import re
-
-from flask import (
+﻿from flask import (
     Blueprint,
     flash,
     jsonify,
@@ -21,15 +19,11 @@ from modules.batch_utils import (
     plantilla_xlsx,
 )
 from modules.context import get_tenant_filter
+from modules.cuit import cuit_para_guardar, cuit_para_mostrar
 from modules.db_config import get_db_connection
 from modules.sql_dialect import execute_insert
 
 transportes_bp = Blueprint('transportes', __name__)
-
-
-def validar_cuit(cuit):
-    cuit = re.sub(r'[^0-9]', '', str(cuit))
-    return len(cuit) == 11
 
 
 @transportes_bp.route('/transportes')
@@ -39,7 +33,10 @@ def listar():
     try:
         with conn.cursor() as cursor:
             cursor.execute("SELECT * FROM transportes WHERE (%s IS NULL OR tenant_id = %s) ORDER BY razonsocial", (tenant_id, tenant_id))
-            transportes = cursor.fetchall()
+            transportes = [dict(t) for t in cursor.fetchall()]
+            for t in transportes:
+                # Los CUIT cargados antes como 11 dígitos se muestran y editan ya formateados
+                t['cuit'] = cuit_para_mostrar(t.get('cuit'))
             cursor.execute("SELECT * FROM rutas WHERE (%s IS NULL OR tenant_id = %s) ORDER BY nombre_ruta", (tenant_id, tenant_id))
             rutas_lista = cursor.fetchall()
             cursor.execute("SELECT * FROM transporte_rutas WHERE (%s IS NULL OR tenant_id = %s)", (tenant_id, tenant_id))
@@ -63,11 +60,11 @@ def guardar():
     d = request.form
     t_id = d.get('id_transporte')
     tenant_id = get_tenant_filter()
-    cuit = d.get('cuit')
     email = d.get('email')
-
-    if cuit and not validar_cuit(cuit):
-        flash("Error: El CUIT debe contener 11 dígitos numéricos.", "danger")
+    try:
+        cuit = cuit_para_guardar(d.get('cuit'))
+    except ValueError as e:
+        flash(str(e), "danger")
         return redirect(url_for('transportes.listar'))
 
     rutas_ids = request.form.getlist('rutas_ids[]')
@@ -79,7 +76,7 @@ def guardar():
             params = (
                 d.get('codigo'),
                 d.get('razonsocial'),
-                re.sub(r'[^0-9]', '', cuit) if cuit else None,
+                cuit,
                 d.get('telefono'),
                 email if email else None,
                 1 if d.get('activo') else 0,
@@ -99,7 +96,7 @@ def guardar():
             for i in range(len(rutas_ids)):
                 if rutas_ids[i]:
                     cursor.execute("""
-                        INSERT INTO transporte_rutas (id_transporte, id_ruta, observaciones, tenant_id) 
+                        INSERT INTO transporte_rutas (id_transporte, id_ruta, observaciones, tenant_id)
                         VALUES (%s, %s, %s, %s)
                     """, (current_id, rutas_ids[i], rutas_obs[i], tenant_id))
 
@@ -173,7 +170,7 @@ def importar():
                         VALUES (%s, %s, %s, %s, %s, %s, %s)
                     """, (
                         codigo, razon,
-                        str(row.get('cuit', '') or '').strip() or None,
+                        cuit_para_guardar(row.get('cuit')),
                         str(row.get('telefono', '') or '').strip() or None,
                         str(row.get('email', '') or '').strip() or None,
                         bool_col(row.get('activo', '1')),

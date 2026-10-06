@@ -52,6 +52,12 @@
                 <code>clase_nombre</code>.</li>
         </ul>
 
+        <h3>CUIT de transportes y clientes</h3>
+        <p>La columna <code>cuit</code> de <code>intercambio_transportes</code> e <code>intercambio_clientes</code>
+        es opcional. Si se informa, tiene que tener el formato <code>99-99999999-9</code> o ser los 11 dígitos sin
+        guiones; en los dos casos se guarda con guiones. Con cualquier otro valor el registro queda en
+        <code>error</code> con el mensaje "CUIT inválido". Es la misma regla que aplican las pantallas del WMS.</p>
+
         <h3>Ítems de un pedido</h3>
         <p>La cabecera va en columnas y los ítems en <code>items_json</code>, como una lista:</p>
 <pre><code>[

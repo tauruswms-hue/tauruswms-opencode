@@ -67,6 +67,7 @@ function editCliente(data) {
     $('#form_codigo').val(data.codigo);
     $('#form_razonsocial').val(data.razonsocial);
     $('#form_cuit').val(data.cuit);
+    formatCuit(document.getElementById('form_cuit'));
     $('#form_telefono').val(data.telefono);
     $('#form_email').val(data.email);
     $('#form_direccion').val(data.direccion);

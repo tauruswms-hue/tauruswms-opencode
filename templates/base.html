@@ -68,7 +68,7 @@
             --sidebar-collapsed-width: 60px;
             --navbar-height: 56px;
         }
-        
+
         html, body {
             height: 100%;
             margin: 0;
@@ -76,7 +76,7 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             overflow-y: auto;
         }
-        
+
         /* Sidebar */
         .sidebar {
             position: fixed;
@@ -92,20 +92,20 @@
             z-index: 1000;
             box-shadow: 2px 0 10px rgba(0,0,0,0.2);
         }
-        
+
         .sidebar::-webkit-scrollbar {
             width: 6px;
         }
-        
+
         .sidebar::-webkit-scrollbar-track {
             background: rgba(255,255,255,0.1);
         }
-        
+
         .sidebar::-webkit-scrollbar-thumb {
             background: rgba(255,255,255,0.3);
             border-radius: 3px;
         }
-        
+
         .sidebar-header {
             padding: 15px 20px;
             background: rgba(0,0,0,0.2);
@@ -114,26 +114,26 @@
             align-items: center;
             gap: 12px;
         }
-        
+
         .sidebar-header img {
             height: 32px;
             width: auto;
         }
-        
+
         .sidebar-header span {
             font-size: 1.1rem;
             font-weight: 600;
             white-space: nowrap;
         }
-        
+
         .sidebar-nav {
             padding: 10px 0;
         }
-        
+
         .sidebar-section {
             margin-bottom: 5px;
         }
-        
+
         .sidebar-title {
             padding: 8px 20px;
             font-size: 0.75rem;
@@ -142,11 +142,11 @@
             color: rgba(255,255,255,0.5);
             letter-spacing: 1px;
         }
-        
+
         .sidebar-item {
             position: relative;
         }
-        
+
         .sidebar-link {
             display: flex;
             align-items: center;
@@ -157,56 +157,56 @@
             cursor: pointer;
             gap: 12px;
         }
-        
+
         .sidebar-link:hover {
             background: rgba(255,255,255,0.1);
             color: white;
         }
-        
+
         .sidebar-link.active {
             background: rgba(255,255,255,0.15);
             color: white;
             border-left: 3px solid #63b3ed;
         }
-        
+
         .sidebar-link i {
             width: 20px;
             text-align: center;
             font-size: 1rem;
         }
-        
+
         .sidebar-link .link-text {
             flex: 1;
             white-space: nowrap;
         }
-        
+
         .sidebar-link .submenu-icon {
             font-size: 0.7rem;
             transition: transform 0.2s ease;
         }
-        
+
         .sidebar-link.expanded .submenu-icon {
             transform: rotate(180deg);
         }
-        
+
         .sidebar-submenu {
             display: none;
             background: rgba(0,0,0,0.15);
         }
-        
+
         .sidebar-submenu.show {
             display: block;
         }
-        
+
         .sidebar-submenu .sidebar-link {
             padding-left: 52px;
             font-size: 0.9rem;
         }
-        
+
         .sidebar-submenu .sidebar-link:hover {
             padding-left: 55px;
         }
-        
+
         /* Navbar superior */
         .navbar {
             position: fixed;
@@ -223,12 +223,12 @@
             z-index: 999;
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
-        
+
         .navbar-menu {
             display: flex;
             gap: 5px;
         }
-        
+
         .navbar-link {
             display: flex;
             align-items: center;
@@ -241,43 +241,43 @@
             font-weight: 500;
             transition: all 0.2s ease;
         }
-        
+
         .navbar-link:hover {
             background: #edf2f7;
             color: #2d3748;
         }
-        
+
         .navbar-link.active {
             background: #ebf8ff;
             color: #2b6cb0;
         }
-        
+
         .navbar-link i {
             font-size: 0.9rem;
         }
-        
+
         .navbar-user {
             display: flex;
             align-items: center;
             gap: 15px;
         }
-        
+
         .user-info {
             display: flex;
             flex-direction: column;
             align-items: flex-end;
             font-size: 0.8rem;
         }
-        
+
         .user-info .tenant {
             color: #2b6cb0;
             font-weight: 600;
         }
-        
+
         .user-info .name {
             color: #4a5568;
         }
-        
+
         .btn-logout {
             padding: 8px 14px;
             background: #e53e3e;
@@ -287,11 +287,11 @@
             font-size: 0.85rem;
             transition: background 0.2s ease;
         }
-        
+
         .btn-logout:hover {
             background: #c53030;
         }
-        
+
         /* Main content */
         .main-content {
             margin-left: var(--sidebar-width);
@@ -302,13 +302,13 @@
             overflow-y: auto;
             box-sizing: border-box;
         }
-        
+
         /* Container override */
         .container {
             max-width: 100%;
             padding: 0;
         }
-        
+
         /* Flash messages */
         .flash-messages {
             position: fixed;
@@ -320,13 +320,13 @@
             flex-direction: column;
             gap: 8px;
         }
-        
+
         /* Session warning */
         #session-warning {
             bottom: 20px;
             right: 20px;
         }
-        
+
         /* Responsive */
         @media (max-width: 1024px) {
             .sidebar {
@@ -347,7 +347,7 @@
                 display: none;
             }
         }
-        
+
         /* Sidebar toggle */
         .sidebar-toggle {
             display: flex;
@@ -406,7 +406,7 @@
             <img src="{{ url_for('static', filename='logo/Taurussuite.jpg') }}" alt="Taurus">
             <span>Taurus WMS</span>
         </div>
-        
+
         <div class="sidebar-nav">
             <!-- Inicio -->
             <div class="sidebar-section">
@@ -415,7 +415,7 @@
                     <span class="link-text">Inicio</span>
                 </a>
             </div>
-            
+
             <!-- Acceso Rápido -->
             <div class="sidebar-section">
                 <div class="sidebar-item">
@@ -444,7 +444,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <!-- Maestros -->
             <div class="sidebar-section">
                 <div class="sidebar-item">
@@ -489,7 +489,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <!-- Almacén -->
             <div class="sidebar-section">
                 <div class="sidebar-item">
@@ -514,7 +514,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <!-- Operaciones -->
             <div class="sidebar-section">
                 <div class="sidebar-item">
@@ -539,7 +539,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <!-- Consultas -->
             <div class="sidebar-section">
                 <div class="sidebar-item">
@@ -570,7 +570,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <!-- Sistema -->
             <div class="sidebar-section">
                 <div class="sidebar-item">
@@ -600,7 +600,7 @@
         </div>
     </nav>
     {% endif %}
-    
+
     <!-- Navbar -->
     <nav class="navbar">
         <div class="navbar-menu">
@@ -611,7 +611,7 @@
             </a>
             {% endif %}
         </div>
-        
+
         {% if session.user_id %}
         <div class="navbar-menu">
         </div>
@@ -626,7 +626,7 @@
         </div>
         {% endif %}
     </nav>
-    
+
     <main id="contenido-principal" {% if session.user_id %}class="main-content"{% else %}class="container" style="padding-top: 20px;"{% endif %}>
         {% block content %}{% endblock %}
     </main>
@@ -671,6 +671,7 @@
     {% endif %}
 
     <script src="{{ url_for('static', filename='js/data_tables.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/cuit.js') }}"></script>
     <script>
     var collapsed = {{ session.get('sidebar_collapsed', '{}')|tojson }};
 
@@ -692,14 +693,14 @@
                 }
             }
         });
-        
+
         // Toggle sections
         $('.sidebar-toggle').on('click', function(e) {
             e.preventDefault();
             var section = $(this).data('section');
             var $submenu = $('#section-' + section);
             var $icon = $(this).find('.toggle-icon');
-            
+
             if ($submenu.is(':visible')) {
                 $submenu.hide();
                 $icon.removeClass('fa-chevron-down').addClass('fa-chevron-right');
@@ -709,7 +710,7 @@
                 $icon.removeClass('fa-chevron-right').addClass('fa-chevron-down');
                 collapsed[section] = true;  // true = expandido
             }
-            
+
             // Guardar preferencias (solo la seccion que cambio)
             fetch('/sidebar-preferences', {
                 method: 'POST',
@@ -717,7 +718,7 @@
                 body: JSON.stringify({ section: section, value: collapsed[section] })
             });
         });
-        
+
         // Highlight active link (sin sobreescribir estado de sesion)
         var path = window.location.pathname;
         $('.sidebar-link, .navbar-link').each(function() {
@@ -726,7 +727,7 @@
             }
         });
     });
-    
+
     // Aviso de expiración de sesión
     (function() {
         var meta = document.querySelector('meta[name="session-expires"]');

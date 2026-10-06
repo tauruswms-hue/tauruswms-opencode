@@ -28,6 +28,7 @@ import logging
 
 from flask import Blueprint, flash, redirect, render_template, request, session, url_for
 
+from modules.cuit import cuit_para_guardar
 from modules.db_config import (
     _get_admin_connection,
     get_db_connection,
@@ -348,7 +349,7 @@ def _aplicar_registro_transporte(reg, conn_wms, cursor_wms, cursor_admin):
 
     campos = dict(
         razonsocial=razonsocial,
-        cuit=(str(reg.get('cuit') or '').strip() or None),
+        cuit=cuit_para_guardar(reg.get('cuit')),
         telefono=(str(reg.get('telefono') or '').strip() or None),
         email=(str(reg.get('email') or '').strip() or None),
         id_muelle_salida=muelle_id,
@@ -465,7 +466,7 @@ def _aplicar_registro_cliente(reg, conn_wms, cursor_wms, cursor_admin):
 
     campos = dict(
         razonsocial=razonsocial,
-        cuit=(str(reg.get('cuit') or '').strip() or None),
+        cuit=cuit_para_guardar(reg.get('cuit')),
         direccion=(str(reg.get('direccion') or '').strip() or None),
         localidad=(str(reg.get('localidad') or '').strip() or None),
         provincia=(str(reg.get('provincia') or '').strip() or None),

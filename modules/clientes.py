@@ -19,6 +19,7 @@ from modules.batch_utils import (
     plantilla_xlsx,
 )
 from modules.context import get_tenant_filter
+from modules.cuit import cuit_para_guardar, cuit_para_mostrar
 from modules.db_config import get_db_connection
 
 clientes_bp = Blueprint('clientes', __name__)
@@ -39,7 +40,10 @@ def listar():
                 ORDER BY c.razonsocial ASC
             """
             cursor.execute(sql, (tenant_id, tenant_id))
-            clientes = cursor.fetchall()
+            clientes = [dict(c) for c in cursor.fetchall()]
+            for c in clientes:
+                # Los CUIT cargados antes sin guiones se muestran y editan ya formateados
+                c['cuit'] = cuit_para_mostrar(c.get('cuit'))
 
             cursor.execute("SELECT * FROM rutas WHERE (%s IS NULL OR tenant_id = %s) ORDER BY nombre_ruta", (tenant_id, tenant_id))
             rutas = cursor.fetchall()
@@ -65,6 +69,11 @@ def guardar():
     c_id = d.get('id_cliente')
     tenant_id = get_tenant_filter()
     activo_val = 1 if d.get('activo') else 0
+    try:
+        cuit = cuit_para_guardar(d.get('cuit'))
+    except ValueError as e:
+        flash(str(e), "danger")
+        return redirect(url_for('clientes.listar'))
 
     conn = get_db_connection()
     try:
@@ -72,7 +81,7 @@ def guardar():
             params = (
                 d.get('codigo'),
                 d.get('razonsocial'),
-                d.get('cuit') or None,
+                cuit,
                 d.get('direccion') or None,
                 d.get('localidad') or None,
                 d.get('provincia') or None,
@@ -85,16 +94,16 @@ def guardar():
             )
 
             if c_id and c_id.strip():
-                sql = """UPDATE clientes SET codigo=%s, razonsocial=%s, cuit=%s, 
-                         direccion=%s, localidad=%s, provincia=%s, telefono=%s, 
-                         email=%s, contacto_nombre=%s, id_ruta=%s, 
-                         id_transporte_predeterminado=%s, activo=%s 
+                sql = """UPDATE clientes SET codigo=%s, razonsocial=%s, cuit=%s,
+                         direccion=%s, localidad=%s, provincia=%s, telefono=%s,
+                         email=%s, contacto_nombre=%s, id_ruta=%s,
+                         id_transporte_predeterminado=%s, activo=%s
                          WHERE id_cliente=%s AND (%s IS NULL OR tenant_id = %s)"""
                 cursor.execute(sql, (*params, c_id, tenant_id, tenant_id))
             else:
-                sql = """INSERT INTO clientes (codigo, razonsocial, cuit, direccion, 
-                         localidad, provincia, telefono, email, contacto_nombre, 
-                         id_ruta, id_transporte_predeterminado, activo, tenant_id) 
+                sql = """INSERT INTO clientes (codigo, razonsocial, cuit, direccion,
+                         localidad, provincia, telefono, email, contacto_nombre,
+                         id_ruta, id_transporte_predeterminado, activo, tenant_id)
                          VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
                 cursor.execute(sql, (*params, tenant_id))
 
@@ -208,7 +217,7 @@ def importar():
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """, (
                         codigo, razon,
-                        str(row.get('cuit', '') or '').strip() or None,
+                        cuit_para_guardar(row.get('cuit')),
                         str(row.get('direccion', '') or '').strip() or None,
                         str(row.get('localidad', '') or '').strip() or None,
                         str(row.get('provincia', '') or '').strip() or None,

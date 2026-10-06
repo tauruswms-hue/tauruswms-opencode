@@ -22,11 +22,6 @@ $(document).ready(function() {
             }
         }
     });
-
-    // Validación extra: Impedir letras en el campo CUIT
-    $('#form_cuit').on('input', function() {
-        this.value = this.value.replace(/[^0-9]/g, '');
-    });
 });
 
 function agregarFilaRuta(idRuta = '', obs = '') {
@@ -81,6 +76,7 @@ function editTransporte(data) {
     $('#form_codigo').val(data.codigo);
     $('#form_razonsocial').val(data.razonsocial);
     $('#form_cuit').val(data.cuit);
+    formatCuit(document.getElementById('form_cuit'));
     $('#form_telefono').val(data.telefono);
     $('#form_email').val(data.email);
     $('#form_activo').prop('checked', data.activo == 1);
