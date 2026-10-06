@@ -16,10 +16,18 @@ from flask import (
     url_for,
 )
 
-from modules.batch_utils import export_csv, export_json, export_xlsx, float_or_zero, int_or_none, parse_file
+from modules.batch_utils import (
+    DatoInvalido,
+    export_csv,
+    export_json,
+    export_xlsx,
+    float_or_zero,
+    int_or_none,
+    parse_file,
+)
 from modules.context import get_tenant_filter
 from modules.db_config import _get_admin_connection, get_db_connection
-from modules.sql_dialect import cast_as_char, execute_insert
+from modules.sql_dialect import cast_as_char, execute_insert, is_duplicate_key_error
 
 load_dotenv()
 materiales_bp = Blueprint('materiales', __name__)
@@ -70,10 +78,51 @@ def _get_picking_metodo_default(tenant_id):
     return default if default in PICKING_METODOS_LABELS else 'libre'
 
 
-def _metodo_picking_valido(metodo, default='libre'):
-    if metodo in PICKING_METODOS_LABELS:
+def _metodo_picking_valido(metodo, default='libre', habilitados=None):
+    """Método de picking a guardar: el pedido si está habilitado para el tenant; si no, el default."""
+    habilitados = habilitados or list(PICKING_METODOS_LABELS)
+    if metodo in habilitados:
         return metodo
-    return default if default in PICKING_METODOS_LABELS else 'libre'
+    return default if default in habilitados else habilitados[0]
+
+
+TRAZABILIDADES = ('ninguna', 'lote', 'serie')
+
+# Tablas que guardan movimientos o existencias de un material: si alguna lo
+# referencia, el material no se borra, se desactiva.
+_USOS_MATERIAL = (
+    ('stockcontable', 'Material'),
+    ('stock_movimientos', 'id_material'),
+    ('recepciones_detalle', 'id_material'),
+    ('pedidos_detalle', 'id_material'),
+    ('inventarios_detalle', 'id_material'),
+)
+
+
+def _numero(valor, rotulo, minimo=0.0):
+    """Número de un campo del formulario (vacío = 0)."""
+    try:
+        n = float(valor or 0)
+    except (TypeError, ValueError):
+        raise DatoInvalido(f'{rotulo}: "{valor}" no es un número válido.') from None
+    if n < minimo:
+        raise DatoInvalido(f'{rotulo} no puede ser menor que {minimo:g}.')
+    return n
+
+
+def _id_del_tenant(cursor, tabla, columna_id, valor, tenant_id, rotulo):
+    """Id de un registro de otra tabla (categoría, unidad, proveedor), verificando que sea del tenant."""
+    try:
+        valor = int(valor or 0)
+    except (TypeError, ValueError):
+        raise DatoInvalido(f'{rotulo}: valor inválido.') from None
+    if not valor:
+        return None
+    cursor.execute(f"SELECT 1 AS ok FROM {tabla} WHERE {columna_id} = %s AND (%s IS NULL OR tenant_id = %s)",
+                   (valor, tenant_id, tenant_id))
+    if not cursor.fetchone():
+        raise DatoInvalido(f'{rotulo}: el valor elegido no existe.')
+    return valor
 
 
 def validar_ean(barcode):
@@ -130,7 +179,10 @@ def listar():
                 ORDER BY m.id DESC
             """
             cursor.execute(sql_mat, (tenant_id, tenant_id, tenant_id, tenant_id, tenant_id, tenant_id, tenant_id, tenant_id, tenant_id, tenant_id))
-            materiales = cursor.fetchall()
+            materiales = [dict(m) for m in cursor.fetchall()]
+            for m in materiales:
+                # Hay bases con el enum en mayúsculas ('LOTE'): la pantalla trabaja en minúsculas
+                m['trazabilidad'] = (m.get('trazabilidad') or 'ninguna').lower()
 
             cursor.execute("SELECT * FROM categorias WHERE activo = 1 AND (%s IS NULL OR tenant_id = %s)", (tenant_id, tenant_id))
             categorias = cursor.fetchall()
@@ -138,7 +190,15 @@ def listar():
             cursor.execute("SELECT id, razonsocial FROM proveedores WHERE activo = 1 AND (%s IS NULL OR tenant_id = %s)", (tenant_id, tenant_id))
             proveedores = cursor.fetchall()
 
-            cursor.execute("SELECT id_unidad, codigo, nombre, simbolo FROM unidades_medida WHERE activo = 1 AND (%s IS NULL OR tenant_id = %s) ORDER BY nombre", (tenant_id, tenant_id))
+            # Activas, más las inactivas que algún material ya usa (para no obligar a cambiarla al editarlo)
+            cursor.execute("""
+                SELECT id_unidad, codigo, nombre, simbolo, activo FROM unidades_medida
+                WHERE (%s IS NULL OR tenant_id = %s)
+                  AND (activo = 1 OR id_unidad IN (SELECT unidad_medida_id FROM materiales
+                                                   WHERE unidad_medida_id IS NOT NULL
+                                                     AND (%s IS NULL OR tenant_id = %s)))
+                ORDER BY nombre
+            """, (tenant_id, tenant_id, tenant_id, tenant_id))
             unidades = cursor.fetchall()
 
             cursor.execute("SELECT mp.* FROM material_proveedor mp WHERE %s IS NULL OR mp.tenant_id = %s", (tenant_id, tenant_id))
@@ -183,35 +243,115 @@ def guardar():
     pres_pesos_brutos = request.form.getlist('pres_pesos_brutos[]')
     pres_pesos_netos = request.form.getlist('pres_pesos_netos[]')
 
-    
-    barcode = d.get('codigo_barras', '')
-    valido, error_msg = validar_ean(barcode)
-    if not valido:
-        flash(error_msg or 'Código de barras inválido', 'danger')
-        return redirect(url_for('materiales.listar'))
-
-    for i, gtin in enumerate(pres_barcodes):
-        if gtin and gtin.strip():
-            valido_gtin, error_gtin = validar_gtin14(gtin.strip())
-            if not valido_gtin:
-                nombre_p = pres_nombres[i].strip() if i < len(pres_nombres) and pres_nombres[i] else f'Presentación {i+1}'
-                flash(f'Presentación "{nombre_p}": {error_gtin}', 'danger')
-                return redirect(url_for('materiales.listar'))
+    codigo = (d.get('codigo') or '').strip()
+    nombre = (d.get('nombre') or '').strip()
+    barcode = (d.get('codigo_barras') or '').strip()
 
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
             tenant_id = get_tenant_filter()
-            trazabilidad = d.get('trazabilidad', 'ninguna')
-            stock_min = float(d.get('stock_minimo') or 0)
-            stock_max = float(d.get('stock_maximo') or 0)
-            peso_bruto = float(d.get('peso_bruto') or 0) or None
-            peso_neto = float(d.get('peso_neto') or 0) or None
-            categoria_id = int(d.get('categoria_id') or 0) or None
-            unidad_id = int(d.get('unidad_medida_id') or 0) or None
-            metodo_picking = _metodo_picking_valido((d.get('metodo_picking') or '').strip().lower(),
-                                                    _get_picking_metodo_default(tenant_id))
 
+            # --- Validaciones (cualquier DatoInvalido corta sin guardar nada) ---
+            if not codigo or not nombre:
+                raise DatoInvalido('Código y Nombre son obligatorios.')
+            valido, error_msg = validar_ean(barcode)
+            if not valido:
+                raise DatoInvalido(error_msg or 'Código de barras inválido')
+
+            if m_id:
+                try:
+                    m_id = int(m_id)
+                except ValueError:
+                    raise DatoInvalido('Material inválido.') from None
+                cursor.execute("SELECT id FROM materiales WHERE id = %s AND (%s IS NULL OR tenant_id = %s)",
+                               (m_id, tenant_id, tenant_id))
+                if not cursor.fetchone():
+                    raise DatoInvalido('El material que se intenta modificar no existe.')
+            else:
+                m_id = None
+            otro = m_id or 0   # id a excluir al buscar duplicados
+
+            cursor.execute("SELECT id FROM materiales WHERE codigo = %s AND id <> %s AND (%s IS NULL OR tenant_id = %s)",
+                           (codigo, otro, tenant_id, tenant_id))
+            if cursor.fetchone():
+                raise DatoInvalido(f'Ya existe un material con el código "{codigo}".')
+            if barcode:
+                cursor.execute("""SELECT codigo FROM materiales
+                                  WHERE codigo_barras = %s AND id <> %s AND (%s IS NULL OR tenant_id = %s)""",
+                               (barcode, otro, tenant_id, tenant_id))
+                repetido = cursor.fetchone()
+                if repetido:
+                    raise DatoInvalido(f'El código de barras {barcode} ya está asignado al material '
+                                       f'"{repetido["codigo"]}".')
+
+            stock_min = _numero(d.get('stock_minimo'), 'Stock mínimo')
+            stock_max = _numero(d.get('stock_maximo'), 'Stock máximo')
+            if stock_max and stock_min > stock_max:
+                raise DatoInvalido('El stock mínimo no puede ser mayor que el stock máximo.')
+            peso_bruto = _numero(d.get('peso_bruto'), 'Peso bruto') or None
+            peso_neto = _numero(d.get('peso_neto'), 'Peso neto') or None
+            categoria_id = _id_del_tenant(cursor, 'categorias', 'id_categoria', d.get('categoria_id'),
+                                          tenant_id, 'Categoría')
+            unidad_id = _id_del_tenant(cursor, 'unidades_medida', 'id_unidad', d.get('unidad_medida_id'),
+                                       tenant_id, 'Unidad de medida')
+            trazabilidad = d.get('trazabilidad') or 'ninguna'
+            if trazabilidad not in TRAZABILIDADES:
+                raise DatoInvalido('Trazabilidad inválida.')
+            metodo_picking = _metodo_picking_valido((d.get('metodo_picking') or '').strip().lower(),
+                                                    _get_picking_metodo_default(tenant_id),
+                                                    _get_picking_metodos(tenant_id))
+
+            # Proveedores: sin filas vacías ni repetidos; el habitual se indica por posición de la fila
+            try:
+                fila_habitual = int(prov_habitual) if prov_habitual not in (None, '') else None
+            except ValueError:
+                fila_habitual = None
+            proveedores = []
+            for i, prov_id in enumerate(prov_ids):
+                if not prov_id:
+                    continue
+                prov_id = _id_del_tenant(cursor, 'proveedores', 'id', prov_id, tenant_id, 'Proveedor')
+                if any(p['id'] == prov_id for p in proveedores):
+                    raise DatoInvalido('Hay un proveedor repetido en la lista de proveedores.')
+                proveedores.append({'id': prov_id,
+                                    'codigo': (prov_codigos[i] if i < len(prov_codigos) else '').strip(),
+                                    'habitual': 1 if fila_habitual == i else 0})
+
+            # Presentaciones
+            presentaciones = []
+            for i, nombre_p in enumerate(pres_nombres):
+                nombre_p = (nombre_p or '').strip()
+                if not nombre_p:
+                    continue
+                gtin = (pres_barcodes[i] if i < len(pres_barcodes) else '').strip()
+                valido_gtin, error_gtin = validar_gtin14(gtin)
+                if not valido_gtin:
+                    raise DatoInvalido(f'Presentación "{nombre_p}": {error_gtin}')
+                if gtin and any(p['gtin'] == gtin for p in presentaciones):
+                    raise DatoInvalido(f'Presentación "{nombre_p}": el GTIN-14 {gtin} está repetido.')
+                if gtin:
+                    cursor.execute("""SELECT m.codigo FROM material_presentaciones mp
+                                      JOIN materiales m ON m.id = mp.id_material
+                                      WHERE mp.codigo_barras = %s AND mp.id_material <> %s
+                                        AND (%s IS NULL OR mp.tenant_id = %s)""",
+                                   (gtin, otro, tenant_id, tenant_id))
+                    usado = cursor.fetchone()
+                    if usado:
+                        raise DatoInvalido(f'Presentación "{nombre_p}": el GTIN-14 {gtin} ya lo usa el material '
+                                           f'"{usado["codigo"]}".')
+                rotulo = f'Presentación "{nombre_p}"'
+                cantidad = (pres_cantidades[i] if i < len(pres_cantidades) else '') or 1
+                presentaciones.append({
+                    'nombre': nombre_p, 'gtin': gtin,
+                    'cantidad': _numero(cantidad, f'{rotulo}: unidades', minimo=0.001),
+                    'peso_bruto': _numero(pres_pesos_brutos[i] if i < len(pres_pesos_brutos) else '',
+                                          f'{rotulo}: peso bruto') or None,
+                    'peso_neto': _numero(pres_pesos_netos[i] if i < len(pres_pesos_netos) else '',
+                                         f'{rotulo}: peso neto') or None,
+                })
+
+            # --- Guardado ---
             if m_id:
                 cursor.execute("""
                     UPDATE materiales SET
@@ -220,48 +360,52 @@ def guardar():
                         unidad_medida_id = %s, trazabilidad = %s, metodo_picking = %s,
                         peso_bruto = %s, peso_neto = %s
                     WHERE id = %s AND (%s IS NULL OR tenant_id = %s)
-                """, (d.get('codigo'), d.get('nombre'), d.get('descripcion') or '', 
+                """, (codigo, nombre, d.get('descripcion') or '',
                       barcode or None, categoria_id, stock_min, stock_max,
                       unidad_id, trazabilidad, metodo_picking, peso_bruto, peso_neto,
                       m_id, tenant_id, tenant_id))
-                current_id = int(m_id)
+                # El formulario manda "activo" (0 y, si está tildado, 1); sin ese campo no se toca
+                estados = request.form.getlist('activo')
+                if estados:
+                    cursor.execute("UPDATE materiales SET activo = %s WHERE id = %s",
+                                   (estados[-1] == '1', m_id))
+                current_id = m_id
             else:
                 current_id = execute_insert(cursor, """
                     INSERT INTO materiales (codigo, nombre, descripcion, codigo_barras, categoria_id,
                         stock_minimo, stock_maximo, unidad_medida_id, trazabilidad, metodo_picking,
                         peso_bruto, peso_neto, tenant_id)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """, (d.get('codigo'), d.get('nombre'), d.get('descripcion') or '', 
+                """, (codigo, nombre, d.get('descripcion') or '',
                       barcode or None, categoria_id, stock_min, stock_max,
                       unidad_id, trazabilidad, metodo_picking, peso_bruto, peso_neto, tenant_id))
 
-            cursor.execute("DELETE FROM material_proveedor WHERE id_material = %s AND (%s IS NULL OR tenant_id = %s)", (current_id, tenant_id, tenant_id))
-            for i, prov_id in enumerate(prov_ids):
-                if prov_id:
-                    codigo_prov = prov_codigos[i] if i < len(prov_codigos) else ''
-                    es_habitual = 1 if prov_habitual is not None and int(prov_habitual) == i else 0
-                    cursor.execute("""
-                        INSERT INTO material_proveedor (id_material, id_proveedor, codigo_referencia_prov, es_habitual, tenant_id)
-                        VALUES (%s, %s, %s, %s, %s)
-                    """, (current_id, prov_id, codigo_prov, es_habitual, tenant_id))
+            cursor.execute("DELETE FROM material_proveedor WHERE id_material = %s", (current_id,))
+            for p in proveedores:
+                cursor.execute("""
+                    INSERT INTO material_proveedor (id_material, id_proveedor, codigo_referencia_prov, es_habitual, tenant_id)
+                    VALUES (%s, %s, %s, %s, %s)
+                """, (current_id, p['id'], p['codigo'], p['habitual'], tenant_id))
 
-            cursor.execute("DELETE FROM material_presentaciones WHERE id_material = %s AND (%s IS NULL OR tenant_id = %s)", (current_id, tenant_id, tenant_id))
-            for i, nombre in enumerate(pres_nombres):
-                if nombre and nombre.strip():
-                    barcode_pres = pres_barcodes[i].strip() if i < len(pres_barcodes) and pres_barcodes[i] else ''
-                    cantidad = float(pres_cantidades[i]) if i < len(pres_cantidades) and pres_cantidades[i] else 1.0
-                    pres_pb = float(pres_pesos_brutos[i]) if i < len(pres_pesos_brutos) and pres_pesos_brutos[i] else None
-                    pres_pn = float(pres_pesos_netos[i]) if i < len(pres_pesos_netos) and pres_pesos_netos[i] else None
-                    cursor.execute("""
-                        INSERT INTO material_presentaciones (id_material, nombre, codigo_barras, cantidad_unidades, peso_bruto, peso_neto, tenant_id)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    """, (current_id, nombre.strip(), barcode_pres or None, cantidad, pres_pb, pres_pn, tenant_id))
+            cursor.execute("DELETE FROM material_presentaciones WHERE id_material = %s", (current_id,))
+            for p in presentaciones:
+                cursor.execute("""
+                    INSERT INTO material_presentaciones (id_material, nombre, codigo_barras, cantidad_unidades, peso_bruto, peso_neto, tenant_id)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (current_id, p['nombre'], p['gtin'] or None, p['cantidad'], p['peso_bruto'], p['peso_neto'],
+                      tenant_id))
 
             conn.commit()
             flash("Material guardado correctamente", "success")
+    except DatoInvalido as e:
+        conn.rollback()
+        flash(str(e), "danger")
     except Exception as e:
         conn.rollback()
-        flash(f"Error: {e!s}", "danger")
+        if is_duplicate_key_error(e):
+            flash("No se pudo guardar: el código del material o un GTIN-14 ya existe.", "danger")
+        else:
+            flash(f"Error al guardar el material: {e!s}", "danger")
     finally:
         conn.close()
     return redirect(url_for('materiales.listar'))
@@ -291,6 +435,7 @@ def importar():
     errores = []
 
     metodo_default = _get_picking_metodo_default(tenant_id)
+    metodos_habilitados = _get_picking_metodos(tenant_id)
 
     conn = get_db_connection()
     try:
@@ -312,7 +457,16 @@ def importar():
                         traz = 'ninguna'
 
                     metodo_picking = _metodo_picking_valido(str(row.get('metodo_picking', '') or '').strip().lower(),
-                                                            metodo_default)
+                                                            metodo_default, metodos_habilitados)
+                    try:
+                        categoria_id = _id_del_tenant(cursor, 'categorias', 'id_categoria',
+                                                      int_or_none(row.get('categoria_id')), tenant_id, 'categoria_id')
+                        unidad_id = _id_del_tenant(cursor, 'unidades_medida', 'id_unidad',
+                                                   int_or_none(row.get('unidad_medida_id')), tenant_id,
+                                                   'unidad_medida_id')
+                    except DatoInvalido as e:
+                        errores.append({'fila': i, 'codigo': codigo, 'razon': str(e)})
+                        continue
 
                     barcode_import = str(row.get('codigo_barras', '') or '').strip()
                     valido_cb, error_cb = validar_ean(barcode_import)
@@ -339,10 +493,10 @@ def importar():
                         nombre,
                         str(row.get('descripcion', '') or '').strip() or None,
                         barcode_import or None,
-                        int_or_none(row.get('categoria_id')),
+                        categoria_id,
                         float_or_zero(row.get('stock_minimo')),
                         float_or_zero(row.get('stock_maximo')),
-                        int_or_none(row.get('unidad_medida_id')),
+                        unidad_id,
                         traz,
                         metodo_picking,
                         float_or_zero(row.get('peso_bruto')) or None,
@@ -485,11 +639,9 @@ def plantilla(formato):
         ws_mat.append(EJEMPLO)
         
         # Estilo para cabecera
-        from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+        from openpyxl.styles import Alignment, Font, PatternFill
         header_font = Font(bold=True, color='FFFFFF')
         header_fill = PatternFill(fill_type='solid', fgColor='2980B9')
-        Border(left=Side(style='thin'), right=Side(style='thin'),
-                            top=Side(style='thin'), bottom=Side(style='thin'))
         
         for cell in ws_mat[1]:
             cell.font = header_font
@@ -548,13 +700,37 @@ def plantilla(formato):
 
 @materiales_bp.route('/materiales/eliminar/<int:id>', methods=['POST'])
 def eliminar(id):
+    """Borra el material; si tiene stock o movimientos lo desactiva, para no perder su historial."""
     tenant_id = get_tenant_filter()
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            cursor.execute("DELETE FROM materiales WHERE id = %s AND (%s IS NULL OR tenant_id = %s)", (id, tenant_id, tenant_id))
-            conn.commit()
-            flash("Material eliminado", "success")
+            cursor.execute("SELECT codigo FROM materiales WHERE id = %s AND (%s IS NULL OR tenant_id = %s)",
+                           (id, tenant_id, tenant_id))
+            material = cursor.fetchone()
+            if not material:
+                flash("Material no encontrado.", "warning")
+                return redirect(url_for('materiales.listar'))
+
+            en_uso = False
+            for tabla, columna in _USOS_MATERIAL:
+                cursor.execute(f"SELECT COUNT(*) AS n FROM {tabla} WHERE {columna} = %s", (id,))
+                if cursor.fetchone()['n']:
+                    en_uso = True
+                    break
+
+            if en_uso:
+                cursor.execute("UPDATE materiales SET activo = %s WHERE id = %s", (False, id))
+                conn.commit()
+                flash(f'El material "{material["codigo"]}" tiene stock o movimientos: no se borró, quedó inactivo. '
+                      'Se puede reactivar desde su edición.', "warning")
+            else:
+                cursor.execute("DELETE FROM materiales WHERE id = %s", (id,))
+                conn.commit()
+                flash("Material eliminado", "success")
+    except Exception as e:
+        conn.rollback()
+        flash(f"No se pudo eliminar el material: {e!s}", "danger")
     finally:
         conn.close()
     return redirect(url_for('materiales.listar'))

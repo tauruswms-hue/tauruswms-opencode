@@ -31,11 +31,14 @@
                         <tr><td style="padding:3px 8px;"><code>stock_maximo</code></td><td style="padding:3px 8px; color:#27ae60;">No</td><td style="padding:3px 8px;">Decimal, default 0</td></tr>
                         <tr style="background:#f9f9f9;"><td style="padding:3px 8px;"><code>unidad_medida_id</code></td><td style="padding:3px 8px; color:#27ae60;">No</td><td style="padding:3px 8px;">ID numérico</td></tr>
                         <tr><td style="padding:3px 8px;"><code>trazabilidad</code></td><td style="padding:3px 8px; color:#27ae60;">No</td><td style="padding:3px 8px;"><code>ninguna</code> / <code>lote</code> / <code>serie</code></td></tr>
+                        <tr style="background:#f9f9f9;"><td style="padding:3px 8px;"><code>metodo_picking</code></td><td style="padding:3px 8px; color:#27ae60;">No</td><td style="padding:3px 8px;"><code>fifo</code> / <code>lifo</code> / <code>fefo</code> / <code>libre</code>. Si falta o no está habilitado para la empresa, se usa el método por defecto</td></tr>
+                        <tr><td style="padding:3px 8px;"><code>peso_bruto</code>, <code>peso_neto</code></td><td style="padding:3px 8px; color:#27ae60;">No</td><td style="padding:3px 8px;">Decimal, en kg</td></tr>
                         <tr style="background:#f9f9f9;"><td style="padding:3px 8px;"><code>id_proveedor_habitual</code></td><td style="padding:3px 8px; color:#27ae60;">No</td><td style="padding:3px 8px;">ID numérico (ver hoja/sección Proveedores de la plantilla)</td></tr>
                         <tr><td style="padding:3px 8px;"><code>codigo_referencia_prov</code></td><td style="padding:3px 8px; color:#27ae60;">No</td><td style="padding:3px 8px;">Código del material según el proveedor</td></tr>
                     </tbody>
                 </table>
                 <p style="margin:10px 0 0; color:#555;">Los materiales con <strong>código duplicado</strong> serán omitidos (no actualizados).</p>
+                <p style="margin:6px 0 0; color:#555;">Las plantillas traen una <strong>fila de ejemplo</strong> (<code>MAT001</code>): reemplazarla o borrarla antes de importar. Las listas de referencia que incluyen (categorías, unidades, proveedores) no se importan.</p>
             </div>
 
             <!-- Descarga de plantillas -->

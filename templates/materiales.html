@@ -59,9 +59,13 @@
             </thead>
             <tbody>
                 {% for m in materiales %}
-                <tr>
+                <tr{% if not m.activo %} style="color:#999;"{% endif %}>
                     <td><code>{{ m.codigo }}</code></td>
-                    <td><strong>{{ m.nombre }}</strong></td>
+                    <td><strong>{{ m.nombre }}</strong>
+                        {% if not m.activo %}
+                            <span title="Material inactivo: no se ofrece al cargar pedidos" style="background:#95a5a6; color:white; padding:1px 7px; border-radius:10px; font-size:0.75rem; margin-left:4px;">Inactivo</span>
+                        {% endif %}
+                    </td>
                     <td>{{ m.categoria_nombre or '-' }}</td>
                     <td>
                         {% if m.codigo_barras %}
@@ -99,7 +103,7 @@
                         <button class="btn-icon edit" onclick='editMaterial({{ m | tojson }})' style="color: #3498db; border:none; background:none; cursor:pointer;">
                             <i class="fas fa-edit"></i>
                         </button>
-                        <form method="POST" action="{{ url_for('materiales.eliminar', id=m.id) }}" style="display:inline;" onsubmit="return confirm('¿Eliminar material?')">
+                        <form method="POST" action="{{ url_for('materiales.eliminar', id=m.id) }}" style="display:inline;" onsubmit="return confirm('¿Eliminar material?\n\nSi tiene stock o movimientos no se borra: queda inactivo.')">
                             <button type="submit" class="btn-icon delete" style="color: #e74c3c; border:none; background:none; cursor:pointer;"><i class="fas fa-trash"></i></button>
                         </form>
                     </td>

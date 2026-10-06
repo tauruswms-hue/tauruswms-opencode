@@ -1,3 +1,11 @@
+// Escapa un valor para insertarlo en HTML (texto o atributo). Sin esto, una comilla
+// en un nombre o código corta el campo al editar y se pierde al guardar.
+function esc(valor) {
+    return String(valor === null || valor === undefined ? '' : valor)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 function validarEAN(barcode) {
     if (!barcode || barcode.trim() === '') return { valido: true };
     barcode = barcode.trim();
@@ -60,6 +68,20 @@ $(document).ready(function() {
             return;
         }
 
+        var proveedoresUsados = [];
+        var proveedorRepetido = false;
+        $('select[name="prov_ids[]"]').each(function() {
+            var id = $(this).val();
+            if (!id) return;
+            if (proveedoresUsados.indexOf(id) !== -1) proveedorRepetido = true;
+            proveedoresUsados.push(id);
+        });
+        if (proveedorRepetido) {
+            e.preventDefault();
+            alert('Hay un proveedor repetido en la lista de proveedores.');
+            return;
+        }
+
         var gtinUsados = [];
         var cantidadesUsadas = [];
         var warningCantidades = [];
@@ -109,14 +131,14 @@ function agregarFilaProveedor(idProv = '', codigoProv = '', esHabitual = 0) {
     let options = '<option value="">Seleccionar...</option>';
     listaProveedoresDB.forEach(p => {
         let selected = (p.id == idProv) ? 'selected' : '';
-        options += `<option value="${p.id}" ${selected}>${p.razonsocial}</option>`;
+        options += `<option value="${esc(p.id)}" ${selected}>${esc(p.razonsocial)}</option>`;
     });
 
     let checked = esHabitual ? 'checked' : '';
     let fila = `
         <tr>
             <td style="padding: 5px;"><select name="prov_ids[]" required style="width:100%; padding: 5px; border:1px solid #ddd; border-radius:4px;">${options}</select></td>
-            <td style="padding: 5px;"><input type="text" name="prov_codigos[]" value="${codigoProv}" style="width:100%; padding: 5px; border:1px solid #ddd; border-radius:4px;"></td>
+            <td style="padding: 5px;"><input type="text" name="prov_codigos[]" value="${esc(codigoProv)}" style="width:100%; padding: 5px; border:1px solid #ddd; border-radius:4px;"></td>
             <td style="padding: 5px; text-align:center;">
                 <input type="radio" name="prov_habitual" value="_idx_" ${checked} title="Marcar como habitual" style="cursor:pointer; accent-color:#f39c12; width:16px; height:16px;">
             </td>
@@ -193,7 +215,7 @@ function agregarFilaPresentacion(nombre, codigoBarras, cantidadUnidades, indicad
     var fila = `
         <tr>
             <td style="padding:5px;">
-                <input type="text" name="pres_nombres[]" value="${nombre}" placeholder="Ej: Caja x12"
+                <input type="text" name="pres_nombres[]" value="${esc(nombre)}" placeholder="Ej: Caja x12"
                        required style="width:100%; padding:5px; border:1px solid #ddd; border-radius:4px;">
             </td>
             <td style="padding:5px; display:flex; gap:4px; align-items:center;">
@@ -201,7 +223,7 @@ function agregarFilaPresentacion(nombre, codigoBarras, cantidadUnidades, indicad
                         style="padding:5px; border:1px solid #ddd; border-radius:4px; width:50px;">
                     ${indicadorOptions}
                 </select>
-                <input type="text" name="pres_barcodes[]" value="${codigoBarras}" maxlength="14"
+                <input type="text" name="pres_barcodes[]" value="${esc(codigoBarras)}" maxlength="14"
                        placeholder="GTIN-14"
                        style="flex:1; padding:5px; border:1px solid #ddd; border-radius:4px;">
                 <button type="button" title="Generar GTIN-14 desde EAN-13 del material"
@@ -211,16 +233,16 @@ function agregarFilaPresentacion(nombre, codigoBarras, cantidadUnidades, indicad
                 </button>
             </td>
             <td style="padding:5px;">
-                <input type="number" name="pres_cantidades[]" value="${cantidadUnidades}" min="0.001" step="0.001"
+                <input type="number" name="pres_cantidades[]" value="${esc(cantidadUnidades)}" min="0.001" step="0.001"
                        style="width:100%; padding:5px; border:1px solid #ddd; border-radius:4px; text-align:right;"
                        onchange="actualizarPesoNetoPresentacion(this)">
             </td>
             <td style="padding:5px;">
-                <input type="number" name="pres_pesos_brutos[]" value="${pesoBruto}" step="0.001" min="0"
+                <input type="number" name="pres_pesos_brutos[]" value="${esc(pesoBruto)}" step="0.001" min="0"
                        placeholder="0.000" style="width:100%; padding:5px; border:1px solid #ddd; border-radius:4px; text-align:right;">
             </td>
             <td style="padding:5px;">
-                <input type="number" name="pres_pesos_netos[]" value="${pesoNeto}" step="0.001" min="0"
+                <input type="number" name="pres_pesos_netos[]" value="${esc(pesoNeto)}" step="0.001" min="0"
                        placeholder="0.000" style="width:100%; padding:5px; border:1px solid #ddd; border-radius:4px; text-align:right;">
             </td>
             <td style="padding:5px; text-align:center;">
@@ -269,7 +291,8 @@ function openModal() {
         }
         $selMetodo.val(valorDefault);
     }
-    agregarFilaProveedor();
+    $('#fila_activo').hide();
+    $('#form_activo, #form_activo_base').prop('disabled', true);
     $('#modalMateriales').css('display', 'flex').hide().fadeIn(150);
 }
 
@@ -280,6 +303,10 @@ function editMaterial(data) {
     $('#modalTitle').text('Editar: ' + data.nombre);
 
     $('#form_id_material').val(data.id);
+    // "Activo" solo se muestra y se envía al editar
+    $('#fila_activo').show();
+    $('#form_activo, #form_activo_base').prop('disabled', false);
+    $('#form_activo').prop('checked', !!data.activo);
     $('#form_codigo').val(data.codigo);
     $('#form_nombre').val(data.nombre);
     $('#form_desc').val(data.descripcion);
@@ -300,13 +327,9 @@ function editMaterial(data) {
     let misProvs = relacionesExistentes.filter(r => r.id_material == data.id);
 
     $('#listaProveedoresCuerpo').empty();
-    if(misProvs.length > 0) {
-        misProvs.forEach(rel => {
-            agregarFilaProveedor(rel.id_proveedor, rel.codigo_referencia_prov, rel.es_habitual);
-        });
-    } else {
-        agregarFilaProveedor();
-    }
+    misProvs.forEach(rel => {
+        agregarFilaProveedor(rel.id_proveedor, rel.codigo_referencia_prov || '', rel.es_habitual);
+    });
 
     let misPres = presentacionesExistentes.filter(p => p.id_material == data.id);
     $('#listaPresentacionesCuerpo').empty();

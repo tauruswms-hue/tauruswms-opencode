@@ -26,14 +26,37 @@ def parse_file(file, hoja=None):
 
 
 def _parse_csv(file):
+    """Lee un CSV con encabezado.
+
+    Las líneas que empiezan con '#' son comentarios: se ignoran las que están
+    antes del encabezado, y la primera que aparece después corta la lectura
+    (así una plantilla puede traer tablas de referencia debajo de los datos).
+    """
     content = file.read().decode('utf-8-sig')
-    reader = csv.DictReader(io.StringIO(content))
-    return [{k.strip().lower(): v for k, v in row.items()} for row in reader]
+    lineas = []
+    for linea in content.splitlines():
+        if linea.lstrip().startswith('#'):
+            if lineas:
+                break
+            continue
+        if lineas or linea.strip():
+            lineas.append(linea)
+    reader = csv.DictReader(io.StringIO('\n'.join(lineas)))
+    filas = []
+    for row in reader:
+        fila = {k.strip().lower(): v for k, v in row.items() if k is not None}
+        if any((v or '').strip() for v in fila.values()):
+            filas.append(fila)
+    return filas
 
 
 def _parse_json(file):
+    """Lee un JSON: un array de objetos, o un objeto cuya primera lista es la de datos
+    (formato de las plantillas que además traen listas de referencia)."""
     data = json.load(file)
-    if not isinstance(data, list):
+    if isinstance(data, dict):
+        data = next((v for v in data.values() if isinstance(v, list)), None)
+    if not isinstance(data, list) or not all(isinstance(row, dict) for row in data):
         raise ValueError('El JSON debe ser un array de objetos')
     return [{k.lower(): v for k, v in row.items()} for row in data]
 
@@ -71,6 +94,13 @@ def _parse_xlsx(file, hoja=None):
         if any(obj.values()):
             result.append(obj)
     return result
+
+
+class DatoInvalido(ValueError):
+    """Dato de un formulario o de una fila importada que no se puede guardar.
+
+    El mensaje está pensado para mostrarse tal cual al usuario.
+    """
 
 
 # ── Helpers de valor ─────────────────────────────────────────────────────────
