@@ -263,13 +263,15 @@ WMS_TABLES = [
             {"name": "simbolo",                "type": "varchar(20)"},
             {"name": "tipo_magnitud",          "type": "varchar(50)",   "default": "'CANTIDAD'"},
             {"name": "conversion_a_base",      "type": "decimal(12,4)", "default": 1.0},
-            {"name": "unidad_base_referencia", "type": "varchar(10)",   "default": "'U'"},
+            # Código de la unidad base (misma magnitud); NULL si es ella misma una unidad base
+            {"name": "unidad_base_referencia", "type": "varchar(50)"},
             {"name": "decimales_permitidos",   "type": "int",           "default": 0},
             {"name": "activo",                 "type": "boolean", "not_null": True, "default": True},
             {"name": "tenant_id",              "type": "int"},
         ],
         "indexes": [
             {"columns": ["tenant_id"], "name": "idx_unidades_tenant"},
+            {"columns": ["codigo", "tenant_id"], "name": "uk_unidades_codigo_tenant", "unique": True},
         ],
     },
     {

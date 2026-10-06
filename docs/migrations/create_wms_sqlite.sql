@@ -78,10 +78,11 @@ CREATE TABLE IF NOT EXISTS "unidades_medida" (
     "simbolo" TEXT,
     "tipo_magnitud" TEXT DEFAULT 'CANTIDAD',
     "conversion_a_base" REAL DEFAULT 1.0,
-    "unidad_base_referencia" TEXT DEFAULT 'U',
+    "unidad_base_referencia" TEXT,
     "decimales_permitidos" INTEGER DEFAULT 0,
     "activo" INTEGER NOT NULL DEFAULT 1,
-    "tenant_id" INTEGER
+    "tenant_id" INTEGER,
+    UNIQUE ("codigo", "tenant_id")
 );
 CREATE INDEX IF NOT EXISTS "idx_unidades_tenant" ON "unidades_medida" ("tenant_id");
 

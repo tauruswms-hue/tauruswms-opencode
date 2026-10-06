@@ -13,15 +13,15 @@
                     <div class="form-row">
                         <div class="form-group">
                             <label>Código *</label>
-                            <input type="text" name="codigo" id="codigo" required maxlength="5">
+                            <input type="text" name="codigo" id="codigo" required maxlength="{{ largos.codigo }}">
                         </div>
                         <div class="form-group">
                             <label>Nombre *</label>
-                            <input type="text" name="nombre" id="nombre" required maxlength="30">
+                            <input type="text" name="nombre" id="nombre" required maxlength="{{ largos.nombre }}">
                         </div>
                         <div class="form-group">
                             <label>Símbolo *</label>
-                            <input type="text" name="simbolo" id="simbolo" required maxlength="5">
+                            <input type="text" name="simbolo" id="simbolo" required maxlength="{{ largos.simbolo }}">
                         </div>
                     </div>
                 </div>
@@ -32,29 +32,31 @@
                         <div class="form-group">
                             <label>Tipo Magnitud</label>
                             <select name="tipo_magnitud" id="tipo_magnitud">
-                                <option value="MASA">Masa</option>
-                                <option value="VOLUMEN">Volumen</option>
-                                <option value="UNIDAD">Unidad</option>
-                                <option value="LONGITUD">Longitud</option>
-                                <option value="TIEMPO">Tiempo</option>
+                                {% for valor, rotulo in magnitudes.items() %}
+                                <option value="{{ valor }}">{{ rotulo }}</option>
+                                {% endfor %}
                             </select>
                         </div>
                         <div class="form-group">
-                            <label>Conversión a Base</label>
-                            <input type="number" step="0.0001" name="conversion_a_base" id="conversion_a_base" value="1.0000">
+                            <label>Unidad Base</label>
+                            <select name="unidad_base_referencia" id="unidad_base_referencia"></select>
                         </div>
                         <div class="form-group">
-                            <label>Unidad Base Referencia</label>
-                            <input type="text" name="unidad_base_referencia" id="unidad_base_referencia" maxlength="5" value="U">
+                            <label>Conversión a Base</label>
+                            <input type="number" step="0.0001" min="0.0001" name="conversion_a_base" id="conversion_a_base" value="1.0000">
                         </div>
                         <div class="form-group">
                             <label>Decimales Permitidos</label>
-                            <input type="number" name="decimales_permitidos" id="decimales_permitidos" value="0">
+                            <input type="number" name="decimales_permitidos" id="decimales_permitidos" value="0" min="0" max="{{ max_decimales }}" step="1">
                         </div>
+                    </div>
+                    <div class="form-row">
+                        <small id="ayuda_unidad_base" style="color:#666; display:block; margin-bottom:8px;"></small>
                     </div>
                     <div class="form-row">
                         <div class="form-group check-group">
                             <label><input type="checkbox" name="activo" id="activo" checked> Unidad Activa</label>
+                            <small style="color:#888; display:block;">Una unidad inactiva no se ofrece para materiales nuevos; los que ya la usan la conservan.</small>
                         </div>
                     </div>
                 </div>

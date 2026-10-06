@@ -123,6 +123,10 @@ BASES = [
                 otras <code>id_pedido</code>, <code>id_cliente</code>, <code>id_transporte</code>, etc.
                 <code>stockcontable</code> usa nombres con mayúsculas (<code>ID</code>, <code>Ubicacion</code>,
                 <code>Material</code>).</li>
+            <li><strong>Las unidades de medida se referencian entre sí.</strong>
+                <code>unidades_medida.unidad_base_referencia</code> guarda el código de la unidad base (otra unidad
+                de la misma magnitud) sobre la que se calculan los múltiplos y submúltiplos; está vacío en las
+                unidades base. No se dibuja por ser una relación de la tabla consigo misma.</li>
             <li><strong><code>id_contenedor</code> no es una relación.</strong> Es el código del contenedor
                 (pallet, caja), un dato; no hay una tabla de contenedores.</li>
             <li><strong>Cabecera y detalle.</strong> Recepciones, pedidos e inventarios se guardan en dos tablas:

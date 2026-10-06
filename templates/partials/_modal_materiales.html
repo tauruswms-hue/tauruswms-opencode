@@ -29,6 +29,14 @@
                     </div>
                 </div>
 
+                <div class="form-row" id="fila_activo" style="display:none; margin-bottom: 15px;">
+                    <input type="hidden" name="activo" value="0" id="form_activo_base" disabled>
+                    <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.9rem;">
+                        <input type="checkbox" name="activo" value="1" id="form_activo" disabled style="cursor:pointer;">
+                        <span><strong>Activo</strong> — un material inactivo no se ofrece al cargar pedidos.</span>
+                    </label>
+                </div>
+
                 <div class="form-row" style="display: flex; gap: 15px; margin-bottom: 15px; flex-wrap: wrap;">
                     <div class="form-group" style="flex: 1; min-width: 200px;">
                         <label style="font-size:0.8rem; font-weight:bold; color:#666;">
@@ -56,7 +64,7 @@
                         <select name="unidad_medida_id" id="form_unidad" required style="width:100%; padding: 10px; border: 1px solid #ddd; border-radius:4px; box-sizing:border-box;">
                             <option value="">Seleccionar...</option>
                             {% for u in unidades %}
-                            <option value="{{ u.id_unidad }}">{{ u.nombre }} ({{ u.simbolo }})</option>
+                            <option value="{{ u.id_unidad }}">{{ u.nombre }} ({{ u.simbolo }}){% if not u.activo %} — inactiva{% endif %}</option>
                             {% endfor %}
                         </select>
                     </div>

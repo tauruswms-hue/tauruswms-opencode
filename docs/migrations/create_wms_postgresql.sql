@@ -79,12 +79,13 @@ CREATE TABLE "unidades_medida" (
     "simbolo" VARCHAR(20),
     "tipo_magnitud" VARCHAR(50) DEFAULT 'CANTIDAD',
     "conversion_a_base" decimal(12,4) DEFAULT 1.0,
-    "unidad_base_referencia" VARCHAR(10) DEFAULT 'U',
+    "unidad_base_referencia" VARCHAR(50),
     "decimales_permitidos" INTEGER DEFAULT 0,
     "activo" BOOLEAN NOT NULL DEFAULT TRUE,
     "tenant_id" INTEGER
 );
 CREATE INDEX "idx_unidades_tenant" ON "unidades_medida" ("tenant_id");
+CREATE UNIQUE INDEX "uk_unidades_codigo_tenant" ON "unidades_medida" ("codigo", "tenant_id");
 
 -- --- ubicaciones ---;
 CREATE TABLE "ubicaciones" (

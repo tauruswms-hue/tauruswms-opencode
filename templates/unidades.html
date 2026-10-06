@@ -48,25 +48,35 @@
                     <th>Nombre</th>
                     <th>Símbolo</th>
                     <th>Magnitud</th>
-                    <th>Conv. Base</th>
+                    <th>Unidad Base</th>
+                    <th>Equivalencia</th>
+                    <th>Decimales</th>
                     <th>Acciones</th>
                 </tr>
             </thead>
             <tbody>
                 {% for u in unidades %}
-                <tr>
+                <tr{% if not u.activo %} style="color:#999;"{% endif %}>
                     <td><strong>{{ u.codigo }}</strong></td>
-                    <td>{{ u.nombre }}</td>
-                    <td>{{ u.simbolo }}</td>
-                    <td>{{ u.tipo_magnitud }}</td>
-                    <td>{{ u.conversion_a_base }}</td>
+                    <td>{{ u.nombre }}
+                        {% if not u.activo %}
+                            <span title="Unidad inactiva: no se ofrece para materiales nuevos" style="background:#95a5a6; color:white; padding:1px 7px; border-radius:10px; font-size:0.75rem; margin-left:4px;">Inactiva</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ u.simbolo or '' }}</td>
+                    <td>{{ magnitudes.get(u.tipo_magnitud, u.tipo_magnitud or '') }}</td>
+                    <td>{% if u.unidad_base_referencia %}{{ u.unidad_base_referencia }}{% else %}<span style="color:#999;" title="Es una unidad base: los múltiplos y submúltiplos se calculan sobre ella">— (es base)</span>{% endif %}</td>
+                    <td>{% if u.unidad_base_referencia %}1 {{ u.simbolo or u.codigo }} = {{ '%g' | format(u.conversion_a_base | float) }} {{ u.base_simbolo }}{% endif %}</td>
+                    <td>{{ u.decimales_permitidos }}</td>
                     <td class="actions-cell">
                         <button class="btn-icon edit" onclick='editUnidad({{ u | tojson }})'>
                             <i class="fas fa-edit"></i>
                         </button>
-                        <form method="POST" action="{{ url_for('unidades.eliminar', id=u.id_unidad) }}" style="display:inline;" onsubmit="return confirm('¿Inactivar esta unidad?')">
-                            <button type="submit" class="btn-icon delete"><i class="fas fa-trash"></i></button>
+                        {% if u.activo %}
+                        <form method="POST" action="{{ url_for('unidades.eliminar', id=u.id_unidad) }}" style="display:inline;" onsubmit="return confirm('¿Inactivar esta unidad?\n\nNo se borra: deja de ofrecerse para materiales nuevos y se puede reactivar desde su edición.')">
+                            <button type="submit" class="btn-icon delete" title="Inactivar"><i class="fas fa-trash"></i></button>
                         </form>
+                        {% endif %}
                     </td>
                 </tr>
                 {% endfor %}
@@ -79,6 +89,10 @@
 {% include "partials/_modal_importar_unidades.html" %}
 
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script>
+    // Unidades cargadas, para armar la lista de "Unidad Base" según la magnitud
+    const unidadesCargadas = {{ unidades | tojson }};
+</script>
 <script src="{{ url_for('static', filename='js/unidades.js') }}"></script>
 <script src="{{ url_for('static', filename='js/batch_ui.js') }}"></script>
 {% endblock %}

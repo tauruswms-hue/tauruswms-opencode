@@ -25,10 +25,10 @@
                         <tr><td style="padding:3px 8px;"><code>codigo</code></td><td style="padding:3px 8px; color:#e74c3c;">Sí</td><td style="padding:3px 8px;">Único</td></tr>
                         <tr style="background:#f9f9f9;"><td style="padding:3px 8px;"><code>nombre</code></td><td style="padding:3px 8px; color:#e74c3c;">Sí</td><td style="padding:3px 8px;"></td></tr>
                         <tr><td style="padding:3px 8px;"><code>simbolo</code></td><td style="padding:3px 8px; color:#27ae60;">No</td><td style="padding:3px 8px;"></td></tr>
-                        <tr style="background:#f9f9f9;"><td style="padding:3px 8px;"><code>tipo_magnitud</code></td><td style="padding:3px 8px; color:#27ae60;">No</td><td style="padding:3px 8px;">CANTIDAD, PESO, VOLUMEN, LONGITUD</td></tr>
-                        <tr><td style="padding:3px 8px;"><code>conversion_a_base</code></td><td style="padding:3px 8px; color:#27ae60;">No</td><td style="padding:3px 8px;">Decimal, default 1</td></tr>
-                        <tr style="background:#f9f9f9;"><td style="padding:3px 8px;"><code>unidad_base_referencia</code></td><td style="padding:3px 8px; color:#27ae60;">No</td><td style="padding:3px 8px;">Símbolo, default U</td></tr>
-                        <tr><td style="padding:3px 8px;"><code>decimales_permitidos</code></td><td style="padding:3px 8px; color:#27ae60;">No</td><td style="padding:3px 8px;">Entero, default 0</td></tr>
+                        <tr style="background:#f9f9f9;"><td style="padding:3px 8px;"><code>tipo_magnitud</code></td><td style="padding:3px 8px; color:#27ae60;">No</td><td style="padding:3px 8px;">{{ magnitudes.keys() | join(", ") }} (default CANTIDAD)</td></tr>
+                        <tr><td style="padding:3px 8px;"><code>conversion_a_base</code></td><td style="padding:3px 8px; color:#27ae60;">No</td><td style="padding:3px 8px;">Cuántas unidades base equivalen a una de esta (mm sobre m: 0.001). En una unidad base es 1</td></tr>
+                        <tr style="background:#f9f9f9;"><td style="padding:3px 8px;"><code>unidad_base_referencia</code></td><td style="padding:3px 8px; color:#27ae60;">No</td><td style="padding:3px 8px;">Código de la unidad base: otra unidad de la misma magnitud, ya cargada o anterior en el archivo. Vacío si esta es una unidad base</td></tr>
+                        <tr><td style="padding:3px 8px;"><code>decimales_permitidos</code></td><td style="padding:3px 8px; color:#27ae60;">No</td><td style="padding:3px 8px;">Entero de 0 a {{ max_decimales }}, default 0</td></tr>
                         <tr style="background:#f9f9f9;"><td style="padding:3px 8px;"><code>activo</code></td><td style="padding:3px 8px; color:#27ae60;">No</td><td style="padding:3px 8px;">1 o 0, default 1</td></tr>
                     </tbody>
                 </table>
