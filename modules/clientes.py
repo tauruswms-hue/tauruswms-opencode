@@ -1,4 +1,7 @@
-﻿from flask import (
+﻿import re
+from urllib.parse import urlparse
+
+from flask import (
     Blueprint,
     flash,
     jsonify,
@@ -9,7 +12,6 @@
 )
 
 from modules.batch_utils import (
-    bool_col,
     export_csv,
     export_json,
     export_xlsx,
@@ -23,6 +25,49 @@ from modules.cuit import cuit_para_guardar, cuit_para_mostrar
 from modules.db_config import get_db_connection
 
 clientes_bp = Blueprint('clientes', __name__)
+
+# Largo máximo de los textos del cliente (el de su columna)
+_LARGOS = {'nombre_fantasia': 200, 'sitio_web': 255, 'email': 100, 'direccion': 255, 'contacto_nombre': 100}
+_ROTULOS = {'nombre_fantasia': 'Nombre de fantasía', 'sitio_web': 'Sitio web', 'email': 'Mail principal',
+            'direccion': 'Domicilio', 'contacto_nombre': 'Contacto'}
+
+
+def _texto(datos, campo):
+    """Texto opcional de un cliente: recortado, o None si está vacío. ValueError si no entra en la columna."""
+    valor = str(datos.get(campo) or '').strip()
+    if len(valor) > _LARGOS[campo]:
+        raise ValueError(f'{_ROTULOS[campo]}: admite hasta {_LARGOS[campo]} caracteres.')
+    return valor or None
+
+
+def _email(datos):
+    valor = _texto(datos, 'email')
+    if valor and not re.fullmatch(r'[^@\s]+@[^@\s]+\.[^@\s]+', valor):
+        raise ValueError('Mail principal: no tiene formato de dirección de correo.')
+    return valor
+
+
+def _sitio_web(datos):
+    """Sitio web como dirección http(s). Si se escribe sin el protocolo (www.empresa.com) se completa con https://."""
+    valor = _texto(datos, 'sitio_web')
+    if not valor:
+        return None
+    if not re.match(r'^[a-z][a-z0-9+.-]*://', valor, re.I):
+        valor = 'https://' + valor
+    partes = urlparse(valor)
+    if partes.scheme not in ('http', 'https') or '.' not in partes.netloc or ' ' in valor:
+        raise ValueError('Sitio web: tiene que ser una dirección web, por ejemplo www.empresa.com.')
+    if len(valor) > _LARGOS['sitio_web']:
+        raise ValueError(f'Sitio web: admite hasta {_LARGOS["sitio_web"]} caracteres.')
+    return valor
+
+
+def _activo(valor, por_defecto=True):
+    """Estado del cliente: True = Activo. Acepta 1/0 (lista Estado) y on (casilla, formularios anteriores)."""
+    valor = str(valor if valor is not None else '').strip().lower()
+    if not valor:
+        return por_defecto
+    return valor in ('1', 'on', 'true', 'si', 'sí', 'yes')
 
 
 @clientes_bp.route('/clientes')
@@ -68,9 +113,15 @@ def guardar():
     d = request.form
     c_id = d.get('id_cliente')
     tenant_id = get_tenant_filter()
-    activo_val = 1 if d.get('activo') else 0
+    # Sin el campo Estado, un alta nace activa; en una edición equivale a Inactivo (casilla sin tildar)
+    activo_val = _activo(d.get('activo'), por_defecto=not (c_id and c_id.strip()))
     try:
         cuit = cuit_para_guardar(d.get('cuit'))
+        nombre_fantasia = _texto(d, 'nombre_fantasia')
+        sitio_web = _sitio_web(d)
+        email = _email(d)
+        direccion = _texto(d, 'direccion')
+        contacto = _texto(d, 'contacto_nombre')
     except ValueError as e:
         flash(str(e), "danger")
         return redirect(url_for('clientes.listar'))
@@ -82,29 +133,33 @@ def guardar():
                 d.get('codigo'),
                 d.get('razonsocial'),
                 cuit,
-                d.get('direccion') or None,
+                direccion,
                 d.get('localidad') or None,
                 d.get('provincia') or None,
                 d.get('telefono') or None,
-                d.get('email') or None,
-                d.get('contacto_nombre') or None,
+                email,
+                contacto,
                 d.get('id_ruta') or None,
                 d.get('id_transporte_predeterminado') or None,
-                activo_val
+                activo_val,
+                nombre_fantasia,
+                sitio_web,
             )
 
             if c_id and c_id.strip():
                 sql = """UPDATE clientes SET codigo=%s, razonsocial=%s, cuit=%s,
                          direccion=%s, localidad=%s, provincia=%s, telefono=%s,
                          email=%s, contacto_nombre=%s, id_ruta=%s,
-                         id_transporte_predeterminado=%s, activo=%s
+                         id_transporte_predeterminado=%s, activo=%s,
+                         nombre_fantasia=%s, sitio_web=%s
                          WHERE id_cliente=%s AND (%s IS NULL OR tenant_id = %s)"""
                 cursor.execute(sql, (*params, c_id, tenant_id, tenant_id))
             else:
                 sql = """INSERT INTO clientes (codigo, razonsocial, cuit, direccion,
                          localidad, provincia, telefono, email, contacto_nombre,
-                         id_ruta, id_transporte_predeterminado, activo, tenant_id)
-                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
+                         id_ruta, id_transporte_predeterminado, activo,
+                         nombre_fantasia, sitio_web, tenant_id)
+                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
                 cursor.execute(sql, (*params, tenant_id))
 
             conn.commit()
@@ -135,16 +190,16 @@ def eliminar(id_cliente):
         conn.close()
     return redirect(url_for('clientes.listar'))
 # ── Batch ─────────────────────────────────────────────────────────────────────
-_CAMPOS_EXPORT = ['codigo', 'razonsocial', 'cuit', 'direccion', 'localidad', 'provincia',
-                  'telefono', 'email', 'contacto_nombre',
+_CAMPOS_EXPORT = ['codigo', 'razonsocial', 'nombre_fantasia', 'cuit', 'direccion', 'localidad', 'provincia',
+                  'telefono', 'email', 'sitio_web', 'contacto_nombre',
                   'id_ruta', 'nombre_ruta', 'id_transporte_predeterminado', 'nombre_transporte',
                   'activo']
-_CAMPOS_IMPORT = ['codigo', 'razonsocial', 'cuit', 'direccion', 'localidad', 'provincia',
-                  'telefono', 'email', 'contacto_nombre',
+_CAMPOS_IMPORT = ['codigo', 'razonsocial', 'nombre_fantasia', 'cuit', 'direccion', 'localidad', 'provincia',
+                  'telefono', 'email', 'sitio_web', 'contacto_nombre',
                   'id_ruta', 'id_transporte_predeterminado', 'activo']
-_EJEMPLO_IMPORT = ['CLI001', 'Cliente de Ejemplo S.A.', '20-87654321-0',
+_EJEMPLO_IMPORT = ['CLI001', 'Cliente de Ejemplo S.A.', 'El Ejemplo', '20-87654321-0',
                    'Av. Corrientes 1234', 'Buenos Aires', 'Buenos Aires',
-                   '011-5555-6666', 'cliente@ejemplo.com', 'Juan Pérez',
+                   '011-5555-6666', 'cliente@ejemplo.com', 'www.ejemplo.com', 'Juan Pérez',
                    'Zona Centro', 'TRA005', '1']
 
 
@@ -213,20 +268,23 @@ def importar():
                         INSERT INTO clientes
                             (codigo, razonsocial, cuit, direccion, localidad, provincia,
                              telefono, email, contacto_nombre,
-                             id_ruta, id_transporte_predeterminado, activo, tenant_id)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                             id_ruta, id_transporte_predeterminado, activo,
+                             nombre_fantasia, sitio_web, tenant_id)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """, (
                         codigo, razon,
                         cuit_para_guardar(row.get('cuit')),
-                        str(row.get('direccion', '') or '').strip() or None,
+                        _texto(row, 'direccion'),
                         str(row.get('localidad', '') or '').strip() or None,
                         str(row.get('provincia', '') or '').strip() or None,
                         str(row.get('telefono', '') or '').strip() or None,
-                        str(row.get('email', '') or '').strip() or None,
-                        str(row.get('contacto_nombre', '') or '').strip() or None,
+                        _email(row),
+                        _texto(row, 'contacto_nombre'),
                         id_ruta,
                         id_transporte,
-                        bool_col(row.get('activo', '1')),
+                        _activo(row.get('activo')),
+                        _texto(row, 'nombre_fantasia'),
+                        _sitio_web(row),
                         tenant_id
                     ))
                     insertados += 1
@@ -249,8 +307,8 @@ def exportar(formato):
     try:
         with conn.cursor() as cursor:
             cursor.execute("""
-                SELECT c.codigo, c.razonsocial, c.cuit, c.direccion, c.localidad, c.provincia,
-                       c.telefono, c.email, c.contacto_nombre,
+                SELECT c.codigo, c.razonsocial, c.nombre_fantasia, c.cuit, c.direccion, c.localidad, c.provincia,
+                       c.telefono, c.email, c.sitio_web, c.contacto_nombre,
                        c.id_ruta, r.nombre_ruta,
                        c.id_transporte_predeterminado, t.razonsocial AS nombre_transporte,
                        c.activo

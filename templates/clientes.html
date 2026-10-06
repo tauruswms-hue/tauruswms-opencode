@@ -5,6 +5,13 @@
 <link rel="stylesheet" href="https://cdn.datatables.net/fixedheader/3.4.0/css/fixedHeader.dataTables.min.css">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/tipoubicacion.css') }}">
 <style>
+/* Renglones y campos del formulario de clientes */
+.cli-fila { display: flex; flex-wrap: wrap; gap: 12px 15px; margin-bottom: 14px; }
+.cli-campo { flex: 1 1 0; min-width: 160px; display: flex; flex-direction: column; }
+.cli-campo > label { font-size: 0.8rem; font-weight: bold; color: #666; margin-bottom: 4px; }
+.cli-campo input, .cli-campo select { width: 100%; padding: 9px 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; font-family: inherit; font-size: 0.9rem; }
+</style>
+<style>
 #tablaClientes_wrapper .dataTables_scrollHead thead th { background: #f8f9fa; }
         #tablaClientes_wrapper .dataTables_scrollBody td,
         #tablaClientes_wrapper .dataTables_scrollHead th { font-size: 0.9rem; padding: 3px 5px; }
@@ -39,6 +46,7 @@
                 <tr>
                     <th>Código</th>
                     <th>Razón Social</th>
+                    <th>Mail y sitio web</th>
                     <th>Ruta / Zona</th>
                     <th>Transporte</th>
                     <th>Estado</th>
@@ -49,14 +57,21 @@
                 {% for c in clientes %}
                 <tr>
                     <td><code>{{ c.codigo }}</code></td>
-                    <td><strong>{{ c.razonsocial }}</strong></td>
+                    <td><strong>{{ c.razonsocial }}</strong>
+                        {% if c.nombre_fantasia %}<div title="Nombre de fantasía" style="font-size:0.8rem; color:#888;">{{ c.nombre_fantasia }}</div>{% endif %}
+                    </td>
+                    <td>
+                        {% if c.email %}<div><a href="mailto:{{ c.email }}" style="color:#3498db; text-decoration:none;"><i class="fas fa-envelope"></i> {{ c.email }}</a></div>{% endif %}
+                        {% if c.sitio_web %}<div><a href="{{ c.sitio_web }}" target="_blank" rel="noopener" style="color:#3498db; text-decoration:none;"><i class="fas fa-globe"></i> {{ c.sitio_web | replace('https://', '') | replace('http://', '') }}</a></div>{% endif %}
+                        {% if not c.email and not c.sitio_web %}<span style="color:#ccc;">—</span>{% endif %}
+                    </td>
                     <td>{{ c.nombre_ruta or 'Sin asignar' }}</td>
                     <td>{{ c.nombre_transporte or '-' }}</td>
                     <td style="text-align: center;">
                         {% if c.activo %}
-                            <span style="color: #27ae60; font-weight: bold;"><i class="fas fa-check"></i> Activo</span>
+                            <span style="background:#27ae60; color:white; padding:2px 8px; border-radius:10px; font-size:0.8rem;">Activo</span>
                         {% else %}
-                            <span style="color: #e74c3c; font-weight: bold;"><i class="fas fa-times"></i> Inactivo</span>
+                            <span title="No se ofrece al cargar pedidos" style="background:#95a5a6; color:white; padding:2px 8px; border-radius:10px; font-size:0.8rem;">Inactivo</span>
                         {% endif %}
                     </td>
                     <td class="actions-cell" style="text-align: center;">

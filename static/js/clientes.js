@@ -54,7 +54,7 @@ function filtrarTransportes(idRuta, selectedTransporteId = null) {
 function openModalCliente() {
     $('#formCliente')[0].reset();
     $('#form_id_cliente').val('');
-    $('#form_activo').prop('checked', true); // Por defecto activo
+    $('#form_activo').val('1');   // un cliente nuevo se propone Activo
     $('#form_id_transporte').empty().append('<option value="">-- Seleccionar Transporte --</option>');
     $('#modalCliente').css('display', 'flex').hide().fadeIn(150);
 }
@@ -73,7 +73,10 @@ function editCliente(data) {
     $('#form_direccion').val(data.direccion);
     $('#form_localidad').val(data.localidad);
     $('#form_provincia').val(data.provincia);
-    $('#form_activo').prop('checked', data.activo == 1);
+    $('#form_activo').val(data.activo ? '1' : '0');
+    $('#form_nombre_fantasia').val(data.nombre_fantasia || '');
+    $('#form_sitio_web').val(data.sitio_web || '');
+    $('#form_contacto_nombre').val(data.contacto_nombre || '');
 
     $('#form_id_ruta').val(data.id_ruta);
     filtrarTransportes(data.id_ruta, data.id_transporte_predeterminado);
