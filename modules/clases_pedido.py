@@ -114,7 +114,7 @@ def importar():
                         continue
                     cursor.execute(
                         "INSERT INTO clases_pedido (nombre, activo, tenant_id) VALUES (%s, %s, %s)",
-                        (nombre, bool_col(row.get('activo', '1')), tenant_id))
+                        (nombre, bool_col(row.get('activo') if str(row.get('activo') or '').strip() else '1'), tenant_id))
                     insertados += 1
             except Exception as e:
                 errores.append({'fila': i, 'codigo': nombre, 'razon': str(e)})

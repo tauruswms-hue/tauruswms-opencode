@@ -25,6 +25,7 @@ MAESTROS = [
     ('05_transportes.csv', '/transportes/importar', 'transportes', 'codigo'),
     ('06_clientes.csv', '/clientes/importar', 'clientes', 'codigo'),
     ('07_materiales.csv', '/materiales/importar', 'materiales', 'codigo'),
+    ('08_clases_pedido.csv', '/clases-pedido/importar', 'clases_pedido', 'nombre'),
 ]
 CON_ERRORES = [
     ('unidades_con_errores.csv', '/unidades/importar', 'unidades_medida', 'codigo'),
@@ -119,6 +120,9 @@ def test_los_csv_de_prueba_se_importan_sin_errores(logged_client, base_limpia_al
     cliente = cur.fetchone()
     assert cliente['cuit'] == '30-70987654-3'                    # venía sin guiones
     assert (cliente['nombre_ruta'], cliente['transporte'], cliente['contactos']) == ('Zona Norte', 'TRA003', 1)
+
+    cur.execute("SELECT nombre, activo FROM clases_pedido WHERE nombre IN ('Urgente', 'Exportación') AND tenant_id = %s ORDER BY nombre", (tenant,))
+    assert [(c['nombre'], bool(c['activo'])) for c in cur.fetchall()] == [('Exportación', False), ('Urgente', True)]
 
     cur.execute("SELECT cuit, CHAR_LENGTH(direccion) AS largo FROM proveedores WHERE codigo = 'PROV005' AND tenant_id = %s", (tenant,))
     assert cur.fetchone()['largo'] > 255                         # la dirección ampliada

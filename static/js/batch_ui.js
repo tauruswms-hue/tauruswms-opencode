@@ -3,6 +3,17 @@
  * Usadas por: ubicaciones, proveedores, clientes, stockcontable (y materiales).
  */
 
+// Si una importación agregó o actualizó registros, la grilla de atrás quedó desactualizada:
+// al cerrar la ventana se recarga la página para que se vean.
+var _importacionConCambios = false;
+
+// Escapa un texto que viene del archivo o del servidor antes de mostrarlo
+function _escBatch(valor) {
+    return String(valor === null || valor === undefined ? '' : valor)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 function openModalImportar() {
     $('#importarArchivo').val('');
     _hideSelectorHoja();
@@ -12,6 +23,10 @@ function openModalImportar() {
 }
 
 function closeModalImportar() {
+    if (_importacionConCambios) {
+        location.reload();
+        return;
+    }
     $('#modalImportar').fadeOut(150);
 }
 
@@ -108,7 +123,7 @@ function ejecutarImportar(url) {
             _mostrarResultadoBatch(resp);
         },
         error: function(xhr) {
-            var msg = (xhr.responseJSON && xhr.responseJSON.error) ? xhr.responseJSON.error : 'Error desconocido';
+            var msg = _escBatch((xhr.responseJSON && xhr.responseJSON.error) ? xhr.responseJSON.error : 'Error desconocido');
             $('#importarResultado').html(
                 '<div style="background:#fde8e8; border:1px solid #f5c6cb; border-radius:6px; padding:14px; color:#c0392b;">' +
                 '<i class="fas fa-exclamation-triangle"></i> <strong>Error:</strong> ' + msg + '</div>'
@@ -124,6 +139,7 @@ function _mostrarResultadoBatch(resp) {
     var hayErrores  = resp.errores  && resp.errores.length  > 0;
     var hayOmitidos = resp.omitidos && resp.omitidos.length > 0;
     var hayActualizados = resp.actualizados > 0;
+    if (resp.insertados > 0 || hayActualizados) _importacionConCambios = true;
     var bgColor     = hayErrores ? '#fff3cd' : '#d4edda';
     var border      = hayErrores ? '#ffc107' : '#28a745';
     var icon        = hayErrores ? 'fa-exclamation-triangle' : 'fa-check-circle';
@@ -134,14 +150,14 @@ function _mostrarResultadoBatch(resp) {
         '<ul style="margin:0; padding-left:18px; font-size:0.9rem; color:#333;">' +
         '<li><strong>' + resp.insertados + '</strong> registro(s) importado(s) correctamente</li>' +
         (hayActualizados ? '<li><strong>' + resp.actualizados + '</strong> registro(s) actualizado(s)</li>' : '') +
-        '<li><strong>' + (resp.omitidos ? resp.omitidos.length : 0) + '</strong> omitido(s) por duplicado</li>' +
+        '<li><strong>' + (resp.omitidos ? resp.omitidos.length : 0) + '</strong> omitido(s) porque ya existían</li>' +
         '<li><strong>' + (resp.errores  ? resp.errores.length  : 0) + '</strong> error(es)</li>' +
         '</ul></div>';
 
     if (hayOmitidos) {
         html += '<div style="background:#fff3cd; border:1px solid #ffc107; border-radius:6px; padding:10px 14px; margin-bottom:10px; font-size:0.85rem;">' +
-            '<p style="margin:0 0 4px; font-weight:bold; color:#856404;"><i class="fas fa-ban"></i> Omitidos (ya existen)</p>' +
-            '<p style="margin:0; color:#555; word-break:break-all;">' + resp.omitidos.join(', ') + '</p></div>';
+            '<p style="margin:0 0 4px; font-weight:bold; color:#856404;"><i class="fas fa-ban"></i> Omitidos: ya existían en la empresa y no se modificaron</p>' +
+            '<p style="margin:0; color:#555; word-break:break-all;">' + resp.omitidos.map(_escBatch).join(', ') + '</p></div>';
     }
 
     if (hayErrores) {
@@ -150,15 +166,16 @@ function _mostrarResultadoBatch(resp) {
             '<table style="width:100%; border-collapse:collapse; font-size:0.82rem;">' +
             '<thead><tr style="background:#f8d7da;"><th style="padding:4px 8px; text-align:left;">Fila</th><th style="padding:4px 8px; text-align:left;">Código</th><th style="padding:4px 8px; text-align:left;">Razón</th></tr></thead><tbody>';
         resp.errores.forEach(function(e) {
-            html += '<tr><td style="padding:3px 8px;">' + e.fila + '</td>' +
-                    '<td style="padding:3px 8px;"><code>' + e.codigo + '</code></td>' +
-                    '<td style="padding:3px 8px;">' + e.razon + '</td></tr>';
+            html += '<tr><td style="padding:3px 8px;">' + _escBatch(e.fila) + '</td>' +
+                    '<td style="padding:3px 8px;"><code>' + _escBatch(e.codigo) + '</code></td>' +
+                    '<td style="padding:3px 8px;">' + _escBatch(e.razon) + '</td></tr>';
         });
         html += '</tbody></table></div>';
     }
 
-    if (resp.insertados > 0) {
-        html += '<div style="text-align:right; margin-top:4px;">' +
+    if (resp.insertados > 0 || hayActualizados) {
+        html += '<p style="margin:0 0 6px; font-size:0.85rem; color:#555;">La grilla se actualiza al cerrar esta ventana.</p>' +
+            '<div style="text-align:right; margin-top:4px;">' +
             '<button onclick="location.reload()" style="background:#27ae60; color:white; border:none; padding:8px 16px; border-radius:4px; cursor:pointer; font-size:0.88rem;">' +
             '<i class="fas fa-sync-alt"></i> Actualizar tabla</button></div>';
     }
