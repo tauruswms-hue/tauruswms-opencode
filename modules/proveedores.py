@@ -18,9 +18,28 @@ from modules.batch_utils import (
     plantilla_xlsx,
 )
 from modules.context import get_tenant_filter
+from modules.cuit import CUIT_INVALIDO, normalizar_cuit
 from modules.db_config import get_db_connection
 
 proveedores_bp = Blueprint('proveedores', __name__)
+
+DIRECCION_MAX = 500   # largo de la columna proveedores.direccion
+
+
+def _direccion(valor):
+    """Dirección del proveedor; lanza ValueError si no entra en la columna."""
+    valor = str(valor or '').strip()
+    if len(valor) > DIRECCION_MAX:
+        raise ValueError(f'Dirección: admite hasta {DIRECCION_MAX} caracteres (tiene {len(valor)}).')
+    return valor or None
+
+
+def _cuit(valor):
+    """CUIT con formato 99-99999999-9 (o None si está vacío); lanza ValueError si es inválido."""
+    cuit = normalizar_cuit(valor)
+    if cuit is None:
+        raise ValueError(CUIT_INVALIDO)
+    return cuit or None
 
 
 @proveedores_bp.route('/proveedores')
@@ -30,8 +49,11 @@ def listar():
     try:
         with conn.cursor() as cursor:
             cursor.execute("SELECT * FROM proveedores WHERE activo = 1 AND (%s IS NULL OR tenant_id = %s) ORDER BY razonsocial ASC", (tenant_id, tenant_id))
-            proveedores = cursor.fetchall()
-        return render_template('proveedores.html', proveedores=proveedores)
+            proveedores = [dict(p) for p in cursor.fetchall()]
+        for p in proveedores:
+            # Los CUIT cargados antes como 11 dígitos se muestran y editan ya formateados
+            p['cuit'] = normalizar_cuit(p.get('cuit')) or p.get('cuit')
+        return render_template('proveedores.html', proveedores=proveedores, direccion_max=DIRECCION_MAX)
     finally:
         conn.close()
 
@@ -42,20 +64,27 @@ def guardar():
     p_id = d.get('id')
     tenant_id = get_tenant_filter()
 
+    try:
+        cuit = _cuit(d.get('cuit'))
+        direccion = _direccion(d.get('direccion'))
+    except ValueError as e:
+        flash(str(e), "danger")
+        return redirect(url_for('proveedores.listar'))
+
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
             if p_id and p_id.strip():
-                sql = """UPDATE proveedores SET codigo=%s, razonsocial=%s, cuit=%s, 
+                sql = """UPDATE proveedores SET codigo=%s, razonsocial=%s, cuit=%s,
                          direccion=%s, telefono=%s, email=%s WHERE id=%s AND (%s IS NULL OR tenant_id = %s)"""
-                cursor.execute(sql, (d.get('codigo'), d.get('razonsocial'), d.get('cuit'),
-                                     d.get('direccion'), d.get('telefono'), d.get('email'),
+                cursor.execute(sql, (d.get('codigo'), d.get('razonsocial'), cuit,
+                                     direccion, d.get('telefono'), d.get('email'),
                                      p_id, tenant_id, tenant_id))
             else:
-                sql = """INSERT INTO proveedores (codigo, razonsocial, cuit, direccion, telefono, email, tenant_id) 
+                sql = """INSERT INTO proveedores (codigo, razonsocial, cuit, direccion, telefono, email, tenant_id)
                          VALUES (%s, %s, %s, %s, %s, %s, %s)"""
-                cursor.execute(sql, (d.get('codigo'), d.get('razonsocial'), d.get('cuit'),
-                                     d.get('direccion'), d.get('telefono'), d.get('email'), tenant_id))
+                cursor.execute(sql, (d.get('codigo'), d.get('razonsocial'), cuit,
+                                     direccion, d.get('telefono'), d.get('email'), tenant_id))
 
             conn.commit()
             flash("Proveedor guardado correctamente", "success")
@@ -117,8 +146,8 @@ def importar():
                         VALUES (%s, %s, %s, %s, %s, %s, %s)
                     """, (
                         codigo, razon,
-                        str(row.get('cuit', '') or '').strip() or None,
-                        str(row.get('direccion', '') or '').strip() or None,
+                        _cuit(row.get('cuit')),
+                        _direccion(row.get('direccion')),
                         str(row.get('telefono', '') or '').strip() or None,
                         str(row.get('email', '') or '').strip() or None,
                         tenant_id,

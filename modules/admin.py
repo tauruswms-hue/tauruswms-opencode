@@ -14,6 +14,7 @@ from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from modules.api import _hash_token
+from modules.cuit import CUIT_INVALIDO, normalizar_cuit
 from modules.db_config import (
     ConexionesError,
     _get_admin_connection,
@@ -77,23 +78,6 @@ def decode_codigo(encoded_codigo):
 
 
 @admin_bp.app_template_filter('datetime')
-def normalizar_cuit(valor):
-    """CUIT de un tenant en formato 99-99999999-9.
-
-    Acepta el valor ya formateado o sus 11 dígitos sin guiones. Devuelve '' si
-    está vacío (el CUIT es opcional) y None si no tiene un formato válido.
-    """
-    valor = (valor or '').strip()
-    if not valor:
-        return ''
-    if re.fullmatch(r'\d{11}', valor):
-        return f'{valor[:2]}-{valor[2:10]}-{valor[10]}'
-    return valor if re.fullmatch(r'\d{2}-\d{8}-\d', valor) else None
-
-
-CUIT_INVALIDO = 'CUIT inválido: debe tener el formato 99-99999999-9.'
-
-
 def format_datetime(value):
     if value is None:
         return '-'

@@ -325,7 +325,7 @@ CREATE TABLE `proveedores` (
     `codigo` varchar(50),
     `razonsocial` varchar(200) NOT NULL,
     `cuit` varchar(50),
-    `direccion` varchar(255),
+    `direccion` varchar(500),
     `telefono` varchar(50),
     `email` varchar(100),
     `activo` TINYINT(1) NOT NULL DEFAULT TRUE,

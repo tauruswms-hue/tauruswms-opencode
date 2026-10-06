@@ -325,7 +325,7 @@ CREATE TABLE "proveedores" (
     "codigo" VARCHAR(50),
     "razonsocial" VARCHAR(200) NOT NULL,
     "cuit" VARCHAR(50),
-    "direccion" VARCHAR(255),
+    "direccion" VARCHAR(500),
     "telefono" VARCHAR(50),
     "email" VARCHAR(100),
     "activo" BOOLEAN NOT NULL DEFAULT TRUE,

@@ -329,7 +329,7 @@ CREATE TABLE [proveedores] (
     [codigo] NVARCHAR(50),
     [razonsocial] NVARCHAR(200) NOT NULL,
     [cuit] NVARCHAR(50),
-    [direccion] NVARCHAR(255),
+    [direccion] NVARCHAR(500),
     [telefono] NVARCHAR(50),
     [email] NVARCHAR(100),
     [activo] BIT NOT NULL DEFAULT 1,

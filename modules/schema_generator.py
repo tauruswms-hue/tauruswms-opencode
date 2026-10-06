@@ -230,7 +230,7 @@ WMS_TABLES = [
             {"name": "codigo",      "type": "varchar(50)"},
             {"name": "razonsocial", "type": "varchar(200)",  "not_null": True},
             {"name": "cuit",        "type": "varchar(50)"},
-            {"name": "direccion",   "type": "varchar(255)"},
+            {"name": "direccion",   "type": "varchar(500)"},
             {"name": "telefono",    "type": "varchar(50)"},
             {"name": "email",       "type": "varchar(100)"},
             {"name": "activo",      "type": "boolean", "not_null": True, "default": True},

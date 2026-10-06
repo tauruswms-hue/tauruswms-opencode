@@ -33,7 +33,7 @@
                 <tr>
                     <th>Código</th>
                     <th>Razón Social</th>
-                    <th>CUIT/ID</th>
+                    <th>CUIT</th>
                     <th>Teléfono</th>
                     <th>Email</th>
                     <th>Acciones</th>
@@ -76,10 +76,21 @@
         $('#formProveedor')[0].reset();
         $('#form_id').val('');
         $('#modalTitle').text('Nuevo Proveedor');
+        contarDireccion();
         $('#modalProveedor').css('display', 'flex').hide().fadeIn(150);
     }
 
     function closeModal() { $('#modalProveedor').fadeOut(150); }
+
+    // CUIT con formato 99-99999999-9: los guiones se agregan al escribir
+    function formatCuit(input) {
+        const d = input.value.replace(/[^0-9]/g, '').substring(0, 11);
+        input.value = d.length > 10 ? d.substring(0, 2) + '-' + d.substring(2, 10) + '-' + d.substring(10)
+            : d.length > 2 ? d.substring(0, 2) + '-' + d.substring(2) : d;
+    }
+    function contarDireccion() { $('#form_dir_cuenta').text($('#form_dir').val().length); }
+    $(document).on('input', '#form_cuit', function() { formatCuit(this); });
+    $(document).on('input', '#form_dir', contarDireccion);
 
     function editProveedor(data) {
         openModal();
@@ -91,6 +102,8 @@
         $('#form_dir').val(data.direccion);
         $('#form_tel').val(data.telefono);
         $('#form_email').val(data.email);
+        formatCuit(document.getElementById('form_cuit'));
+        contarDireccion();
     }
 </script>
 {% endblock %}
