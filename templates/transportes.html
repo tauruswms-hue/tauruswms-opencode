@@ -8,6 +8,21 @@
 #tablaTransportes_wrapper .dataTables_scrollHead thead th { background: #f8f9fa; }
         #tablaTransportes_wrapper .dataTables_scrollBody td,
         #tablaTransportes_wrapper .dataTables_scrollHead th { font-size: 0.9rem; padding: 3px 5px; }
+/* Formulario */
+.tra-fila { display: flex; flex-wrap: wrap; gap: 12px 15px; margin-bottom: 14px; }
+.tra-campo { flex: 1 1 0; min-width: 160px; display: flex; flex-direction: column; }
+.tra-campo > label { font-size: 0.8rem; font-weight: bold; color: #666; margin-bottom: 4px; }
+.tra-campo input, .tra-campo select { width: 100%; padding: 9px 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; font-family: inherit; font-size: 0.9rem; }
+.tra-ayuda { display: block; color: #888; font-size: 0.78rem; line-height: 1.35; margin-top: 3px; }
+.tra-tabla { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.tra-tabla th { padding: 6px 5px; text-align: left; font-size: 0.78rem; color: #666; border-bottom: 2px solid #eee; }
+.tra-tabla td { padding: 5px; vertical-align: middle; }
+.tra-tabla input, .tra-tabla select { width: 100%; padding: 7px 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; font-family: inherit; font-size: 0.88rem; }
+.tra-quitar { color: #e74c3c; background: none; border: none; cursor: pointer; padding: 4px; }
+.tra-vacio { color: #999; font-size: 0.86rem; padding: 8px 5px; }
+/* Listado */
+.tra-enlace { display: block; max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #3498db; text-decoration: none; }
+.tra-ruta { display: inline-block; background: #e2e8f0; color: #475569; border-radius: 10px; padding: 1px 8px; font-size: 0.78rem; margin: 1px 3px 1px 0; white-space: nowrap; }
 </style>
 
 <div class="materiales-container" style="padding: 0 20px 20px 20px; height: calc(100vh - 50px); display: flex; flex-direction: column;">
@@ -40,29 +55,48 @@
                     <th>Código</th>
                     <th>Razón Social</th>
                     <th>CUIT</th>
-                    <th>Contacto</th>
+                    <th>Teléfono y mail</th>
+                    <th>Muelle de salida</th>
+                    <th>Rutas</th>
                     <th>Estado</th>
                     <th>Acciones</th>
                 </tr>
             </thead>
             <tbody>
                 {% for t in transportes %}
-                <tr>
+                <tr{% if not t.activo %} style="color:#999;"{% endif %}>
                     <td><code>{{ t.codigo }}</code></td>
                     <td><strong>{{ t.razonsocial }}</strong></td>
-                    <td>{{ t.cuit or '-' }}</td>
-                    <td>{{ t.telefono or '' }} <br> <small>{{ t.email or '' }}</small></td>
+                    <td style="white-space:nowrap;">{{ t.cuit or '—' }}</td>
                     <td>
-                        <span style="padding: 4px 8px; border-radius: 12px; font-size: 0.8rem; background: {{ '#d4edda' if t.activo else '#f8d7da' }}; color: {{ '#155724' if t.activo else '#721c24' }};">
-                            {{ 'Activo' if t.activo else 'Inactivo' }}
-                        </span>
+                        {% if t.telefono %}<div style="white-space:nowrap;"><i class="fas fa-phone" style="color:#94a3b8;"></i> {{ t.telefono }}</div>{% endif %}
+                        {% if t.email %}<a class="tra-enlace" href="mailto:{{ t.email }}" title="{{ t.email }}"><i class="fas fa-envelope"></i> {{ t.email }}</a>{% endif %}
+                        {% if not t.telefono and not t.email %}<span style="color:#ccc;">—</span>{% endif %}
+                    </td>
+                    <td>
+                        {% if t.muelle_codigo %}
+                            <code>{{ t.muelle_codigo }}</code>
+                            {% if t.muelle_descripcion %}<div style="font-size:0.8rem; color:#888;">{{ t.muelle_descripcion }}</div>{% endif %}
+                        {% else %}
+                            <span style="color:#ccc;">—</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% for nombre in t.rutas_nombres %}<span class="tra-ruta">{{ nombre }}</span>{% else %}<span style="color:#ccc;">—</span>{% endfor %}
+                    </td>
+                    <td style="text-align:center;">
+                        {% if t.activo %}
+                            <span style="background:#27ae60; color:white; padding:2px 8px; border-radius:10px; font-size:0.8rem;">Activo</span>
+                        {% else %}
+                            <span title="No se ofrece para clientes ni pedidos nuevos" style="background:#95a5a6; color:white; padding:2px 8px; border-radius:10px; font-size:0.8rem;">Inactivo</span>
+                        {% endif %}
                     </td>
                     <td class="actions-cell" style="text-align: center;">
-                        <button class="btn-icon edit" onclick='editTransporte({{ t | tojson }})' style="color: #3498db; background: none; border: none; cursor: pointer; font-size: 1.1rem;">
+                        <button class="btn-icon edit" title="Editar" onclick='editTransporte({{ t | tojson }})' style="color: #3498db; background: none; border: none; cursor: pointer; font-size: 1.1rem;">
                             <i class="fas fa-edit"></i>
                         </button>
-                        <form method="POST" action="{{ url_for('transportes.eliminar', id_transporte=t.id_transporte) }}" style="display:inline;" onsubmit="return confirm('¿Inactivar transporte?')">
-                            <button type="submit" class="btn-icon delete" style="color: #e74c3c; background: none; border: none; cursor: pointer; font-size: 1.1rem;">
+                        <form method="POST" action="{{ url_for('transportes.eliminar', id_transporte=t.id_transporte) }}" style="display:inline;" onsubmit="return confirm('¿Inactivar transporte?\n\nNo se borra: deja de ofrecerse para clientes y pedidos nuevos, y se puede reactivar desde su edición.')">
+                            <button type="submit" class="btn-icon delete" title="Inactivar" style="color: #e74c3c; background: none; border: none; cursor: pointer; font-size: 1.1rem;">
                                 <i class="fas fa-trash"></i>
                             </button>
                         </form>

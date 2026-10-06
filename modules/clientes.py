@@ -138,7 +138,15 @@ def listar():
             cursor.execute("SELECT * FROM rutas WHERE (%s IS NULL OR tenant_id = %s) ORDER BY nombre_ruta", (tenant_id, tenant_id))
             rutas = cursor.fetchall()
 
-            cursor.execute("SELECT id_transporte, razonsocial FROM transportes WHERE activo = 1 AND (%s IS NULL OR tenant_id = %s)", (tenant_id, tenant_id))
+            # Activos, más los inactivos que algún cliente ya tiene como habitual (para no quitárselo al editarlo)
+            cursor.execute("""
+                SELECT id_transporte, razonsocial, activo FROM transportes
+                WHERE (%s IS NULL OR tenant_id = %s)
+                  AND (activo = 1 OR id_transporte IN (SELECT id_transporte_predeterminado FROM clientes
+                                                       WHERE id_transporte_predeterminado IS NOT NULL
+                                                         AND (%s IS NULL OR tenant_id = %s)))
+                ORDER BY razonsocial
+            """, (tenant_id, tenant_id, tenant_id, tenant_id))
             transportes_all = cursor.fetchall()
 
             cursor.execute("SELECT id_transporte, id_ruta FROM transporte_rutas WHERE (%s IS NULL OR tenant_id = %s)", (tenant_id, tenant_id))

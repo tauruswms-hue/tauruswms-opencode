@@ -24,30 +24,23 @@ $(document).ready(function() {
     });
 });
 
+// Transportes que se ofrecen en la ficha: los que cubren la ruta elegida (o todos, si la ruta no
+// tiene transportes asignados o no se eligió ruta). Solo los activos, más el que el cliente ya
+// tiene como habitual aunque esté inactivo o no cubra la ruta, para no quitárselo al editar.
 function filtrarTransportes(idRuta, selectedTransporteId = null) {
     const $selectTransp = $('#form_id_transporte');
     $selectTransp.empty().append('<option value="">-- Seleccionar Transporte --</option>');
 
-    if (!idRuta) {
-        transportesDB.forEach(t => {
-            let selected = (t.id_transporte == selectedTransporteId) ? 'selected' : '';
-            $selectTransp.append(`<option value="${t.id_transporte}" ${selected}>${t.razonsocial}</option>`);
-        });
-        return;
-    }
-
-    const idsValidos = relTransporteRutas
-        .filter(rel => rel.id_ruta == idRuta)
-        .map(rel => rel.id_transporte);
-
-    // Si la ruta no tiene transportes asociados (transporte_rutas vacio),
-    // se listan todos los transportes activos como fallback.
-    const usarFiltro = idsValidos.length > 0;
+    const idsRuta = idRuta
+        ? relTransporteRutas.filter(rel => rel.id_ruta == idRuta).map(rel => rel.id_transporte)
+        : [];
+    const usarFiltro = idsRuta.length > 0;
     transportesDB.forEach(t => {
-        if (!usarFiltro || idsValidos.includes(t.id_transporte)) {
-            let selected = (t.id_transporte == selectedTransporteId) ? 'selected' : '';
-            $selectTransp.append(`<option value="${t.id_transporte}" ${selected}>${t.razonsocial}</option>`);
-        }
+        const esElActual = t.id_transporte == selectedTransporteId;
+        if (!esElActual && (!t.activo || (usarFiltro && !idsRuta.includes(t.id_transporte)))) return;
+        $selectTransp.append($('<option>').val(t.id_transporte)
+            .text(t.razonsocial + (t.activo ? '' : ' — inactivo'))
+            .prop('selected', esElActual));
     });
 }
 

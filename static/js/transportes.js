@@ -24,44 +24,68 @@ $(document).ready(function() {
     });
 });
 
-function agregarFilaRuta(idRuta = '', obs = '') {
-    let options = '<option value="">Seleccione Ruta...</option>';
-    listaRutasDB.forEach(r => {
-        let selected = (r.id_ruta == idRuta) ? 'selected' : '';
-        options += `<option value="${r.id_ruta}" ${selected}>${r.nombre_ruta}</option>`;
-    });
-
-    let fila = `
-        <tr style="border-top: 1px solid #eee;">
-            <td style="padding: 8px 5px;">
-                <select name="rutas_ids[]" required style="width:100%; padding: 6px; border-radius:4px;">${options}</select>
-            </td>
-            <td style="padding: 8px 5px;">
-                <textarea name="rutas_obs[]" rows="1" placeholder="Ej: Frecuencia semanal..." style="width:100%; padding: 6px; border-radius:4px; border:1px solid #ddd; height: 35px;">${obs}</textarea>
-            </td>
-            <td style="text-align: center;">
-                <button type="button" onclick="$(this).closest('tr').remove()" style="color:#e74c3c; background:none; border:none; cursor:pointer; font-size: 1.1rem;">&times;</button>
-            </td>
-        </tr>`;
-    $('#listaRutasCuerpo').append(fila);
+// Escapa un valor para insertarlo en HTML (texto o atributo)
+function escTra(valor) {
+    return String(valor === null || valor === undefined ? '' : valor)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
+
+// ─── Rutas que cubre el transporte ───────────────────────────────────────────
+function actualizarRutas() {
+    var cantidad = $('#listaRutasCuerpo tr').length;
+    $('#tra_sin_rutas').toggle(cantidad === 0);
+    $('.tra-tabla').toggle(cantidad > 0);
+}
+
+function agregarFilaRuta(idRuta, obs) {
+    var options = '<option value="">Seleccionar ruta…</option>';
+    listaRutasDB.forEach(function(r) {
+        options += '<option value="' + escTra(r.id_ruta) + '"' + (r.id_ruta == idRuta ? ' selected' : '') + '>' +
+            escTra(r.nombre_ruta) + '</option>';
+    });
+    $('#listaRutasCuerpo').append('<tr>' +
+        '<td><select name="rutas_ids[]" required>' + options + '</select></td>' +
+        '<td><input type="text" name="rutas_obs[]" value="' + escTra(obs) + '" placeholder="Ej: frecuencia semanal"></td>' +
+        '<td style="text-align:center;"><button type="button" class="tra-quitar" title="Quitar" ' +
+        'onclick="$(this).closest(\'tr\').remove(); actualizarRutas();"><i class="fas fa-times"></i></button></td>' +
+        '</tr>');
+    actualizarRutas();
+}
+
+// La misma ruta dos veces no tiene sentido: se avisa antes de enviar
+$(document).on('submit', '#formTransportes', function(e) {
+    var usadas = [], repetida = false;
+    $('select[name="rutas_ids[]"]').each(function() {
+        var id = $(this).val();
+        if (!id) return;
+        if (usadas.indexOf(id) !== -1) repetida = true;
+        usadas.push(id);
+    });
+    if (repetida) {
+        e.preventDefault();
+        alert('Hay una ruta repetida en la lista de rutas.');
+    }
+});
 
 function _poblarSelectMuelles(idSeleccionado) {
     const $sel = $('#form_id_muelle_salida');
     $sel.empty().append('<option value="">-- Sin muelle asignado --</option>');
-    muelles.forEach(m => {
-        const sel = (m.id == idSeleccionado) ? 'selected' : '';
-        $sel.append(`<option value="${m.id}" ${sel}>${m.codigo} - ${m.descipcion}</option>`);
+    muelles.forEach(function(m) {
+        // La descripción del muelle es opcional
+        var texto = m.codigo + (m.descipcion ? ' - ' + m.descipcion : '');
+        $sel.append($('<option>').val(m.id).text(texto).prop('selected', m.id == idSeleccionado));
     });
 }
 
 function openModal() {
     $('#formTransportes')[0].reset();
     $('#form_id_transporte').val('');
+    $('#form_activo').val('1');   // un transporte nuevo se propone Activo
     $('#listaRutasCuerpo').empty();
-    $('#modalTitle').html('<i class="fas fa-plus"></i> Nuevo Transporte');
+    actualizarRutas();
+    $('#modalTitle').text('Nuevo Transporte');
     _poblarSelectMuelles('');
-    agregarFilaRuta();
     $('#modalTransportes').css('display', 'flex').hide().fadeIn(200);
 }
 
@@ -71,7 +95,7 @@ function closeModal() {
 
 function editTransporte(data) {
     openModal();
-    $('#modalTitle').html('<i class="fas fa-edit"></i> Editar: ' + data.razonsocial);
+    $('#modalTitle').text('Editar: ' + data.razonsocial);
     $('#form_id_transporte').val(data.id_transporte);
     $('#form_codigo').val(data.codigo);
     $('#form_razonsocial').val(data.razonsocial);
@@ -79,14 +103,9 @@ function editTransporte(data) {
     formatCuit(document.getElementById('form_cuit'));
     $('#form_telefono').val(data.telefono);
     $('#form_email').val(data.email);
-    $('#form_activo').prop('checked', data.activo == 1);
+    $('#form_activo').val(data.activo ? '1' : '0');
     _poblarSelectMuelles(data.id_muelle_salida);
 
-    let susRutas = relacionesExistentes.filter(r => r.id_transporte == data.id_transporte);
-    $('#listaRutasCuerpo').empty();
-    if(susRutas.length > 0) {
-        susRutas.forEach(rel => agregarFilaRuta(rel.id_ruta, rel.observaciones || ''));
-    } else {
-        agregarFilaRuta();
-    }
+    relacionesExistentes.filter(function(r) { return r.id_transporte == data.id_transporte; })
+        .forEach(function(rel) { agregarFilaRuta(rel.id_ruta, rel.observaciones || ''); });
 }

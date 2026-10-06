@@ -16,7 +16,7 @@ Hay que respetar el orden, porque unos archivos hacen referencia a otros:
   02_categorias.csv     Categorías                    6    -
   03_proveedores.csv    Proveedores                   5    -
   04_rutas.csv          Rutas                         4    -
-  05_transportes.csv    Transportes                   4    -
+  05_transportes.csv    Transportes                   4    rutas
   06_clientes.csv       Clientes                      5    rutas y transportes
   07_materiales.csv     Materiales                   13    unidades, categorías, proveedores
 
@@ -39,7 +39,11 @@ QUÉ PERMITE VER CADA ARCHIVO
     255 caracteres (el campo admite 500).
 
 05_transportes.csv
-  - CUIT con y sin guiones, y un transporte inactivo (TRA004).
+  - CUIT con guiones, sin guiones y vacío (es opcional).
+  - Rutas que cubre cada transporte, por nombre y separadas por punto y coma.
+  - El muelle de salida va vacío: necesita una ubicación de un tipo de salida,
+    que este juego de archivos no carga. Se asigna desde la ficha.
+  - Un transporte inactivo (TRA004) y uno sin estado indicado (queda activo).
 
 06_clientes.csv
   - Nombre de fantasía, sitio web (escrito con y sin "https://"), mail
