@@ -94,9 +94,9 @@ def nueva():
                 SELECT u.id, u.codigo, u.descipcion AS nombre, t.{quote('descripcion')} AS tipo
                 FROM ubicaciones u
                 JOIN tipoubicacion t ON u.tipoubicacion = t.id
-                WHERE t.{quote('descripcion')} LIKE %s AND u.activo = 1 AND (%s IS NULL OR u.tenant_id = %s)
+                WHERE t.operacion = 'R' AND u.activo = 1 AND (%s IS NULL OR u.tenant_id = %s)
                 ORDER BY u.codigo
-            """, ('%Recepci%', tenant_id, tenant_id))
+            """, (tenant_id, tenant_id))
             ubicaciones_recep = cursor.fetchall()
 
         ultima_ubicacion = session.get('ultima_ubicacion_recepcion')
@@ -334,12 +334,12 @@ def buscar_ubicaciones():
                     SELECT u.id, u.codigo, u.descipcion AS nombre, t.{quote('descripcion')} AS tipo
                     FROM ubicaciones u
                     JOIN tipoubicacion t ON u.tipoubicacion = t.id
-                    WHERE t.{quote('descripcion')} LIKE %s AND u.activo = 1
+                    WHERE t.operacion = 'R' AND u.activo = 1
                       AND (u.codigo LIKE %s OR u.descipcion LIKE %s)
                       AND (%s IS NULL OR u.tenant_id = %s)
                     ORDER BY u.codigo
                     {limit_sql(20)}
-                """, ('%Recepci%', like, like, tenant_id, tenant_id))
+                """, (like, like, tenant_id, tenant_id))
             else:
                 cursor.execute(f"""
                     SELECT u.id, u.codigo, u.descipcion AS nombre, t.{quote('descripcion')} AS tipo

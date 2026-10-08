@@ -92,6 +92,7 @@ Interfase con sistemas externos: el sistema de gestión inserta registros en `ta
 
 - UI language is **Spanish** (variable names, route names, flash messages, DB column names)
 - Column `descripcion` in `tipoubicacion` table — no accent, match it exactly in SQL
+- `tipoubicacion.operacion` dice para qué sirven las ubicaciones del tipo y se carga en la pantalla de Tipos de Ubicación: `'R'` = recepción (las que ofrecen Recepciones y la app móvil para recibir), `'S'` = salida (los muelles que ofrece Transportes), vacío = almacenamiento. Es la única regla: no reconocer el uso de un tipo por su descripción
 - ID columns are inconsistent: some tables use `id`, others `id_pedido`, `id_cliente`, `id_transporte`, etc. Check `modules/schema_generator.py` for the real table before writing queries
 - Tenant IDs in admin URLs are base64-encoded (`encode_id`/`decode_id` in `modules/admin.py`) — do not pass raw integers in admin routes
 - `openpyxl` is used for XLSX export; `werkzeug.security` for password hashing (`scrypt`)

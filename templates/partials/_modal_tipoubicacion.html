@@ -12,7 +12,21 @@
                     <div class="form-row">
                         <div class="form-group">
                             <label>Descripción *</label>
-                            <input type="text" name="descipcion" id="form_descipcion" required maxlength="45">
+                            <input type="text" name="descripcion" id="form_descipcion" required maxlength="{{ descripcion_max }}">
+                        </div>
+                    </div>
+                    <div class="form-row" style="margin-top:12px;">
+                        <div class="form-group">
+                            <label>Operación</label>
+                            <select name="operacion" id="form_operacion" style="width:100%; box-sizing:border-box; padding:10px; border:1px solid #ddd; border-radius:4px; background:white; font-size:0.95rem;">
+                                {% for valor, rotulo in operaciones.items() %}
+                                <option value="{{ valor }}">{{ rotulo }}</option>
+                                {% endfor %}
+                            </select>
+                            <small style="color:#7f8c8d; display:block; margin-top:4px;">
+                                <strong>Recepción</strong>: Recepciones ofrece estas ubicaciones para recibir mercadería.
+                                <strong>Salida</strong>: Transportes las ofrece como muelle de salida.
+                            </small>
                         </div>
                     </div>
                     <div class="form-row" style="margin-top:12px;">

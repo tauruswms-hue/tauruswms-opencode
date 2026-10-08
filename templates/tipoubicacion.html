@@ -31,17 +31,26 @@
         <table id="tablaTipos" class="display cell-border hover stripe" style="width:100%">
             <thead>
                 <tr>
-                    <th>ID</th>
                     <th>Descripción</th>
+                    <th title="Para qué se usan las ubicaciones de este tipo">Operación</th>
                     <th style="text-align:center;">Soporta Picking</th>
+                    <th style="text-align:center;">Ubicaciones</th>
                     <th>Acciones</th>
                 </tr>
             </thead>
             <tbody>
                 {% for t in tipos %}
                 <tr>
-                    <td>{{ t.id }}</td>
                     <td><strong>{{ t.descripcion }}</strong></td>
+                    <td>
+                        {% if t.operacion == 'R' %}
+                            <span title="Recepciones ofrece estas ubicaciones para recibir mercadería" style="background:#2980b9; color:white; padding:2px 8px; border-radius:10px; font-size:0.8rem;">Recepción</span>
+                        {% elif t.operacion == 'S' %}
+                            <span title="Transportes ofrece estas ubicaciones como muelle de salida" style="background:#8e44ad; color:white; padding:2px 8px; border-radius:10px; font-size:0.8rem;">Salida (despacho)</span>
+                        {% else %}
+                            <span style="color:#888;">Almacenamiento</span>
+                        {% endif %}
+                    </td>
                     <td style="text-align:center;">
                         {% if t.soporte_picking %}
                             <span style="color:#27ae60; font-size:1.1rem;" title="Sí"><i class="fas fa-check-circle"></i></span>
@@ -49,12 +58,13 @@
                             <span style="color:#bdc3c7; font-size:1.1rem;" title="No"><i class="fas fa-times-circle"></i></span>
                         {% endif %}
                     </td>
+                    <td style="text-align:center;" title="Ubicaciones de este tipo">{{ t.ubicaciones }}</td>
                     <td class="actions-cell">
-                        <button class="btn-icon edit" onclick='editTipo({{ t | tojson }})'>
+                        <button class="btn-icon edit" title="Editar" onclick='editTipo({{ t | tojson }})'>
                             <i class="fas fa-edit"></i>
                         </button>
-                        <form method="POST" action="{{ url_for('tipoubicacion.eliminar', id=t.id) }}" style="display:inline;" onsubmit="return confirm('¿Eliminar este tipo?')">
-                            <button type="submit" class="btn-icon delete"><i class="fas fa-trash"></i></button>
+                        <form method="POST" action="{{ url_for('tipoubicacion.eliminar', id=t.id) }}" style="display:inline;" onsubmit="return confirm('¿Eliminar este tipo?\n\nSolo se puede eliminar si ninguna ubicación lo usa.')">
+                            <button type="submit" class="btn-icon delete" title="Eliminar"><i class="fas fa-trash"></i></button>
                         </form>
                     </td>
                 </tr>

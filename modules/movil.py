@@ -20,7 +20,6 @@ from modules.sql_dialect import (
     execute_insert,
     group_concat,
     limit_sql,
-    quote,
     substring_index,
     upsert_incremental_sql,
 )
@@ -100,13 +99,13 @@ def recepcion_listar():
             )
             proveedores = cursor.fetchall()
 
-            cursor.execute(f"""
+            cursor.execute("""
                 SELECT u.id, u.codigo, u.descipcion AS nombre
                 FROM ubicaciones u
                 JOIN tipoubicacion t ON u.tipoubicacion = t.id
-                WHERE t.{quote('descripcion')} LIKE %s AND u.activo = 1 AND (%s IS NULL OR u.tenant_id = %s)
+                WHERE t.operacion = 'R' AND u.activo = 1 AND (%s IS NULL OR u.tenant_id = %s)
                 ORDER BY u.codigo
-            """, ('%Recepci%', tenant_id, tenant_id))
+            """, (tenant_id, tenant_id))
             ubicaciones = cursor.fetchall()
     finally:
         conn.close()
