@@ -187,8 +187,10 @@ $(document).ready(function() {
 function agregarFilaProveedor(idProv = '', codigoProv = '', esHabitual = 0) {
     let options = '<option value="">Seleccionar...</option>';
     listaProveedoresDB.forEach(p => {
+        // Un proveedor inactivo no se ofrece, salvo en la fila del material que ya lo tiene
+        if (!p.activo && p.id != idProv) return;
         let selected = (p.id == idProv) ? 'selected' : '';
-        options += `<option value="${esc(p.id)}" ${selected}>${esc(p.razonsocial)}</option>`;
+        options += `<option value="${esc(p.id)}" ${selected}>${esc(p.razonsocial)}${p.activo ? '' : ' — inactivo'}</option>`;
     });
 
     let checked = esHabitual ? 'checked' : '';

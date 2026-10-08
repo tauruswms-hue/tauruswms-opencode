@@ -36,24 +36,36 @@
                     <th>CUIT</th>
                     <th>Teléfono</th>
                     <th>Email</th>
+                    <th>Materiales</th>
+                    <th>Estado</th>
                     <th>Acciones</th>
                 </tr>
             </thead>
             <tbody>
                 {% for p in proveedores %}
-                <tr>
+                <tr{% if not p.activo %} style="color:#999;"{% endif %}>
                     <td><code>{{ p.codigo }}</code></td>
                     <td><strong>{{ p.razonsocial }}</strong></td>
                     <td>{{ p.cuit or '-' }}</td>
                     <td>{{ p.telefono or '-' }}</td>
                     <td>{{ p.email or '-' }}</td>
+                    <td title="Materiales que lo tienen asignado">{{ p.materiales }}</td>
+                    <td>
+                        {% if p.activo %}
+                            <span style="background:#27ae60; color:white; padding:1px 7px; border-radius:10px; font-size:0.75rem;">Activo</span>
+                        {% else %}
+                            <span title="Proveedor inactivo: no se ofrece para recepciones ni materiales nuevos" style="background:#95a5a6; color:white; padding:1px 7px; border-radius:10px; font-size:0.75rem;">Inactivo</span>
+                        {% endif %}
+                    </td>
                     <td class="actions-cell">
-                        <button class="btn-icon edit" onclick='editProveedor({{ p | tojson }})'>
+                        <button class="btn-icon edit" title="Editar" onclick='editProveedor({{ p | tojson }})'>
                             <i class="fas fa-edit"></i>
                         </button>
-                        <form method="POST" action="{{ url_for('proveedores.eliminar', id=p.id) }}" style="display:inline;" onsubmit="return confirm('¿Inactivar proveedor?')">
-                            <button type="submit" class="btn-icon delete"><i class="fas fa-trash"></i></button>
+                        {% if p.activo %}
+                        <form method="POST" action="{{ url_for('proveedores.eliminar', id=p.id) }}" style="display:inline;" onsubmit="return confirm('¿Inactivar este proveedor?\n\nNo se borra: deja de ofrecerse para recepciones y materiales nuevos, y se puede reactivar desde su edición.')">
+                            <button type="submit" class="btn-icon delete" title="Inactivar"><i class="fas fa-trash"></i></button>
                         </form>
+                        {% endif %}
                     </td>
                 </tr>
                 {% endfor %}
@@ -75,6 +87,7 @@
     function openModal() {
         $('#formProveedor')[0].reset();
         $('#form_id').val('');
+        $('#form_activo').val('1');   // un proveedor nuevo se propone Activo
         $('#modalTitle').text('Nuevo Proveedor');
         contarDireccion();
         $('#modalProveedor').css('display', 'flex').hide().fadeIn(150);
@@ -95,6 +108,7 @@
         $('#form_dir').val(data.direccion);
         $('#form_tel').val(data.telefono);
         $('#form_email').val(data.email);
+        $('#form_activo').val(data.activo ? '1' : '0');
         formatCuit(document.getElementById('form_cuit'));
         contarDireccion();
     }

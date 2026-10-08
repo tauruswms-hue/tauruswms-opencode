@@ -12,7 +12,7 @@
                     <div class="form-row">
                         <div class="form-group">
                             <label>Código Proveedor *</label>
-                            <input type="text" name="codigo" id="form_codigo" required maxlength="20">
+                            <input type="text" name="codigo" id="form_codigo" required maxlength="{{ largos.codigo }}">
                         </div>
                         <div class="form-group">
                             <label>CUIT</label>
@@ -23,17 +23,24 @@
                     <div class="form-row">
                         <div class="form-group">
                             <label>Razón Social *</label>
-                            <input type="text" name="razonsocial" id="form_razon" required maxlength="50">
+                            <input type="text" name="razonsocial" id="form_razon" required maxlength="{{ largos.razonsocial }}">
+                        </div>
+                        <div class="form-group" style="max-width:180px;">
+                            <label>Estado</label>
+                            <select name="activo" id="form_activo" style="width:100%; box-sizing:border-box; padding:10px; border:1px solid #ddd; border-radius:4px; background:white; font-size:0.95rem;">
+                                <option value="1">Activo</option>
+                                <option value="0">Inactivo</option>
+                            </select>
                         </div>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
                             <label>Email</label>
-                            <input type="email" name="email" id="form_email" maxlength="100">
+                            <input type="email" name="email" id="form_email" maxlength="{{ largos.email }}">
                         </div>
                         <div class="form-group">
                             <label>Teléfono</label>
-                            <input type="text" name="telefono" id="form_tel" maxlength="50">
+                            <input type="text" name="telefono" id="form_tel" maxlength="{{ largos.telefono }}">
                         </div>
                     </div>
                     <div class="form-group">

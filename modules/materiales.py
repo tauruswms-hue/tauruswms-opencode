@@ -336,7 +336,8 @@ def listar():
             cursor.execute("SELECT * FROM categorias WHERE (%s IS NULL OR tenant_id = %s) ORDER BY nombre", (tenant_id, tenant_id))
             categorias = cursor.fetchall()
 
-            cursor.execute("SELECT id, razonsocial FROM proveedores WHERE activo = 1 AND (%s IS NULL OR tenant_id = %s)", (tenant_id, tenant_id))
+            # Todos: el formulario ofrece los activos, y el inactivo solo en la fila del material que ya lo tiene
+            cursor.execute("SELECT id, razonsocial, activo FROM proveedores WHERE (%s IS NULL OR tenant_id = %s) ORDER BY razonsocial", (tenant_id, tenant_id))
             proveedores = cursor.fetchall()
 
             # Todas: el formulario oculta las inactivas, salvo la que el material ya tiene
