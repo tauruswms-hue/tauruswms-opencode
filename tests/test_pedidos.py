@@ -253,14 +253,16 @@ def test_anular(logged_client, wms, datos):
     assert anular(trabajo) == ([f'Pedido {trabajo["nro_pedido"]} anulado.'], 'Anulado')
 
     _estado(wms, con_omc['id_pedido'], 'Trabajo')
+    codigo = _codigo()
+    id_ubicacion = _alta(wms, """INSERT INTO ubicaciones (codigo, capacidad_maxima, ocupado, orden_picking, activo, tenant_id)
+                               VALUES (%s, 0, 0, 0, 1, %s)""", (codigo, datos['tenant']), 'ubicaciones', 'id', 'codigo', codigo)
     cur = wms.cursor()
     cur.execute("""INSERT INTO omc (numero, id_ubicacion_destino, id_pedido, estado, usuario_creacion, tenant_id)
-                   SELECT %s, MIN(id), %s, 'Pendiente', 'test', %s FROM ubicaciones""",
-                (_codigo(), con_omc['id_pedido'], datos['tenant']))
+                   VALUES (%s, %s, %s, 'Pendiente', 'test', %s)""",
+                (_codigo(), id_ubicacion, con_omc['id_pedido'], datos['tenant']))
     wms.commit()
-    if cur.rowcount:                                              # hace falta alguna ubicación para la OMC
-        mensajes, estado = anular(con_omc)
-        assert 'tiene una OMC pendiente o confirmada' in mensajes[0] and estado == 'Trabajo'
+    mensajes, estado = anular(con_omc)
+    assert 'tiene una OMC pendiente o confirmada' in mensajes[0] and estado == 'Trabajo'
 
     _estado(wms, despachado['id_pedido'], 'Despachado')
     mensajes, estado = anular(despachado)
