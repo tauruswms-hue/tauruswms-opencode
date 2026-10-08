@@ -100,6 +100,8 @@
         {
             titulo: 'Operación',
             paginas: [
+                { href: 'operacion/instalacion-lan.html', titulo: 'Instalación de pruebas en la LAN', estado: 'completa',
+                  desc: 'Paso a paso en un servidor Windows de la red, para las pruebas de los key users.' },
                 { href: 'operacion/produccion.html', titulo: 'Puesta en producción', estado: 'borrador',
                   desc: 'Lista de verificación antes de salir a producción.' }
             ]

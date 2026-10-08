@@ -1,0 +1,322 @@
+================================================================================
+TAURUS WMS - INSTALACION EN UN SERVIDOR WINDOWS DE LA LAN
+Entorno de pruebas para key users
+================================================================================
+
+Esta instalacion es para pruebas dentro de la red interna: sin proxy ni HTTPS,
+con las dos aplicaciones escuchando directo en la red.
+
+  - WMS .............. http://<servidor>:5000
+  - Panel admin ...... http://<servidor>:5001/admin
+
+IMPORTANTE
+
+  - Se usa APP_ENV=development. Con APP_ENV=production la sesion solo funciona
+    por HTTPS y por HTTP nadie podria iniciar sesion. El costo es que las
+    contrasenas viajan sin cifrar dentro de la LAN: aceptable para pruebas, no
+    para produccion.
+
+  - NO arrancar con "python app.py" ni "python admin.py". Ese modo levanta el
+    depurador de Flask abierto a la red y cualquiera en la LAN podria ejecutar
+    codigo en el servidor. Se usa waitress (paso 7).
+
+  - NO ejecutar scripts\crear_tablas.py ni scripts\crear_datos_ejemplo.py:
+    son de desarrollo.
+
+Todos los comandos se ejecutan en PowerShell abierto como Administrador.
+
+
+--------------------------------------------------------------------------------
+1. INSTALAR LO NECESARIO
+--------------------------------------------------------------------------------
+
+  1.1  Python 3.12 de 64 bits.
+       Durante la instalacion marcar "Install for all users" y
+       "Add Python to PATH".
+
+  1.2  MySQL Server 8, instalado como servicio de Windows.
+       Anotar la contrasena de root.
+
+  1.3  Git para Windows.
+
+  1.4  NSSM (sirve para dejar las aplicaciones como servicios de Windows).
+       Descomprimirlo y dejar nssm.exe (carpeta win64) en C:\herramientas\
+       Agregar C:\herramientas al PATH, o escribir la ruta completa al usarlo.
+
+  1.5  Crear las carpetas:
+
+         mkdir C:\taurus
+         mkdir C:\taurus\logs
+
+
+--------------------------------------------------------------------------------
+2. COPIAR LA APLICACION
+--------------------------------------------------------------------------------
+
+         git clone https://github.com/tauruswms-hue/tauruswms-opencode.git C:\taurus\app
+         cd C:\taurus\app
+         python -m venv .venv
+         .venv\Scripts\pip install -r requirements.txt waitress
+
+  "waitress" no esta en requirements.txt, por eso se agrega en el comando.
+
+
+--------------------------------------------------------------------------------
+3. CREAR LAS BASES DE DATOS
+--------------------------------------------------------------------------------
+
+  3.1  Crear las tres bases con sus tablas y datos iniciales. Desde
+       C:\taurus\app, en una consola CMD (en PowerShell el "<" no funciona;
+       abrir cmd.exe para estos tres comandos):
+
+         mysql -u root -p < docs\migrations\create_admin_mysql.sql
+         mysql -u root -p < docs\migrations\create_wms_mysql.sql
+         mysql -u root -p < docs\migrations\create_intercambio_mysql.sql
+
+       Si "mysql" no se reconoce, usar la ruta completa, por ejemplo:
+         "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe"
+
+  3.2  Crear el usuario de la aplicacion. Entrar con "mysql -u root -p" y
+       ejecutar (cambiar UNA_CLAVE_PROPIA por una contrasena propia):
+
+         CREATE USER 'taurus'@'localhost' IDENTIFIED BY 'UNA_CLAVE_PROPIA';
+         GRANT ALL PRIVILEGES ON taurus_admin.* TO 'taurus'@'localhost';
+         GRANT ALL PRIVILEGES ON taurus_wms.* TO 'taurus'@'localhost';
+         GRANT ALL PRIVILEGES ON taurus_intercambio.* TO 'taurus'@'localhost';
+         FLUSH PRIVILEGES;
+         EXIT;
+
+
+--------------------------------------------------------------------------------
+4. CONFIGURAR
+--------------------------------------------------------------------------------
+
+  4.1  Crear el archivo C:\taurus\app\conexiones.json con este contenido
+       (poner la contrasena del paso 3.2 en los tres lugares):
+
+         {
+           "admin": {
+             "engine": "mysql",
+             "host": "localhost",
+             "port": 3306,
+             "user": "taurus",
+             "password": "UNA_CLAVE_PROPIA",
+             "database": "taurus_admin",
+             "charset": "utf8mb4"
+           },
+           "wms": {
+             "engine": "mysql",
+             "host": "localhost",
+             "port": 3306,
+             "user": "taurus",
+             "password": "UNA_CLAVE_PROPIA",
+             "database": "taurus_wms",
+             "charset": "utf8mb4"
+           },
+           "intercambio": {
+             "engine": "mysql",
+             "host": "localhost",
+             "port": 3306,
+             "user": "taurus",
+             "password": "UNA_CLAVE_PROPIA",
+             "database": "taurus_intercambio",
+             "charset": "utf8mb4"
+           }
+         }
+
+  4.2  Generar tres secretos. Ejecutar este comando tres veces y guardar
+       cada resultado:
+
+         .venv\Scripts\python -c "import secrets; print(secrets.token_hex(32))"
+
+  4.3  Crear el archivo C:\taurus\app\.env con este contenido (un secreto
+       distinto en cada linea):
+
+         APP_ENV=development
+         SECRET_KEY=<secreto 1>
+         ADMIN_SECRET_KEY=<secreto 2>
+         SECRET_SALT=<secreto 3>
+
+
+--------------------------------------------------------------------------------
+5. REGISTRAR LAS MIGRACIONES
+--------------------------------------------------------------------------------
+
+  Las bases recien creadas ya tienen todo. Este paso marca las migraciones
+  como aplicadas, sin ejecutarlas, para que las proximas actualizaciones
+  apliquen solo lo nuevo.
+
+         cd C:\taurus\app
+         .venv\Scripts\python migrate.py --db admin --baseline
+         .venv\Scripts\python migrate.py --db wms --baseline
+         .venv\Scripts\python migrate.py --db intercambio --baseline
+
+
+--------------------------------------------------------------------------------
+6. CREAR EL SUPERADMIN DEL PANEL
+--------------------------------------------------------------------------------
+
+  Ejecutar:
+
+         C:\taurus\app\superusuario-dist\superusuario.exe
+
+  Toma la conexion de C:\taurus\app\conexiones.json. Desde su menu, crear el
+  usuario SUPERADMIN (contrasena de 8 caracteres como minimo).
+
+  Este paso es obligatorio: con esta forma de arranque el panel no crea
+  ningun usuario por defecto.
+
+
+--------------------------------------------------------------------------------
+7. PROBAR EL ARRANQUE A MANO
+--------------------------------------------------------------------------------
+
+         cd C:\taurus\app
+         .venv\Scripts\waitress-serve --listen=0.0.0.0:5000 app:app
+
+  Abrir http://localhost:5000 en el servidor: tiene que aparecer el login.
+  Cortar con Ctrl+C y probar el panel:
+
+         .venv\Scripts\waitress-serve --listen=0.0.0.0:5001 admin:app
+
+  Abrir http://localhost:5001/admin y entrar con el SUPERADMIN.
+  Cortar con Ctrl+C.
+
+  Si alguno no arranca, el mensaje en la consola dice que corregir (lo mas
+  comun: un error en conexiones.json o la contrasena de la base).
+
+
+--------------------------------------------------------------------------------
+8. INSTALAR LAS DOS APLICACIONES COMO SERVICIOS
+--------------------------------------------------------------------------------
+
+  Asi arrancan solas cuando se reinicia el servidor.
+
+  WMS:
+
+         nssm install TaurusWMS C:\taurus\app\.venv\Scripts\waitress-serve.exe
+         nssm set TaurusWMS AppParameters "--listen=0.0.0.0:5000 --threads=8 app:app"
+         nssm set TaurusWMS AppDirectory C:\taurus\app
+         nssm set TaurusWMS AppStdout C:\taurus\logs\wms.log
+         nssm set TaurusWMS AppStderr C:\taurus\logs\wms.log
+         nssm set TaurusWMS AppRotateFiles 1
+         nssm set TaurusWMS AppRotateBytes 10485760
+         nssm start TaurusWMS
+
+  Panel admin:
+
+         nssm install TaurusAdmin C:\taurus\app\.venv\Scripts\waitress-serve.exe
+         nssm set TaurusAdmin AppParameters "--listen=0.0.0.0:5001 --threads=8 admin:app"
+         nssm set TaurusAdmin AppDirectory C:\taurus\app
+         nssm set TaurusAdmin AppStdout C:\taurus\logs\admin.log
+         nssm set TaurusAdmin AppStderr C:\taurus\logs\admin.log
+         nssm set TaurusAdmin AppRotateFiles 1
+         nssm set TaurusAdmin AppRotateBytes 10485760
+         nssm start TaurusAdmin
+
+  Si un servicio no arranca, el motivo queda en C:\taurus\logs\.
+
+  Comandos utiles:
+         nssm status TaurusWMS
+         nssm restart TaurusWMS
+         nssm stop TaurusWMS
+
+
+--------------------------------------------------------------------------------
+9. ABRIR EL FIREWALL PARA LA LAN
+--------------------------------------------------------------------------------
+
+         New-NetFirewallRule -DisplayName "Taurus WMS" -Direction Inbound -Protocol TCP -LocalPort 5000 -Profile Domain,Private -Action Allow
+         New-NetFirewallRule -DisplayName "Taurus Admin" -Direction Inbound -Protocol TCP -LocalPort 5001 -Profile Domain,Private -Action Allow
+
+  Si el panel admin se va a usar solo desde el propio servidor, no crear la
+  segunda regla.
+
+  El puerto de MySQL (3306) no se abre.
+
+
+--------------------------------------------------------------------------------
+10. DEJARLO LISTO PARA LOS KEY USERS
+--------------------------------------------------------------------------------
+
+  10.1  Entrar a http://<servidor>:5001/admin con el SUPERADMIN.
+
+  10.2  Crear la empresa (tenant) de pruebas.
+
+  10.3  Crear un usuario del WMS por cada key user, con su rol.
+
+  10.4  Probar desde otra PC de la red: http://<servidor>:5000
+
+  10.5  Cargar los maestros desde las pantallas de importacion. Los CSV de la
+        carpeta Importaciones\ sirven de modelo; el orden de carga esta en
+        Importaciones\LEEME.txt.
+
+  <servidor> es el nombre o la IP del servidor en la red.
+
+
+--------------------------------------------------------------------------------
+11. ACTUALIZAR DURANTE LAS PRUEBAS
+--------------------------------------------------------------------------------
+
+  Cada vez que haya correcciones para probar.
+
+  11.1  Copia de seguridad de las bases (en CMD):
+
+         mysqldump -u root -p --single-transaction --databases taurus_admin taurus_wms taurus_intercambio > C:\taurus\respaldo_AAAAMMDD.sql
+
+  11.2  Actualizar (en PowerShell como Administrador):
+
+         nssm stop TaurusWMS
+         nssm stop TaurusAdmin
+         cd C:\taurus\app
+         git pull
+         .venv\Scripts\pip install -r requirements.txt
+         .venv\Scripts\python migrate.py --db admin
+         .venv\Scripts\python migrate.py --db wms
+         .venv\Scripts\python migrate.py --db intercambio
+         nssm start TaurusWMS
+         nssm start TaurusAdmin
+
+  Para restaurar una copia si algo sale mal (en CMD):
+
+         mysql -u root -p < C:\taurus\respaldo_AAAAMMDD.sql
+
+
+--------------------------------------------------------------------------------
+12. SI SE USA EL INTERCAMBIO CON OTRO SISTEMA (OPCIONAL)
+--------------------------------------------------------------------------------
+
+  Crear una tarea en el Programador de tareas de Windows:
+
+         Programa ......... C:\taurus\app\.venv\Scripts\python.exe
+         Argumentos ....... procesar_intercambio.py
+         Iniciar en ....... C:\taurus\app
+         Repetir .......... cada 5 minutos (o lo que haga falta)
+
+  Tambien se puede disparar a mano desde la pantalla Intercambio del WMS.
+
+
+--------------------------------------------------------------------------------
+PROBLEMAS FRECUENTES
+--------------------------------------------------------------------------------
+
+  - Desde otra PC no abre la pagina: revisar el firewall (paso 9) y que el
+    servicio este corriendo (nssm status TaurusWMS).
+
+  - El login vuelve siempre a la pantalla de ingreso: revisar que el .env
+    diga APP_ENV=development. Con "production" la sesion exige HTTPS.
+
+  - Error de conexion a la base: revisar usuario, contrasena y nombres de
+    base en conexiones.json. El archivo se relee solo cada 30 segundos, no
+    hace falta reiniciar los servicios.
+
+  - Cambie el .env y no toma el cambio: reiniciar los dos servicios.
+
+
+--------------------------------------------------------------------------------
+PARA PASAR A PRODUCCION REAL
+--------------------------------------------------------------------------------
+
+  Esta instalacion NO es de produccion. Al terminar las pruebas hace falta:
+  APP_ENV=production, HTTPS delante de las dos aplicaciones, una cuenta de
+  Windows sin privilegios para los servicios y bases limpias.
