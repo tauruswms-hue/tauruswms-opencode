@@ -1,4 +1,4 @@
-"""Clientes: nombre de fantasía, sitio web, mail principal, domicilio y estado."""
+"""Clientes: datos, validaciones, estado, contactos, ruta y transporte, importación y exportación."""
 
 import io
 import uuid
@@ -23,8 +23,13 @@ def wms(usuario_wms):
     yield conn
     cur = conn.cursor()
     # El CLI001 de la plantilla se borra solo si es el de ejemplo, por si existe un cliente real con ese código
+    cur.execute("DELETE FROM pedidos_cabecera WHERE nro_pedido LIKE %s", (PREFIJO + '%',))
     cur.execute("DELETE FROM clientes WHERE codigo LIKE %s OR (codigo = 'CLI001' AND razonsocial = %s)",
                 (PREFIJO + '%', EJEMPLO))
+    cur.execute("DELETE FROM transporte_rutas WHERE id_transporte IN (SELECT id_transporte FROM transportes WHERE codigo LIKE %s)",
+                (PREFIJO + '%',))
+    cur.execute("DELETE FROM transportes WHERE codigo LIKE %s", (PREFIJO + '%',))
+    cur.execute("DELETE FROM rutas WHERE nombre_ruta LIKE %s", (PREFIJO + '%',))
     conn.commit()
     conn.close()
 
@@ -270,3 +275,201 @@ def test_la_plantilla_se_puede_importar(logged_client, wms, formato):
     cur = wms.cursor()
     cur.execute("DELETE FROM clientes WHERE codigo = 'CLI001' AND razonsocial = %s", (EJEMPLO,))
     wms.commit()
+
+
+# --- Validaciones del servidor, ruta y transporte, inactivación ---
+
+def _importar(client, contenido):
+    r = client.post('/clientes/importar', data={
+        'archivo': (io.BytesIO(contenido.encode('utf-8')), 'clientes.csv')}, content_type='multipart/form-data')
+    assert r.status_code == 200, r.get_data(as_text=True)
+    return r.get_json()
+
+
+@pytest.fixture
+def logistica(wms, usuario_wms):
+    """Una ruta y un transporte de la empresa de prueba, y una ruta de otra empresa."""
+    tenant = usuario_wms['tenant_id']
+    nombre, ajena, codigo = 'Ruta ' + _codigo(), 'Ajena ' + _codigo(), _codigo()
+    cur = wms.cursor()
+    cur.execute("INSERT INTO rutas (nombre_ruta, tenant_id, activo) VALUES (%s, %s, 1)", (PREFIJO + nombre, tenant))
+    cur.execute("INSERT INTO rutas (nombre_ruta, tenant_id, activo) VALUES (%s, %s, 1)", (PREFIJO + ajena, tenant + 100000))
+    cur.execute("INSERT INTO transportes (codigo, razonsocial, tenant_id, activo) VALUES (%s, 'Transporte de prueba', %s, 1)",
+                (codigo, tenant))
+    wms.commit()
+    ids = {}
+    for clave, valor in (('ruta', PREFIJO + nombre), ('ruta_ajena', PREFIJO + ajena)):
+        cur.execute("SELECT id_ruta FROM rutas WHERE nombre_ruta = %s", (valor,))
+        ids[clave] = cur.fetchone()['id_ruta']
+    cur.execute("SELECT id_transporte FROM transportes WHERE codigo = %s", (codigo,))
+    return {**ids, 'transporte': cur.fetchone()['id_transporte'], 'ruta_nombre': PREFIJO + nombre,
+            'transporte_codigo': codigo}
+
+
+@requires_db
+def test_datos_sin_espacios_en_los_extremos(logged_client, wms):
+    codigo = _codigo()
+    assert _guardar(logged_client, codigo=f'  {codigo}  ', razonsocial='  Uno S.A.  ', localidad='  Rosario  ',
+                    provincia='  Santa Fe  ', telefono='  0341 1  ') == ['Cliente guardado correctamente']
+    c = _cliente(wms, codigo)
+    assert (c['codigo'], c['razonsocial'], c['localidad'], c['provincia'], c['telefono']) == (
+        codigo, 'Uno S.A.', 'Rosario', 'Santa Fe', '0341 1')
+
+
+@requires_db
+@pytest.mark.parametrize('datos, mensaje', [
+    ({'codigo': '   '}, 'Código: es obligatorio.'),
+    ({'razonsocial': '   '}, 'Razón Social: es obligatorio.'),
+    ({'codigo': PREFIJO + 'x' * 100}, 'Código: admite hasta 100 caracteres.'),
+    ({'razonsocial': 'x' * 201}, 'Razón Social: admite hasta 200 caracteres.'),
+    ({'localidad': 'x' * 101}, 'Localidad: admite hasta 100 caracteres.'),
+    ({'provincia': 'x' * 101}, 'Provincia: admite hasta 100 caracteres.'),
+    ({'telefono': '1' * 51}, 'Teléfono: admite hasta 50 caracteres.'),
+    ({'id_ruta': '999999999'}, 'Ruta de entrega: no existe.'),
+    ({'id_ruta': 'abc'}, 'Ruta de entrega: no existe.'),
+    ({'id_transporte_predeterminado': '999999999'}, 'Transporte habitual: no existe.'),
+    ({'id_cliente': 'abc'}, 'El cliente que se intenta modificar no existe.'),
+    ({'id_cliente': '999999999'}, 'El cliente que se intenta modificar no existe.'),
+])
+def test_el_servidor_valida_lo_que_antes_rechazaba_la_base(logged_client, wms, datos, mensaje):
+    """Antes se guardaba tal cual o salía el error de la base (Data too long, foreign key constraint fails)."""
+    codigo = _codigo()
+    assert _guardar(logged_client, **{'codigo': codigo, **datos}) == [mensaje]
+    assert _cliente(wms, codigo) is None
+
+
+@requires_db
+def test_codigo_repetido_se_rechaza(logged_client, wms):
+    codigo, otro = _codigo(), _codigo()
+    _guardar(logged_client, codigo=codigo)
+    _guardar(logged_client, codigo=otro)
+    assert _guardar(logged_client, codigo=f' {codigo} ') == [f'Ya existe un cliente con el código "{codigo}".']
+    assert _guardar(logged_client, id_cliente=_cliente(wms, otro)['id_cliente'], codigo=codigo) == [
+        f'Ya existe un cliente con el código "{codigo}".']
+    # Guardar el mismo cliente con su propio código sí se puede
+    assert _guardar(logged_client, id_cliente=_cliente(wms, codigo)['id_cliente'], codigo=codigo,
+                    razonsocial='Renombrado') == ['Cliente guardado correctamente']
+
+
+@requires_db
+def test_ruta_y_transporte_tienen_que_ser_de_la_empresa(logged_client, wms, logistica):
+    codigo, otro = _codigo(), _codigo()
+    assert _guardar(logged_client, codigo=codigo, id_ruta=logistica['ruta'],
+                    id_transporte_predeterminado=logistica['transporte']) == ['Cliente guardado correctamente']
+    c = _cliente(wms, codigo)
+    assert (c['id_ruta'], c['id_transporte_predeterminado']) == (logistica['ruta'], logistica['transporte'])
+    # Una ruta de otra empresa no se puede asignar: antes quedaba guardada
+    assert _guardar(logged_client, codigo=otro, id_ruta=logistica['ruta_ajena']) == ['Ruta de entrega: no existe.']
+    assert _cliente(wms, otro) is None
+
+
+@requires_db
+def test_editar_sin_el_estado_lo_conserva(logged_client, wms):
+    codigo = _codigo()
+    _guardar(logged_client, codigo=codigo, activo='0')
+    cid = _cliente(wms, codigo)['id_cliente']
+    _guardar(logged_client, id_cliente=cid, codigo=codigo)
+    assert not _cliente(wms, codigo)['activo']
+    _guardar(logged_client, id_cliente=cid, codigo=codigo, activo='1')
+    _guardar(logged_client, id_cliente=cid, codigo=codigo)
+    assert _cliente(wms, codigo)['activo']
+
+
+@requires_db
+def test_inactivar(logged_client, wms, usuario_wms):
+    codigo = _codigo()
+    _guardar(logged_client, codigo=codigo, razonsocial=f'Razon {codigo}')
+    cid = _cliente(wms, codigo)['id_cliente']
+    cur = wms.cursor()
+    for estado in ('Pendiente', 'Despachado'):
+        cur.execute("INSERT INTO pedidos_cabecera (nro_pedido, id_cliente, fecha_pedido, estado, tenant_id) "
+                    "VALUES (%s, %s, CURRENT_DATE, %s, %s)", (_codigo(), cid, estado, usuario_wms['tenant_id']))
+    wms.commit()
+
+    logged_client.post(f'/clientes/eliminar/{cid}')
+    (mensaje,) = _flashes(logged_client)
+    assert 'quedó inactivo' in mensaje and 'Tiene 1 pedido sin despachar, que sigue su curso.' in mensaje
+    assert not _cliente(wms, codigo)['activo']
+    logged_client.post(f'/clientes/eliminar/{cid}')
+    assert _flashes(logged_client) == [f'El cliente "Razon {codigo}" ya estaba inactivo.']
+    logged_client.post('/clientes/eliminar/999999999')
+    assert _flashes(logged_client) == ['Cliente no encontrado.']
+
+    # En el listado: con sus pedidos y sin el botón de inactivar
+    html = logged_client.get('/clientes').get_data(as_text=True)
+    fila = html[html.index(f'<code>{codigo}</code>'):]
+    fila = fila[:fila.index('</tr>')]
+    assert '>2</td>' in fila and 'Inactivo</span>' in fila and '/clientes/eliminar/' not in fila
+
+
+@requires_db
+def test_importar_no_le_quita_la_ruta_a_un_cliente_existente(logged_client, wms, logistica):
+    """Un archivo sin las columnas de ruta y transporte (o vacías) dejaba al cliente sin ellas."""
+    codigo = _codigo()
+    _guardar(logged_client, codigo=codigo, id_ruta=logistica['ruta'], id_transporte_predeterminado=logistica['transporte'])
+
+    resultado = _importar(logged_client, f'codigo,razonsocial\n{codigo},Otro nombre\n')
+    assert (resultado['actualizados'], resultado['omitidos'], resultado['errores']) == (0, [codigo], [])
+    resultado = _importar(logged_client, f'codigo,razonsocial,id_ruta,id_transporte_predeterminado\n{codigo},X,,\n')
+    assert resultado['omitidos'] == [codigo]
+    c = _cliente(wms, codigo)
+    assert (c['id_ruta'], c['id_transporte_predeterminado']) == (logistica['ruta'], logistica['transporte'])
+    assert c['razonsocial'] == 'Cliente de prueba S.A.'           # el resto de los datos no se toca
+
+    # Con dato en una sola columna, cambia esa y conserva la otra
+    cur = wms.cursor()
+    cur.execute("UPDATE clientes SET id_ruta = NULL WHERE id_cliente = %s", (c['id_cliente'],))
+    wms.commit()
+    resultado = _importar(logged_client, f'codigo,razonsocial,id_ruta\n{codigo},X,{logistica["ruta_nombre"]}\n')
+    assert resultado['actualizados'] == 1
+    c = _cliente(wms, codigo)
+    assert (c['id_ruta'], c['id_transporte_predeterminado']) == (logistica['ruta'], logistica['transporte'])
+
+
+@requires_db
+def test_importar_con_ruta_o_transporte_inexistente_es_un_error(logged_client, wms, logistica):
+    bueno, por_id, sin_ruta, sin_transporte, ajena, largo = (_codigo() for _ in range(6))
+    resultado = _importar(logged_client, '\n'.join([
+        'codigo,razonsocial,localidad,id_ruta,id_transporte_predeterminado',
+        f'  {bueno}  ,  Uno  ,  Rosario  ,{logistica["ruta_nombre"]},{logistica["transporte_codigo"]}',
+        f'{por_id},Dos,,{logistica["ruta"]},{logistica["transporte"]}',
+        f'{sin_ruta},Tres,,No existe,',
+        f'{sin_transporte},Cuatro,,,NOEXISTE',
+        f'{ajena},Cinco,,{logistica["ruta_ajena"]},',
+        f'{largo},Seis,{"x" * 101},,',
+    ]))
+    assert resultado['insertados'] == 2
+    assert [(e['fila'], e['razon']) for e in resultado['errores']] == [
+        (3, 'Ruta "No existe": no existe.'),
+        (4, 'Transporte "NOEXISTE": no existe.'),
+        (5, f'Ruta "{logistica["ruta_ajena"]}": no existe.'),      # el ID de una ruta de otra empresa
+        (6, 'Localidad: admite hasta 100 caracteres.')]
+    c = _cliente(wms, bueno)
+    assert (c['razonsocial'], c['localidad'], c['id_ruta'], c['id_transporte_predeterminado']) == (
+        'Uno', 'Rosario', logistica['ruta'], logistica['transporte'])
+    assert _cliente(wms, por_id)['id_ruta'] == logistica['ruta']
+    assert _cliente(wms, sin_ruta) is None and _cliente(wms, ajena) is None
+
+
+@requires_db
+def test_la_exportacion_se_puede_importar_en_otro_servidor(logged_client, wms, logistica):
+    """La ruta sale por su nombre y el transporte por su código: los ID internos cambian de un servidor a otro."""
+    import csv as modulo_csv
+    codigo = _codigo()
+    _guardar(logged_client, codigo=codigo, id_ruta=logistica['ruta'], id_transporte_predeterminado=logistica['transporte'])
+    exportado = logged_client.get('/clientes/exportar/csv').get_data(as_text=True)
+    fila = next(f for f in modulo_csv.DictReader(io.StringIO(exportado.lstrip('\ufeff'))) if f['codigo'] == codigo)
+    assert (fila['id_ruta'], fila['nombre_ruta']) == (logistica['ruta_nombre'], logistica['ruta_nombre'])
+    assert (fila['id_transporte_predeterminado'], fila['nombre_transporte']) == (
+        logistica['transporte_codigo'], 'Transporte de prueba')
+
+    # Como si fuera otro servidor: se borra el cliente y se lo vuelve a cargar desde esa fila
+    cur = wms.cursor()
+    cur.execute("DELETE FROM clientes WHERE codigo = %s", (codigo,))
+    wms.commit()
+    encabezado = exportado.splitlines()[0].lstrip('\ufeff')
+    linea = next(x for x in exportado.splitlines() if x.startswith(codigo + ','))
+    resultado = _importar(logged_client, f'{encabezado}\n{linea}\n')
+    assert resultado['insertados'] == 1 and resultado['errores'] == []
+    c = _cliente(wms, codigo)
+    assert (c['id_ruta'], c['id_transporte_predeterminado']) == (logistica['ruta'], logistica['transporte'])

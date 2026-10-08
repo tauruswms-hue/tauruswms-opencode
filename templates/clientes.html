@@ -71,13 +71,14 @@
                     <th>Contactos</th>
                     <th>Ruta</th>
                     <th>Transporte</th>
+                    <th>Pedidos</th>
                     <th>Estado</th>
                     <th>Acciones</th>
                 </tr>
             </thead>
             <tbody>
                 {% for c in clientes %}
-                <tr>
+                <tr{% if not c.activo %} style="color:#999;"{% endif %}>
                     <td><code>{{ c.codigo }}</code></td>
                     <td><strong>{{ c.razonsocial }}</strong>
                         {% if c.nombre_fantasia %}<div title="Nombre de fantasía" style="font-size:0.8rem; color:#888;">{{ c.nombre_fantasia }}</div>{% endif %}
@@ -97,6 +98,7 @@
                     </td>
                     <td>{{ c.nombre_ruta or 'Sin asignar' }}</td>
                     <td>{{ c.nombre_transporte or '-' }}</td>
+                    <td style="text-align: center;" title="Pedidos cargados para este cliente">{{ c.pedidos }}</td>
                     <td style="text-align: center;">
                         {% if c.activo %}
                             <span style="background:#27ae60; color:white; padding:2px 8px; border-radius:10px; font-size:0.8rem;">Activo</span>
@@ -105,14 +107,16 @@
                         {% endif %}
                     </td>
                     <td class="actions-cell" style="text-align: center;">
-                        <button class="btn-icon edit" onclick='editCliente({{ c | tojson }})' style="color: #3498db; background: none; border: none; cursor: pointer; font-size: 1.1rem;">
+                        <button class="btn-icon edit" title="Editar" onclick='editCliente({{ c | tojson }})' style="color: #3498db; background: none; border: none; cursor: pointer; font-size: 1.1rem;">
                             <i class="fas fa-edit"></i>
                         </button>
-                        <form method="POST" action="{{ url_for('clientes.eliminar', id_cliente=c.id_cliente) }}" style="display:inline;" onsubmit="return confirm('¿Inactivar cliente?')">
-                            <button type="submit" class="btn-icon delete" style="color: #e74c3c; background: none; border: none; cursor: pointer; font-size: 1.1rem;">
+                        {% if c.activo %}
+                        <form method="POST" action="{{ url_for('clientes.eliminar', id_cliente=c.id_cliente) }}" style="display:inline;" onsubmit="return confirm('¿Inactivar este cliente?\n\nNo se borra: deja de ofrecerse al cargar pedidos y se puede reactivar desde su edición.')">
+                            <button type="submit" class="btn-icon delete" title="Inactivar" style="color: #e74c3c; background: none; border: none; cursor: pointer; font-size: 1.1rem;">
                                 <i class="fas fa-trash"></i>
                             </button>
                         </form>
+                        {% endif %}
                     </td>
                 </tr>
                 {% endfor %}
