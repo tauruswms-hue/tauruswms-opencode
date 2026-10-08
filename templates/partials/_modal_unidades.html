@@ -20,8 +20,8 @@
                             <input type="text" name="nombre" id="nombre" required maxlength="{{ largos.nombre }}">
                         </div>
                         <div class="form-group">
-                            <label>Símbolo *</label>
-                            <input type="text" name="simbolo" id="simbolo" required maxlength="{{ largos.simbolo }}">
+                            <label>Símbolo</label>
+                            <input type="text" name="simbolo" id="simbolo" maxlength="{{ largos.simbolo }}">
                         </div>
                     </div>
                 </div>
@@ -54,8 +54,12 @@
                         <small id="ayuda_unidad_base" style="color:#666; display:block; margin-bottom:8px;"></small>
                     </div>
                     <div class="form-row">
-                        <div class="form-group check-group">
-                            <label><input type="checkbox" name="activo" id="activo" checked> Unidad Activa</label>
+                        <div class="form-group">
+                            <label>Estado</label>
+                            <select name="activo" id="activo">
+                                <option value="1">Activa</option>
+                                <option value="0">Inactiva</option>
+                            </select>
                             <small style="color:#888; display:block;">Una unidad inactiva no se ofrece para materiales nuevos; los que ya la usan la conservan.</small>
                         </div>
                     </div>

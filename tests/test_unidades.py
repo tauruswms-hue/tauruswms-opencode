@@ -80,6 +80,13 @@ def test_codigo_repetido_se_rechaza(logged_client, wms):
     ({'tipo_magnitud': 'INVENTADA'}, 'Tipo de magnitud "INVENTADA" no válido. Usar: CANTIDAD, MASA, VOLUMEN, LONGITUD, TIEMPO.'),
     ({'conversion_a_base': '0'}, 'Conversión a base: tiene que ser mayor que cero.'),
     ({'conversion_a_base': 'abc'}, 'Conversión a base: "abc" no es un número válido.'),
+    ({'conversion_a_base': 'nan'}, 'Conversión a base: "nan" no es un número válido.'),
+    ({'conversion_a_base': 'inf'}, 'Conversión a base: "inf" no es un número válido.'),
+    # La columna guarda 4 decimales: 0,00001 quedaba guardado como 0
+    ({'conversion_a_base': '0.00001'}, 'Conversión a base: admite hasta 4 decimales.'),
+    ({'conversion_a_base': '1e9'}, 'Conversión a base: tiene que ser menor que 100.000.000.'),
+    ({'decimales_permitidos': '2.7'}, 'Decimales permitidos: "2.7" no es un número entero.'),
+    ({'decimales_permitidos': 'inf'}, 'Decimales permitidos: "inf" no es un número válido.'),
     ({'decimales_permitidos': '-1'}, 'Decimales permitidos: tiene que estar entre 0 y 4.'),
     ({'decimales_permitidos': '9'}, 'Decimales permitidos: tiene que estar entre 0 y 4.'),
     ({'nombre': 'x' * 101}, 'Nombre: admite hasta 100 caracteres.'),
@@ -144,9 +151,12 @@ def test_inactivar_y_reactivar(logged_client, wms, usuario_wms):
     logged_client.post(f'/unidades/eliminar/{uid}')
     assert 'ya estaba inactiva' in _flashes(logged_client)[0]
 
-    # Reactivar desde la edición (casilla "Unidad Activa" tildada); destildada, queda inactiva
-    _guardar(logged_client, id_unidad=uid, codigo=codigo)
+    # Reactivar desde la edición (Estado: Activa) y volver a inactivarla (Estado: Inactiva)
+    _guardar(logged_client, id_unidad=uid, codigo=codigo, activo='1')
     assert _unidades(wms, codigo)[0]['activo']
+    _guardar(logged_client, id_unidad=uid, codigo=codigo, activo='0')
+    assert not _unidades(wms, codigo)[0]['activo']
+    # Sin el dato del estado, se conserva el que tenía
     logged_client.post('/unidades/guardar', data={'id_unidad': uid, 'codigo': codigo, 'nombre': 'x'})
     assert not _unidades(wms, codigo)[0]['activo']
 
@@ -189,9 +199,9 @@ def test_la_plantilla_se_puede_importar_y_exportar(logged_client, wms):
         assert [(f['codigo'], f['tipo_magnitud']) for f in filas] == [('UND', 'CANTIDAD')]
     # La exportación incluye las inactivas, con su estado
     codigo = _codigo()
-    logged_client.post('/unidades/guardar', data={'codigo': codigo, 'nombre': 'Inactiva'})
+    logged_client.post('/unidades/guardar', data={'codigo': codigo, 'nombre': 'Inactiva', 'activo': '0'})
     exportado = logged_client.get('/unidades/exportar/csv').get_data(as_text=True)
-    assert codigo in exportado
+    assert f'{codigo},Inactiva,,CANTIDAD,1.0000,,0,0' in exportado
 
 
 # --- Unidad base: la unidad sobre la que se calculan múltiplos y submúltiplos ---
@@ -211,7 +221,7 @@ def test_unidad_base_y_submultiplo(logged_client, wms):
     assert u['unidad_base_referencia'] == metro and float(u['conversion_a_base']) == 0.001
 
     html = logged_client.get('/unidades').get_data(as_text=True)
-    assert '1 mm = 0.001 m' in html and '— (es base)' in html
+    assert '1 mm = 0,001 m' in html and '— (es base)' in html
     # El formulario es una lista desplegable; las opciones las arma el script con las unidades cargadas
     assert '<select name="unidad_base_referencia" id="unidad_base_referencia">' in html
     assert 'const unidadesCargadas = ' in html and f'"codigo": "{metro}"' in html
@@ -287,3 +297,121 @@ def test_importar_con_unidad_base(logged_client, wms):
     assert r.get_json()['insertados'] == 2
     assert _unidades(wms, por_simbolo)[0]['unidad_base_referencia'] == litro
     assert _unidades(wms, propia)[0]['unidad_base_referencia'] is None
+
+
+# --- Rangos, símbolo opcional, uso en materiales y orden de la importación ---
+
+def _material(conn, tenant, **columnas):
+    cur = conn.cursor()
+    codigo = _codigo()
+    campos = ', '.join(columnas)
+    cur.execute(f"INSERT INTO materiales (codigo, nombre, tenant_id, {campos}) VALUES (%s, 'Material', %s, {', '.join(['%s'] * len(columnas))})",
+                (codigo, tenant, *columnas.values()))
+    conn.commit()
+    cur.execute("SELECT id FROM materiales WHERE codigo = %s", (codigo,))
+    return cur.fetchone()['id']
+
+
+@requires_db
+def test_conversion_con_coma_y_equivalencia_sin_redondear(logged_client, wms):
+    base, milla = _codigo(), _codigo()
+    _guardar(logged_client, codigo=base, simbolo='zm', tipo_magnitud='LONGITUD')
+    assert _guardar(logged_client, codigo=milla, simbolo='zmi', tipo_magnitud='LONGITUD', unidad_base_referencia=base,
+                    conversion_a_base='1609,344', decimales_permitidos='2.0') == ['Unidad guardada correctamente']
+    (u,) = _unidades(wms, milla)
+    assert float(u['conversion_a_base']) == 1609.344 and u['decimales_permitidos'] == 2
+    # Antes se mostraba redondeada a 6 cifras (1609.34) y con punto
+    assert '1 zmi = 1609,344 zm' in logged_client.get('/unidades').get_data(as_text=True)
+
+
+def test_numero_para_mostrar():
+    from decimal import Decimal
+
+    from modules.unidades import numero_para_mostrar
+    assert [numero_para_mostrar(Decimal(v)) for v in ('0.0010', '1000.0000', '1234567.5000', '12.0000', '0.5000')] == [
+        '0,001', '1000', '1234567,5', '12', '0,5']
+
+
+@requires_db
+def test_simbolo_opcional(logged_client, wms):
+    """Sin símbolo, Materiales mostraba "Nombre (None)"."""
+    codigo = _codigo()
+    assert _guardar(logged_client, codigo=codigo, nombre=f'Nombre {codigo}', simbolo='  ') == ['Unidad guardada correctamente']
+    assert _unidades(wms, codigo)[0]['simbolo'] is None
+    assert 'name="simbolo" id="simbolo" maxlength' in logged_client.get('/unidades').get_data(as_text=True)   # sin required
+    html = logged_client.get('/materiales').get_data(as_text=True)
+    assert f'>Nombre {codigo}</option>' in html and '(None)' not in html
+
+
+@requires_db
+def test_listado_con_estado_y_materiales(logged_client, wms, usuario_wms):
+    codigo = _codigo()
+    _guardar(logged_client, codigo=codigo, tipo_magnitud='VOLUMEN')
+    uid = _unidades(wms, codigo)[0]['id_unidad']
+    _material(wms, usuario_wms['tenant_id'], unidad_medida_id=uid)
+    _material(wms, usuario_wms['tenant_id'], volumen=1, volumen_unidad_id=uid)
+    html = logged_client.get('/unidades').get_data(as_text=True)
+    fila = html[html.index(f'<strong>{codigo}</strong>'):]
+    fila = fila[:fila.index('<td class="actions-cell">')]
+    assert '>2</td>' in fila and 'Activa</span>' in fila        # los dos materiales: por unidad y por volumen
+    assert '<select name="activo" id="activo">' in html
+
+
+@requires_db
+def test_inactivar_cuenta_volumen_y_unidades_derivadas(logged_client, wms, usuario_wms):
+    base, derivada = _codigo(), _codigo()
+    _guardar(logged_client, codigo=base, tipo_magnitud='VOLUMEN')
+    _guardar(logged_client, codigo=derivada, tipo_magnitud='VOLUMEN', unidad_base_referencia=base, conversion_a_base='2')
+    uid = _unidades(wms, base)[0]['id_unidad']
+    _material(wms, usuario_wms['tenant_id'], volumen=1, volumen_unidad_id=uid)   # solo como unidad del volumen
+    logged_client.post(f'/unidades/eliminar/{uid}')
+    (mensaje,) = _flashes(logged_client)
+    assert 'La usa 1 material, que la conserva.' in mensaje
+    assert 'Es la unidad base de 1 unidad, que se sigue calculando sobre ella.' in mensaje
+
+
+@requires_db
+def test_no_cambia_de_magnitud_si_un_material_expresa_su_volumen_en_ella(logged_client, wms, usuario_wms):
+    codigo = _codigo()
+    _guardar(logged_client, codigo=codigo, tipo_magnitud='VOLUMEN')
+    uid = _unidades(wms, codigo)[0]['id_unidad']
+    assert _guardar(logged_client, id_unidad=uid, codigo=codigo, tipo_magnitud='MASA') == ['Unidad guardada correctamente']
+    _guardar(logged_client, id_unidad=uid, codigo=codigo, tipo_magnitud='VOLUMEN')   # sin materiales, se puede
+    _material(wms, usuario_wms['tenant_id'], volumen=1, volumen_unidad_id=uid)
+    assert _guardar(logged_client, id_unidad=uid, codigo=codigo, tipo_magnitud='MASA') == [
+        'No se puede cambiar la magnitud: 1 material expresa su volumen en esta unidad.']
+    assert _unidades(wms, codigo)[0]['tipo_magnitud'] == 'VOLUMEN'
+
+
+@requires_db
+def test_materiales_recibe_las_unidades_inactivas_marcadas(logged_client, wms):
+    """El formulario de materiales las oculta, salvo la que el material ya tiene."""
+    codigo = _codigo()
+    _guardar(logged_client, codigo=codigo, nombre=f'Nombre {codigo}', simbolo='zv', tipo_magnitud='VOLUMEN', activo='0')
+    uid = _unidades(wms, codigo)[0]['id_unidad']
+    html = logged_client.get('/materiales').get_data(as_text=True)
+    opcion = f'<option value="{uid}" data-inactiva="1">Nombre {codigo} (zv) — inactiva</option>'
+    assert html.count(opcion) == 2                               # en Unidad de medida y en Unidad del volumen
+
+
+@requires_db
+def test_importar_unidad_antes_que_su_base(logged_client, wms):
+    """La exportación ordenaba por nombre: "Centímetro" salía antes que "Metro" y no se podía reimportar."""
+    metro, centi, mili, huerfana = _codigo(), _codigo(), _codigo(), _codigo()
+    csv = ('codigo,nombre,simbolo,tipo_magnitud,conversion_a_base,unidad_base_referencia\n'
+           f'{mili},Mili,zmm,LONGITUD,0.1,{centi}\n'            # sobre una derivada, que también viene después
+           f'{centi},Centi,zcm,LONGITUD,0.01,{metro}\n'
+           f'{huerfana},Huérfana,zh,LONGITUD,2,NOEXISTE\n'
+           f'{metro},Metro,zm,LONGITUD,1,\n')
+    r = logged_client.post('/unidades/importar', data={
+        'archivo': (io.BytesIO(csv.encode('utf-8')), 'unidades.csv')}, content_type='multipart/form-data')
+    resultado = r.get_json()
+    assert resultado['insertados'] == 3 and resultado['omitidos'] == []
+    assert [(e['fila'], e['razon']) for e in resultado['errores']] == [
+        (3, 'Unidad base: no existe una unidad con el código "NOEXISTE".')]
+    assert _unidades(wms, mili)[0]['unidad_base_referencia'] == centi
+    assert _unidades(wms, centi)[0]['unidad_base_referencia'] == metro
+
+    # La exportación pone primero las unidades base
+    exportado = logged_client.get('/unidades/exportar/csv').get_data(as_text=True)
+    assert exportado.index(metro + ',') < exportado.index(centi + ',')

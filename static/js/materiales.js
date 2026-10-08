@@ -316,8 +316,19 @@ function mostrarCategoriasInactivas(idCategoriaDelMaterial) {
     });
 }
 
+// Lo mismo con las unidades inactivas: cada lista ofrece solo la que el material ya tiene
+function mostrarUnidadesInactivas(idUnidad, idUnidadVolumen) {
+    [['#form_unidad', idUnidad], ['#form_volumen_unidad', idUnidadVolumen]].forEach(function(lista) {
+        $(lista[0] + ' option[data-inactiva]').each(function() {
+            var oculta = this.value != lista[1];
+            $(this).prop('hidden', oculta).prop('disabled', oculta);
+        });
+    });
+}
+
 function openModal() {
     mostrarCategoriasInactivas(null);
+    mostrarUnidadesInactivas(null, null);
     $('#formMateriales')[0].reset();
     $('#form_id_material').val('');
     $('#form_peso_bruto').val('');
@@ -358,6 +369,7 @@ function editMaterial(data) {
     $('#form_codigo_alternativo').val(data.codigo_alternativo || data.codigo);
     $('#form_codigo_proveedor').val(data.codigo_proveedor || data.codigo);
     codigoPrevio = data.codigo;
+    mostrarUnidadesInactivas(data.unidad_medida_id, data.volumen_unidad_id);
     $('#form_volumen').val(numeroLimpio(data.volumen));
     $('#form_volumen_unidad').val(data.volumen_unidad_id || '');
     $('#form_imagen_ruta').val(data.imagen_ruta || '');

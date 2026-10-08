@@ -51,6 +51,8 @@
                     <th>Unidad Base</th>
                     <th>Equivalencia</th>
                     <th>Decimales</th>
+                    <th>Materiales</th>
+                    <th>Estado</th>
                     <th>Acciones</th>
                 </tr>
             </thead>
@@ -58,16 +60,20 @@
                 {% for u in unidades %}
                 <tr{% if not u.activo %} style="color:#999;"{% endif %}>
                     <td><strong>{{ u.codigo }}</strong></td>
-                    <td>{{ u.nombre }}
-                        {% if not u.activo %}
-                            <span title="Unidad inactiva: no se ofrece para materiales nuevos" style="background:#95a5a6; color:white; padding:1px 7px; border-radius:10px; font-size:0.75rem; margin-left:4px;">Inactiva</span>
-                        {% endif %}
-                    </td>
+                    <td>{{ u.nombre }}</td>
                     <td>{{ u.simbolo or '' }}</td>
                     <td>{{ magnitudes.get(u.tipo_magnitud, u.tipo_magnitud or '') }}</td>
                     <td>{% if u.unidad_base_referencia %}{{ u.unidad_base_referencia }}{% else %}<span style="color:#999;" title="Es una unidad base: los múltiplos y submúltiplos se calculan sobre ella">— (es base)</span>{% endif %}</td>
-                    <td>{% if u.unidad_base_referencia %}1 {{ u.simbolo or u.codigo }} = {{ '%g' | format(u.conversion_a_base | float) }} {{ u.base_simbolo }}{% endif %}</td>
+                    <td>{{ u.equivalencia }}</td>
                     <td>{{ u.decimales_permitidos }}</td>
+                    <td title="Materiales que la usan como unidad de medida o como unidad del volumen">{{ u.materiales }}</td>
+                    <td>
+                        {% if u.activo %}
+                            <span style="background:#27ae60; color:white; padding:1px 7px; border-radius:10px; font-size:0.75rem;">Activa</span>
+                        {% else %}
+                            <span title="Unidad inactiva: no se ofrece para materiales nuevos" style="background:#95a5a6; color:white; padding:1px 7px; border-radius:10px; font-size:0.75rem;">Inactiva</span>
+                        {% endif %}
+                    </td>
                     <td class="actions-cell">
                         <button class="btn-icon edit" onclick='editUnidad({{ u | tojson }})'>
                             <i class="fas fa-edit"></i>

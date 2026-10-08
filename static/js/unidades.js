@@ -42,7 +42,7 @@ function actualizarAyudaBase() {
     var simboloBase = unidadBase ? (unidadBase.simbolo || unidadBase.codigo) : base;
     var factor = parseFloat($conv.val());
     $('#ayuda_unidad_base').text('Conversión a base: cuántas unidades base equivalen a una de esta. ' +
-        (factor > 0 ? '1 ' + propia + ' = ' + factor + ' ' + simboloBase + '.' : '') +
+        (factor > 0 ? '1 ' + propia + ' = ' + String(factor).replace('.', ',') + ' ' + simboloBase + '.' : '') +
         ' Ejemplo: para milímetro con base metro, 0,001 (1000 mm = 1 m).');
 }
 
@@ -53,6 +53,7 @@ $(document).on('input', '#conversion_a_base, #simbolo, #codigo', actualizarAyuda
 function openModal() {
     $('#formUnidades')[0].reset();
     $('#form_id_unidad').val('');   // vacío = alta
+    $('#activo').val('1');          // una unidad nueva se propone Activa
     $('#modalTitle').text('Nueva Unidad');
     $('#codigo').prop('readonly', false).removeClass('readonly-input');
     cargarUnidadesBase('');
@@ -74,5 +75,5 @@ function editUnidad(data) {
     $('#conversion_a_base').val(data.conversion_a_base);
     cargarUnidadesBase(data.unidad_base_referencia || '');
     $('#decimales_permitidos').val(data.decimales_permitidos);
-    $('#activo').prop('checked', !!data.activo);
+    $('#activo').val(data.activo ? '1' : '0');
 }

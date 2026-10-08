@@ -339,27 +339,15 @@ def listar():
             cursor.execute("SELECT id, razonsocial FROM proveedores WHERE activo = 1 AND (%s IS NULL OR tenant_id = %s)", (tenant_id, tenant_id))
             proveedores = cursor.fetchall()
 
-            # Activas, más las inactivas que algún material ya usa (para no obligar a cambiarla al editarlo)
+            # Todas: el formulario oculta las inactivas, salvo la que el material ya tiene
             cursor.execute("""
-                SELECT id_unidad, codigo, nombre, simbolo, activo FROM unidades_medida
+                SELECT id_unidad, codigo, nombre, simbolo, tipo_magnitud, activo FROM unidades_medida
                 WHERE (%s IS NULL OR tenant_id = %s)
-                  AND (activo = 1 OR id_unidad IN (SELECT unidad_medida_id FROM materiales
-                                                   WHERE unidad_medida_id IS NOT NULL
-                                                     AND (%s IS NULL OR tenant_id = %s)))
                 ORDER BY nombre
-            """, (tenant_id, tenant_id, tenant_id, tenant_id))
+            """, (tenant_id, tenant_id))
             unidades = cursor.fetchall()
-
-            # Unidades en que se puede expresar el volumen: las de magnitud VOLUMEN (activas, o ya usadas)
-            cursor.execute("""
-                SELECT id_unidad, codigo, nombre, simbolo, activo FROM unidades_medida
-                WHERE (%s IS NULL OR tenant_id = %s) AND UPPER(tipo_magnitud) = 'VOLUMEN'
-                  AND (activo = 1 OR id_unidad IN (SELECT volumen_unidad_id FROM materiales
-                                                   WHERE volumen_unidad_id IS NOT NULL
-                                                     AND (%s IS NULL OR tenant_id = %s)))
-                ORDER BY nombre
-            """, (tenant_id, tenant_id, tenant_id, tenant_id))
-            unidades_volumen = cursor.fetchall()
+            # Unidades en que se puede expresar el volumen: las de magnitud VOLUMEN
+            unidades_volumen = [u for u in unidades if str(u['tipo_magnitud'] or '').upper() == 'VOLUMEN']
 
             cursor.execute("SELECT mp.* FROM material_proveedor mp WHERE %s IS NULL OR mp.tenant_id = %s", (tenant_id, tenant_id))
             relaciones = cursor.fetchall()
