@@ -405,3 +405,22 @@ def test_importar(logged_client, wms, datos):
                str(r['fecha_vencimiento'] or '')) for r in cur.fetchall()]
     assert lineas == [(datos['material'], 'UNICO', 100.0, 0.0, 'libre venta', ''),
                       (datos['material_lote'], 'L-1', 12.5, 0.0, 'calidad', '2027-06-30')]
+
+
+# --- Los estados se guardan como los define el esquema ---
+
+def test_los_enum_de_mysql_conservan_sus_valores():
+    """El generador pasaba los valores a mayúsculas ('ABIERTA'): la base devolvía un texto que las
+    pantallas, que comparan con 'Abierta', no reconocían."""
+    from modules.schema_generator import ENGINE_MAP
+    traducir = ENGINE_MAP['mysql']().translate_type
+    assert traducir("enum('Abierta','Cerrada')") == "ENUM('Abierta','Cerrada')"
+    assert traducir("enum('Libre Venta','Mal Estado')") == "ENUM('Libre Venta','Mal Estado')"
+
+
+@requires_db
+def test_la_ficha_de_una_recepcion_abierta_ofrece_cerrarla(logged_client, wms, datos):
+    id_recepcion, _ = _nueva(logged_client, datos)
+    assert _recepcion(wms, id_recepcion)['estado'] == 'Abierta'          # tal cual, no 'ABIERTA'
+    html = logged_client.get(f'/recepciones/ver/{id_recepcion}').get_data(as_text=True)
+    assert f'/recepciones/cerrar/{id_recepcion}' in html and '>Abierta</span>' in html

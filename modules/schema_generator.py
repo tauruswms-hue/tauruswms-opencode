@@ -1420,7 +1420,10 @@ class MySQLEngine(DDLEngine):
         if t == "boolean":
             return "TINYINT(1)"
         if t.startswith("enum("):
-            return t.upper().replace("enum(", "ENUM(")
+            # Solo la palabra clave va en mayúsculas: los valores se dejan como están definidos.
+            # Pasarlos a mayúsculas ('ABIERTA') hacía que la base devolviera un texto distinto del que
+            # comparan las pantallas ('Abierta'), y en MySQL los estados no se reconocían.
+            return "ENUM(" + t[len("enum("):]
         return t
 
     def on_conflict_ignore(self):
