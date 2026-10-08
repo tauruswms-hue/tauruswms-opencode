@@ -633,7 +633,7 @@ CREATE TABLE [recepciones_cabecera] (
     CONSTRAINT [fk_recepciones_cabecera_id_ubicacion_recep] FOREIGN KEY ([id_ubicacion_recep]) REFERENCES [ubicaciones] ([id]) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT [fk_recepciones_cabecera_id_ubicacion_destino] FOREIGN KEY ([id_ubicacion_destino]) REFERENCES [ubicaciones] ([id]) ON DELETE RESTRICT ON UPDATE CASCADE
 );
-CREATE UNIQUE INDEX [uq_recepcion_numero] ON [recepciones_cabecera] ([numero]);
+CREATE UNIQUE INDEX [uk_recepciones_numero_tenant] ON [recepciones_cabecera] ([numero], [tenant_id]);
 CREATE INDEX [idx_rec_proveedor] ON [recepciones_cabecera] ([id_proveedor]);
 CREATE INDEX [idx_rec_estado] ON [recepciones_cabecera] ([estado]);
 CREATE INDEX [idx_rec_contenedor] ON [recepciones_cabecera] ([id_contenedor]);
@@ -686,7 +686,7 @@ CREATE TABLE [pedidos_cabecera] (
     CONSTRAINT [fk_pedidos_cabecera_id_ruta] FOREIGN KEY ([id_ruta]) REFERENCES [rutas] ([id_ruta]) ON DELETE SET NULL ON UPDATE CASCADE,
     CONSTRAINT [fk_pedidos_cabecera_id_transporte] FOREIGN KEY ([id_transporte]) REFERENCES [transportes] ([id_transporte]) ON DELETE SET NULL ON UPDATE CASCADE
 );
-CREATE UNIQUE INDEX [uq_pedido_nro] ON [pedidos_cabecera] ([nro_pedido]);
+CREATE UNIQUE INDEX [uk_pedidos_nro_tenant] ON [pedidos_cabecera] ([nro_pedido], [tenant_id]);
 CREATE INDEX [idx_pedido_cliente] ON [pedidos_cabecera] ([id_cliente]);
 CREATE INDEX [idx_pedido_estado] ON [pedidos_cabecera] ([estado]);
 CREATE INDEX [idx_pedido_fecha] ON [pedidos_cabecera] ([fecha_pedido]);
@@ -736,7 +736,7 @@ CREATE TABLE [omc] (
     CONSTRAINT [fk_omc_id_recepcion] FOREIGN KEY ([id_recepcion]) REFERENCES [recepciones_cabecera] ([id_recepcion]) ON DELETE SET NULL ON UPDATE CASCADE,
     CONSTRAINT [fk_omc_id_pedido] FOREIGN KEY ([id_pedido]) REFERENCES [pedidos_cabecera] ([id_pedido]) ON DELETE SET NULL ON UPDATE CASCADE
 );
-CREATE UNIQUE INDEX [uq_omc_numero] ON [omc] ([numero]);
+CREATE UNIQUE INDEX [uk_omc_numero_tenant] ON [omc] ([numero], [tenant_id]);
 CREATE INDEX [idx_omc_contenedor] ON [omc] ([id_contenedor]);
 CREATE INDEX [idx_omc_origen] ON [omc] ([id_ubicacion_origen]);
 CREATE INDEX [idx_omc_destino] ON [omc] ([id_ubicacion_destino]);

@@ -718,9 +718,16 @@ def anular(id_omc):
                         lote=rec['Lote'], tipo_stock=rec['TipoStock'], cantidad=rec['cantidad'],
                         detalle=f"Stock vuelve a Disponible en origen al anular OMC {omc['numero']}")
 
-            # Si vino de una recepción (no hace nada extra)
+            # Si vino de una recepción: la mercadería ingresó y queda disponible en la ubicación de
+            # recepción (el origen de la OMC). La recepción pasa a Confirmada con esa ubicación como
+            # destino; antes quedaba Cerrada para siempre, sin ningún paso siguiente.
             if omc['id_recepcion']:
-                pass
+                cursor.execute("""
+                    UPDATE recepciones_cabecera
+                    SET estado = 'Confirmada', id_ubicacion_destino = id_ubicacion_recep
+                    WHERE id_recepcion = %s AND estado = 'Cerrada'
+                      AND (%s IS NULL OR tenant_id = %s)
+                """, (omc['id_recepcion'], tenant_id, tenant_id))
 
             # Si vino de un pedido, anular el pedido
             if omc.get('id_pedido'):

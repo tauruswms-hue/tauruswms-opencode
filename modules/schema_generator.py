@@ -583,7 +583,8 @@ WMS_TABLES = [
             {"name": "updated_at",           "type": "datetime",     "not_null": True, "default": "CURRENT_TIMESTAMP_ON_UPDATE"},
         ],
         "indexes": [
-            {"columns": ["numero"],              "name": "uq_recepcion_numero", "unique": True},
+            # El número se arma por empresa (REC-año-secuencia): único por tenant, no entre todas
+            {"columns": ["numero", "tenant_id"], "name": "uk_recepciones_numero_tenant", "unique": True},
             {"columns": ["id_proveedor"],        "name": "idx_rec_proveedor"},
             {"columns": ["estado"],              "name": "idx_rec_estado"},
             {"columns": ["id_contenedor"],       "name": "idx_rec_contenedor"},
@@ -651,7 +652,7 @@ WMS_TABLES = [
             {"name": "updated_at",        "type": "datetime", "not_null": True, "default": "CURRENT_TIMESTAMP_ON_UPDATE"},
         ],
         "indexes": [
-            {"columns": ["nro_pedido"],  "name": "uq_pedido_nro", "unique": True},
+            {"columns": ["nro_pedido", "tenant_id"], "name": "uk_pedidos_nro_tenant", "unique": True},
             {"columns": ["id_cliente"],  "name": "idx_pedido_cliente"},
             {"columns": ["estado"],      "name": "idx_pedido_estado"},
             {"columns": ["fecha_pedido"],"name": "idx_pedido_fecha"},
@@ -718,7 +719,7 @@ WMS_TABLES = [
             {"name": "updated_at",            "type": "datetime",     "not_null": True, "default": "CURRENT_TIMESTAMP_ON_UPDATE"},
         ],
         "indexes": [
-            {"columns": ["numero"],               "name": "uq_omc_numero", "unique": True},
+            {"columns": ["numero", "tenant_id"],  "name": "uk_omc_numero_tenant", "unique": True},
             {"columns": ["id_contenedor"],        "name": "idx_omc_contenedor"},
             {"columns": ["id_ubicacion_origen"],  "name": "idx_omc_origen"},
             {"columns": ["id_ubicacion_destino"], "name": "idx_omc_destino"},

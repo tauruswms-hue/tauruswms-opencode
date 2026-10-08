@@ -1,4 +1,5 @@
-﻿from collections import OrderedDict
+﻿import math
+from collections import OrderedDict
 from datetime import datetime
 
 from flask import (
@@ -14,7 +15,7 @@ from flask import (
 
 from modules.auditoria import registrar_movimiento
 from modules.batch_utils import (
-    float_or_zero,
+    DatoInvalido,
     parse_file,
     plantilla_csv,
     plantilla_json,
@@ -25,6 +26,7 @@ from modules.db_config import _get_admin_connection, get_db_connection
 from modules.sql_dialect import (
     cast_as_int,
     execute_insert,
+    is_duplicate_key_error,
     limit_sql,
     quote,
     substring_index,
@@ -33,6 +35,134 @@ from modules.sql_dialect import (
 from modules.sql_dialect import year as year_func
 
 recepciones_bp = Blueprint('recepciones', __name__)
+
+TIPOS_STOCK = ('Libre Venta', 'Calidad', 'Bloqueado', 'Mal Estado')
+LOTE_MAX = 100                    # largo de recepciones_detalle.lote
+LOTE_UNICO = 'UNICO'              # lote de los materiales que no llevan trazabilidad
+CANTIDAD_MAX = 99999999999.9999   # mayor valor de las columnas decimal(15,4)
+
+
+def _id(valor):
+    """Id entero de un formulario o JSON, o 0 si no es un id."""
+    try:
+        return int(str(valor if valor is not None else '').strip() or 0)
+    except ValueError:
+        return 0
+
+
+def _proveedor(cursor, valor, tenant_id):
+    """Id de un proveedor activo de la empresa. DatoInvalido si falta, no existe o está inactivo."""
+    id_proveedor = _id(valor)
+    if not id_proveedor:
+        raise DatoInvalido('Debe seleccionar un proveedor.')
+    cursor.execute("SELECT razonsocial, activo FROM proveedores WHERE id = %s AND (%s IS NULL OR tenant_id = %s)",
+                   (id_proveedor, tenant_id, tenant_id))
+    fila = cursor.fetchone()
+    if not fila:
+        raise DatoInvalido('El proveedor elegido no existe.')
+    if not fila['activo']:
+        raise DatoInvalido(f'El proveedor "{fila["razonsocial"]}" está inactivo.')
+    return id_proveedor
+
+
+def _ubicacion(cursor, valor, tenant_id, rotulo, de_recepcion=False):
+    """Id de una ubicación activa de la empresa; con `de_recepcion`, de un tipo de recepción (operación 'R')."""
+    id_ubicacion = _id(valor)
+    if not id_ubicacion:
+        raise DatoInvalido(f'Debe seleccionar la {rotulo}.')
+    cursor.execute("""SELECT u.codigo, u.activo, t.operacion FROM ubicaciones u
+                      LEFT JOIN tipoubicacion t ON u.tipoubicacion = t.id
+                      WHERE u.id = %s AND (%s IS NULL OR u.tenant_id = %s)""", (id_ubicacion, tenant_id, tenant_id))
+    fila = cursor.fetchone()
+    if not fila:
+        raise DatoInvalido(f'La {rotulo} elegida no existe.')
+    if not fila['activo']:
+        raise DatoInvalido(f'La ubicación "{fila["codigo"]}" está inactiva.')
+    if de_recepcion and (fila['operacion'] or '').strip().upper() != 'R':
+        raise DatoInvalido(f'La ubicación "{fila["codigo"]}" no es de recepción: su tipo tiene que tener esa operación.')
+    return id_ubicacion
+
+
+def _destino(cursor, valor, tenant_id, id_ubicacion_recep):
+    """Ubicación destino: activa, de la empresa y distinta de la de recepción."""
+    id_destino = _ubicacion(cursor, valor, tenant_id, 'ubicación destino')
+    if id_destino == id_ubicacion_recep:
+        # El traslado se registra como salida del origen y entrada al destino: no pueden ser la misma
+        raise DatoInvalido('La ubicación destino tiene que ser distinta de la ubicación de recepción.')
+    return id_destino
+
+
+def _cantidad(valor, rotulo):
+    """Cantidad de un renglón (vacío = 0): un número, no negativo y que entre en la columna."""
+    try:
+        n = float(str(valor if valor is not None else '').strip().replace(',', '.') or 0)
+    except ValueError:
+        n = math.nan
+    if not math.isfinite(n):
+        raise DatoInvalido(f'{rotulo}: "{valor}" no es un número válido.')
+    if n < 0:
+        raise DatoInvalido(f'{rotulo}: no puede ser negativa.')
+    if n > CANTIDAD_MAX:
+        raise DatoInvalido(f'{rotulo}: el valor es demasiado grande.')
+    return n
+
+
+def _renglon(datos, cantidad_recibida='cantidad_recibida'):
+    """Lote, vencimiento, cantidades y tipo de stock de un renglón, verificados."""
+    lote = str(datos.get('lote') or '').strip() or LOTE_UNICO
+    if len(lote) > LOTE_MAX:
+        raise DatoInvalido(f'Lote: admite hasta {LOTE_MAX} caracteres.')
+    vencimiento = str(datos.get('fecha_vencimiento') or '').strip()[:10] or None
+    if vencimiento:
+        try:
+            datetime.strptime(vencimiento, '%Y-%m-%d')
+        except ValueError:
+            raise DatoInvalido(f'Fecha de vencimiento: "{datos.get("fecha_vencimiento")}" no es una fecha válida '
+                               '(formato AAAA-MM-DD).') from None
+    tipo_stock = str(datos.get('tipo_stock') or '').strip() or TIPOS_STOCK[0]
+    if tipo_stock not in TIPOS_STOCK:
+        raise DatoInvalido(f'Tipo de stock: "{tipo_stock}" no es válido. Usar: {", ".join(TIPOS_STOCK)}.')
+    return {
+        'lote': lote,
+        'fecha_vencimiento': vencimiento,
+        'cantidad_esperada': _cantidad(datos.get('cantidad_esperada'), 'Cantidad esperada'),
+        'cantidad_recibida': _cantidad(datos.get(cantidad_recibida), 'Cantidad recibida') if cantidad_recibida else 0.0,
+        'tipo_stock': tipo_stock,
+    }
+
+
+def _material_del_proveedor(cursor, id_material, id_proveedor, tenant_id, lote):
+    """Verifica que el material se pueda recibir: activo, de la empresa y asignado al proveedor.
+
+    Un material con trazabilidad por lote o serie tiene que traer su lote.
+    """
+    cursor.execute("""SELECT m.codigo, m.activo, m.trazabilidad,
+                             (SELECT COUNT(*) FROM material_proveedor mp
+                              WHERE mp.id_material = m.id AND mp.id_proveedor = %s) AS asignado
+                      FROM materiales m WHERE m.id = %s AND (%s IS NULL OR m.tenant_id = %s)""",
+                   (id_proveedor, id_material, tenant_id, tenant_id))
+    material = cursor.fetchone()
+    if not material:
+        raise DatoInvalido('El material elegido no existe.')
+    if not material['activo']:
+        raise DatoInvalido(f'El material "{material["codigo"]}" está inactivo.')
+    if not material['asignado']:
+        raise DatoInvalido(f'El material "{material["codigo"]}" no está asignado al proveedor de la recepción.')
+    trazabilidad = (material['trazabilidad'] or 'ninguna').lower()
+    if trazabilidad in ('lote', 'serie') and lote.upper() == LOTE_UNICO:
+        raise DatoInvalido(f'El material "{material["codigo"]}" lleva trazabilidad por {trazabilidad}: '
+                           f'hay que indicar {"el lote" if trazabilidad == "lote" else "la serie"}.')
+    return material
+
+
+def _numero_siguiente(cursor, tenant_id, anio):
+    expr = cast_as_int(substring_index("numero", "-", -1))
+    cursor.execute(
+        f"SELECT MAX({expr}) AS max_seq "
+        f"FROM recepciones_cabecera WHERE {year_func('fecha_recepcion')} = %s AND (%s IS NULL OR tenant_id = %s)",
+        (anio, tenant_id, tenant_id)
+    )
+    return f"REC-{anio}-{(cursor.fetchone()['max_seq'] or 0) + 1:05d}"
 
 
 # ============================================================================
@@ -117,23 +247,17 @@ def nueva():
 def guardar():
     d = request.form
     tenant_id = get_tenant_filter()
-    
-    if not d.get('id_ubicacion_recep'):
-        flash("Debe seleccionar una ubicación de recepción.", "danger")
-        return redirect(url_for('recepciones.nueva'))
-    
+
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            anio = datetime.now().year
-            expr = cast_as_int(substring_index("numero", "-", -1))
-            cursor.execute(
-                f"SELECT MAX({expr}) AS max_seq "
-                f"FROM recepciones_cabecera WHERE {year_func('fecha_recepcion')} = %s AND (%s IS NULL OR tenant_id = %s)",
-                (anio, tenant_id, tenant_id)
-            )
-            seq = (cursor.fetchone()['max_seq'] or 0) + 1
-            numero = f"REC-{anio}-{seq:05d}"
+            id_proveedor = _proveedor(cursor, d.get('id_proveedor'), tenant_id)
+            id_ubicacion_recep = _ubicacion(cursor, d.get('id_ubicacion_recep'), tenant_id, 'ubicación de recepción',
+                                            de_recepcion=True)
+            id_destino = (_destino(cursor, d.get('id_ubicacion_destino'), tenant_id, id_ubicacion_recep)
+                          if (d.get('id_ubicacion_destino') or '').strip() else None)
+
+            numero = _numero_siguiente(cursor, tenant_id, datetime.now().year)
             usuario = session.get('nombre', 'sistema')
 
             id_recepcion = execute_insert(cursor, """
@@ -143,11 +267,11 @@ def guardar():
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 numero,
-                d.get('id_proveedor'),
-                d.get('id_ubicacion_recep'),
-                d.get('id_ubicacion_destino') or None,
+                id_proveedor,
+                id_ubicacion_recep,
+                id_destino,
                 '',
-                d.get('observaciones') or None,
+                (d.get('observaciones') or '').strip() or None,
                 usuario,
                 tenant_id
             ))
@@ -166,9 +290,16 @@ def guardar():
             flash(f"Recepción {numero} creada — contenedor {contenedor}. Agregue los materiales.", "success")
             return redirect(url_for('recepciones.ver', id_recepcion=id_recepcion))
 
+    except DatoInvalido as e:
+        conn.rollback()
+        flash(str(e), "danger")
+        return redirect(url_for('recepciones.nueva'))
     except Exception as e:
         conn.rollback()
-        flash(f"Error al crear la recepción: {e!s}", "danger")
+        if is_duplicate_key_error(e):
+            flash("No se pudo crear la recepción: otro usuario tomó el mismo número. Volver a intentar.", "danger")
+        else:
+            flash(f"Error al crear la recepción: {e!s}", "danger")
         return redirect(url_for('recepciones.nueva'))
     finally:
         conn.close()
@@ -361,22 +492,18 @@ def buscar_ubicaciones():
 @recepciones_bp.route('/recepciones/guardar_item', methods=['POST'])
 def guardar_item():
     d = request.json or {}
-    id_recepcion  = d.get('id_recepcion')
-    id_material   = d.get('id_material')
-    lote          = (d.get('lote') or 'UNICO').strip() or 'UNICO'
-    fecha_venc    = d.get('fecha_vencimiento') or None
-    cant_esp      = float(d.get('cantidad_esperada') or 0)
-    cant_rec      = float(d.get('cantidad_recibida') or 0)
-    tipo_stock    = d.get('tipo_stock') or 'Libre Venta'
-    observaciones = d.get('observaciones') or None
-    id_detalle    = d.get('id_detalle')
+    id_recepcion  = _id(d.get('id_recepcion'))
+    id_material   = _id(d.get('id_material'))
+    observaciones = (d.get('observaciones') or '').strip() or None
+    id_detalle    = _id(d.get('id_detalle'))
     tenant_id = get_tenant_filter()
 
     conn = get_db_connection()
     try:
+        renglon = _renglon(d)
         with conn.cursor() as cursor:
             cursor.execute(
-                "SELECT estado FROM recepciones_cabecera WHERE id_recepcion = %s AND (%s IS NULL OR tenant_id = %s)",
+                "SELECT estado, id_proveedor FROM recepciones_cabecera WHERE id_recepcion = %s AND (%s IS NULL OR tenant_id = %s)",
                 (id_recepcion, tenant_id, tenant_id)
             )
             rec = cursor.fetchone()
@@ -384,30 +511,49 @@ def guardar_item():
                 return jsonify({"ok": False, "msg": "La recepción no está Abierta."})
 
             if id_detalle:
+                cursor.execute("SELECT id_material FROM recepciones_detalle WHERE id_detalle = %s AND id_recepcion = %s",
+                               (id_detalle, id_recepcion))
+                actual = cursor.fetchone()
+                if not actual:
+                    raise DatoInvalido('El renglón que se intenta modificar no existe.')
+                _material_del_proveedor(cursor, actual['id_material'], rec['id_proveedor'], tenant_id, renglon['lote'])
                 cursor.execute("""
                     UPDATE recepciones_detalle
                     SET cantidad_esperada=%s, cantidad_recibida=%s, lote=%s,
                         fecha_vencimiento=%s, tipo_stock=%s, observaciones=%s
                     WHERE id_detalle=%s AND id_recepcion=%s
-                      AND (%s IS NULL OR tenant_id = %s)
-                """, (cant_esp, cant_rec, lote, fecha_venc, tipo_stock,
-                      observaciones, id_detalle, id_recepcion, tenant_id, tenant_id))
+                """, (renglon['cantidad_esperada'], renglon['cantidad_recibida'], renglon['lote'],
+                      renglon['fecha_vencimiento'], renglon['tipo_stock'], observaciones, id_detalle, id_recepcion))
             else:
                 if not id_material:
                     return jsonify({"ok": False, "msg": "Debe seleccionar un material."})
+                material = _material_del_proveedor(cursor, id_material, rec['id_proveedor'], tenant_id, renglon['lote'])
+                # La recepción usa un solo contenedor, y el stock admite una fila por material dentro de un
+                # contenedor: con dos renglones del mismo material, el segundo lote se fundía con el primero.
+                cursor.execute("SELECT COUNT(*) AS n FROM recepciones_detalle WHERE id_recepcion = %s AND id_material = %s",
+                               (id_recepcion, id_material))
+                if cursor.fetchone()['n']:
+                    raise DatoInvalido(f'El material "{material["codigo"]}" ya está cargado en esta recepción. '
+                                       'Para recibir otro lote o tipo de stock del mismo material, hacer otra recepción.')
                 id_detalle = execute_insert(cursor, """
                     INSERT INTO recepciones_detalle
                         (id_recepcion, id_material, lote, fecha_vencimiento,
                          cantidad_esperada, cantidad_recibida, tipo_stock, observaciones, tenant_id)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """, (id_recepcion, id_material, lote, fecha_venc,
-                      cant_esp, cant_rec, tipo_stock, observaciones, tenant_id))
+                """, (id_recepcion, id_material, renglon['lote'], renglon['fecha_vencimiento'],
+                      renglon['cantidad_esperada'], renglon['cantidad_recibida'], renglon['tipo_stock'],
+                      observaciones, tenant_id))
 
             conn.commit()
             return jsonify({"ok": True, "id_detalle": id_detalle})
-    except Exception as e:
+    except DatoInvalido as e:
         conn.rollback()
         return jsonify({"ok": False, "msg": str(e)})
+    except Exception as e:
+        conn.rollback()
+        if is_duplicate_key_error(e):
+            return jsonify({"ok": False, "msg": "Ese material ya está cargado en la recepción."})
+        return jsonify({"ok": False, "msg": f"No se pudo guardar el renglón: {e!s}"})
     finally:
         conn.close()
 
@@ -462,6 +608,11 @@ def cerrar(id_recepcion):
             if not recepcion:
                 flash("La recepción no existe o ya no está Abierta.", "danger")
                 return redirect(url_for('recepciones.listar'))
+            try:
+                id_ubicacion_destino = _destino(cursor, id_ubicacion_destino, tenant_id, recepcion['id_ubicacion_recep'])
+            except DatoInvalido as e:
+                flash(str(e), "danger")
+                return redirect(url_for('recepciones.ver', id_recepcion=id_recepcion))
 
             cursor.execute("""
                 SELECT * FROM recepciones_detalle
@@ -612,6 +763,12 @@ def eliminar(id_recepcion):
 
 @recepciones_bp.route('/recepciones/confirmar_stock/<int:id_recepcion>', methods=['POST'])
 def confirmar_stock(id_recepcion):
+    """Confirma la entrada de una recepción Cerrada que no tiene una OMC pendiente.
+
+    Al cerrar una recepción se genera una OMC, y el stock se confirma confirmando
+    esa OMC. Esta acción queda para las recepciones cerradas sin OMC (anteriores)
+    o cuya OMC ya no está pendiente.
+    """
     tenant_id = get_tenant_filter()
     conn = get_db_connection()
     try:
@@ -625,8 +782,17 @@ def confirmar_stock(id_recepcion):
                 flash("La recepción no existe o no está en estado Cerrada.", "danger")
                 return redirect(url_for('recepciones.ver', id_recepcion=id_recepcion))
 
+            # Con una OMC pendiente, confirmar desde acá dejaba el stock disponible en el destino sin
+            # cerrar la OMC: si después se la anulaba, el stock quedaba también en el origen (duplicado).
+            cursor.execute("SELECT numero FROM omc WHERE id_recepcion = %s AND estado = 'Pendiente'", (id_recepcion,))
+            pendiente = cursor.fetchone()
+            if pendiente:
+                flash(f"La entrada de esta recepción se confirma confirmando la OMC {pendiente['numero']}.", "warning")
+                return redirect(url_for('recepciones.ver', id_recepcion=id_recepcion))
+
             ahora = datetime.now()
             usuario = session.get('nombre', 'sistema')
+            contenedor = recepcion['id_contenedor']
 
             cursor.execute("""
                 SELECT Material, Lote, TipoStock, Ubicacion,
@@ -635,7 +801,7 @@ def confirmar_stock(id_recepcion):
                 WHERE IDContenedor = %s AND StockEntrando > 0
                   AND (%s IS NULL OR tenant_id = %s)
                 GROUP BY Ubicacion, Material, Lote, TipoStock
-            """, (recepcion['id_contenedor'], tenant_id, tenant_id))
+            """, (contenedor, tenant_id, tenant_id))
             movimientos = cursor.fetchall()
 
             cursor.execute("""
@@ -647,25 +813,41 @@ def confirmar_stock(id_recepcion):
                     UltimoMovimiento = %s,
                     UsuarioUltimoMov = %s
                 WHERE IDContenedor = %s AND StockEntrando > 0 AND (%s IS NULL OR tenant_id = %s)
-            """, (ahora, ahora, usuario, recepcion['id_contenedor'], tenant_id, tenant_id))
-
+            """, (ahora, ahora, usuario, contenedor, tenant_id, tenant_id))
             filas = cursor.rowcount
+
+            if movimientos:
+                # El stock ya entró al destino: se quita el "saliendo" que quedaba en la ubicación de recepción
+                cursor.execute("""DELETE FROM stockcontable
+                                  WHERE IDContenedor = %s AND Ubicacion = %s AND StockTotal = 0 AND StockEntrando = 0
+                                    AND (%s IS NULL OR tenant_id = %s)""",
+                               (contenedor, recepcion['id_ubicacion_recep'], tenant_id, tenant_id))
+                cursor.execute("""UPDATE stockcontable SET StockSaliendo = 0
+                                  WHERE IDContenedor = %s AND Ubicacion = %s AND (%s IS NULL OR tenant_id = %s)""",
+                               (contenedor, recepcion['id_ubicacion_recep'], tenant_id, tenant_id))
+                destino = recepcion['id_ubicacion_destino']
+            else:
+                # Sin stock por entrar (su OMC se anuló): la mercadería quedó en la ubicación de recepción
+                destino = recepcion['id_ubicacion_recep']
 
             for mov in movimientos:
                 registrar_movimiento(
                     conn, tenant_id=tenant_id, accion='CONFIRMAR_RECEPCION', usuario=usuario,
                     modulo='recepciones', id_ubicacion=mov['Ubicacion'],
-                    id_material=mov['Material'], id_contenedor=recepcion['id_contenedor'],
+                    id_material=mov['Material'], id_contenedor=contenedor,
                     lote=mov['Lote'], tipo_stock=mov['TipoStock'], cantidad=mov['cantidad'],
                     detalle=f"Stock pasó a Disponible (recepción {recepcion['numero']})")
 
             cursor.execute(
-                "UPDATE recepciones_cabecera SET estado = 'Confirmada' WHERE id_recepcion = %s AND (%s IS NULL OR tenant_id = %s)",
-                (id_recepcion, tenant_id, tenant_id)
+                "UPDATE recepciones_cabecera SET estado = 'Confirmada', id_ubicacion_destino = %s WHERE id_recepcion = %s",
+                (destino, id_recepcion)
             )
 
             conn.commit()
-            flash(f"Entrada confirmada. {filas} registro(s) de stock pasaron a Disponible.", "success")
+            if movimientos:
+                flash(f"Entrada confirmada. {filas} registro(s) de stock pasaron a Disponible.", "success")
+            else:
+                flash("Recepción confirmada: la mercadería quedó disponible en la ubicación de recepción.", "success")
 
     except Exception as e:
         conn.rollback()
@@ -746,93 +928,59 @@ def importar():
         tenant_id = get_tenant_filter()
 
         for agrupador, filas in grupos.items():
-            _, primera = filas[0]
-            proveedor_cod  = str(primera.get('proveedor_codigo', '') or '').strip()
-            ubic_recep_cod = str(primera.get('ubicacion_recep', '') or '').strip()
-            ubic_dest_cod  = str(primera.get('ubicacion_destino', '') or '').strip()
-            observaciones  = str(primera.get('observaciones', '') or '').strip() or None
-
-            if not proveedor_cod:
-                errores.append({'fila': filas[0][0], 'codigo': agrupador, 'razon': 'proveedor_codigo es obligatorio'})
-                continue
-            if not ubic_recep_cod:
-                errores.append({'fila': filas[0][0], 'codigo': agrupador, 'razon': 'ubicacion_recep es obligatorio'})
-                continue
-
+            # Cada grupo es una recepción: se verifica entero antes de guardar nada, y se guarda todo o nada
+            fila_cabecera, primera = filas[0]
+            errores_grupo = []
+            id_recepcion = None
             try:
                 with conn.cursor() as cursor:
-                    cursor.execute("SELECT id FROM proveedores WHERE codigo = %s AND (%s IS NULL OR tenant_id = %s)", (proveedor_cod, tenant_id, tenant_id))
-                    prov = cursor.fetchone()
-                    if not prov:
-                        errores.append({'fila': filas[0][0], 'codigo': agrupador, 'razon': f'Proveedor "{proveedor_cod}" no encontrado'})
+                    cabecera = _cabecera_importada(cursor, primera, tenant_id)
+                    lineas = []
+                    for fila_num, row in filas:
+                        try:
+                            linea = _linea_importada(cursor, row, cabecera['id_proveedor'], tenant_id)
+                            if linea is None:
+                                continue
+                            if any(x['id_material'] == linea['id_material'] for x in lineas):
+                                raise DatoInvalido(f'El material "{row.get("material_codigo")}" está repetido en la recepción. '
+                                                   'Otro lote del mismo material va en otra recepción (otro agrupador).')
+                            lineas.append(linea)
+                        except DatoInvalido as e:
+                            errores_grupo.append({'fila': fila_num, 'codigo': agrupador, 'razon': str(e)})
+                    if not lineas and not errores_grupo:
+                        errores_grupo.append({'fila': fila_cabecera, 'codigo': agrupador,
+                                              'razon': 'Ninguna línea de material válida'})
+                    if errores_grupo:
+                        errores.extend(errores_grupo)
                         continue
-
-                    cursor.execute("SELECT id FROM ubicaciones WHERE codigo = %s AND (%s IS NULL OR tenant_id = %s)", (ubic_recep_cod, tenant_id, tenant_id))
-                    ubic_recep = cursor.fetchone()
-                    if not ubic_recep:
-                        errores.append({'fila': filas[0][0], 'codigo': agrupador, 'razon': f'Ubicación recep "{ubic_recep_cod}" no encontrada'})
-                        continue
-
-                    id_dest = None
-                    if ubic_dest_cod:
-                        cursor.execute("SELECT id FROM ubicaciones WHERE codigo = %s AND (%s IS NULL OR tenant_id = %s)", (ubic_dest_cod, tenant_id, tenant_id))
-                        ubic_dest = cursor.fetchone()
-                        if ubic_dest:
-                            id_dest = ubic_dest['id']
-
-                    expr_imp = cast_as_int(substring_index("numero", "-", -1))
-                    cursor.execute(
-                        f"SELECT MAX({expr_imp}) AS max_seq "
-                        f"FROM recepciones_cabecera WHERE {year_func('fecha_recepcion')} = %s AND (%s IS NULL OR tenant_id = %s)", (anio, tenant_id, tenant_id)
-                    )
-                    seq = (cursor.fetchone()['max_seq'] or 0) + 1
-                    numero = f"REC-{anio}-{seq:05d}"
 
                     id_recepcion = execute_insert(cursor, """
                         INSERT INTO recepciones_cabecera
                             (numero, id_proveedor, id_ubicacion_recep, id_ubicacion_destino,
                              id_contenedor, observaciones, usuario_creacion, tenant_id)
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                    """, (numero, prov['id'], ubic_recep['id'], id_dest, '',
-                          observaciones, usuario, tenant_id))
-
-                    cursor.execute(
-                        "UPDATE recepciones_cabecera SET id_contenedor = %s WHERE id_recepcion = %s AND (%s IS NULL OR tenant_id = %s)",
-                        (f"RC{id_recepcion:05d}", id_recepcion, tenant_id, tenant_id)
-                    )
-
-                    lineas_ok = 0
-                    for fila_num, row in filas:
-                        material_cod = str(row.get('material_codigo', '') or '').strip()
-                        if not material_cod:
-                            continue
-                        cursor.execute("SELECT id FROM materiales WHERE codigo = %s AND (%s IS NULL OR tenant_id = %s)", (material_cod, tenant_id, tenant_id))
-                        mat = cursor.fetchone()
-                        if not mat:
-                            errores.append({'fila': fila_num, 'codigo': agrupador, 'razon': f'Material "{material_cod}" no encontrado'})
-                            continue
+                    """, (_numero_siguiente(cursor, tenant_id, anio), cabecera['id_proveedor'],
+                          cabecera['id_ubicacion_recep'], cabecera['id_ubicacion_destino'], '',
+                          cabecera['observaciones'], usuario, tenant_id))
+                    cursor.execute("UPDATE recepciones_cabecera SET id_contenedor = %s WHERE id_recepcion = %s",
+                                   (f"RC{id_recepcion:05d}", id_recepcion))
+                    for linea in lineas:
                         cursor.execute("""
                             INSERT INTO recepciones_detalle
                                 (id_recepcion, id_material, lote, fecha_vencimiento,
                                  cantidad_esperada, cantidad_recibida, tipo_stock, tenant_id)
                             VALUES (%s, %s, %s, %s, %s, 0, %s, %s)
-                        """, (
-                            id_recepcion, mat['id'],
-                            str(row.get('lote', '') or '').strip() or 'UNICO',
-                            str(row.get('fecha_vencimiento', '') or '').strip() or None,
-                            float_or_zero(row.get('cantidad')),
-                            str(row.get('tipo_stock', '') or '').strip() or 'Libre Venta',
-                            tenant_id
-                        ))
-                        lineas_ok += 1
-
-                    if lineas_ok == 0:
-                        errores.append({'fila': filas[0][0], 'codigo': agrupador, 'razon': 'Ninguna línea de material válida'})
-                    else:
-                        insertados += 1
-
+                        """, (id_recepcion, linea['id_material'], linea['lote'], linea['fecha_vencimiento'],
+                              linea['cantidad_esperada'], linea['tipo_stock'], tenant_id))
+                    insertados += 1
+            except DatoInvalido as e:
+                errores.append({'fila': fila_cabecera, 'codigo': agrupador, 'razon': str(e)})
             except Exception as e:
-                errores.append({'fila': filas[0][0], 'codigo': agrupador, 'razon': str(e)})
+                # Lo que se haya llegado a guardar de este grupo no queda: la cabecera arrastra sus renglones
+                if id_recepcion:
+                    with conn.cursor() as cursor:
+                        cursor.execute("DELETE FROM recepciones_cabecera WHERE id_recepcion = %s", (id_recepcion,))
+                errores.append({'fila': fila_cabecera, 'codigo': agrupador, 'razon': str(e)})
 
         conn.commit()
     except Exception as e:
@@ -842,6 +990,57 @@ def importar():
         conn.close()
 
     return jsonify({'insertados': insertados, 'omitidos': [], 'errores': errores})
+
+
+def _por_codigo(cursor, tabla, columna_id, codigo, tenant_id):
+    cursor.execute(f"SELECT {columna_id} AS id FROM {tabla} WHERE codigo = %s AND (%s IS NULL OR tenant_id = %s)",
+                   (codigo, tenant_id, tenant_id))
+    fila = cursor.fetchone()
+    return fila['id'] if fila else None
+
+
+def _cabecera_importada(cursor, row, tenant_id):
+    """Proveedor y ubicaciones de un grupo del archivo (indicados por código), verificados."""
+    proveedor_cod = str(row.get('proveedor_codigo', '') or '').strip()
+    ubic_recep_cod = str(row.get('ubicacion_recep', '') or '').strip()
+    ubic_dest_cod = str(row.get('ubicacion_destino', '') or '').strip()
+    if not proveedor_cod:
+        raise DatoInvalido('proveedor_codigo es obligatorio')
+    if not ubic_recep_cod:
+        raise DatoInvalido('ubicacion_recep es obligatorio')
+
+    id_proveedor = _por_codigo(cursor, 'proveedores', 'id', proveedor_cod, tenant_id)
+    if not id_proveedor:
+        raise DatoInvalido(f'Proveedor "{proveedor_cod}" no encontrado')
+    id_proveedor = _proveedor(cursor, id_proveedor, tenant_id)
+
+    id_recep = _por_codigo(cursor, 'ubicaciones', 'id', ubic_recep_cod, tenant_id)
+    if not id_recep:
+        raise DatoInvalido(f'Ubicación recep "{ubic_recep_cod}" no encontrada')
+    id_recep = _ubicacion(cursor, id_recep, tenant_id, 'ubicación de recepción', de_recepcion=True)
+
+    id_destino = None
+    if ubic_dest_cod:
+        id_destino = _por_codigo(cursor, 'ubicaciones', 'id', ubic_dest_cod, tenant_id)
+        if not id_destino:
+            raise DatoInvalido(f'Ubicación destino "{ubic_dest_cod}" no encontrada')
+        id_destino = _destino(cursor, id_destino, tenant_id, id_recep)
+    return {'id_proveedor': id_proveedor, 'id_ubicacion_recep': id_recep, 'id_ubicacion_destino': id_destino,
+            'observaciones': str(row.get('observaciones', '') or '').strip() or None}
+
+
+def _linea_importada(cursor, row, id_proveedor, tenant_id):
+    """Renglón de un grupo del archivo, verificado; None si la fila no trae material."""
+    material_cod = str(row.get('material_codigo', '') or '').strip()
+    if not material_cod:
+        return None
+    id_material = _por_codigo(cursor, 'materiales', 'id', material_cod, tenant_id)
+    if not id_material:
+        raise DatoInvalido(f'Material "{material_cod}" no encontrado')
+    # En el archivo la cantidad es la esperada; la recibida se carga al recibir
+    linea = _renglon({**row, 'cantidad_esperada': row.get('cantidad')}, cantidad_recibida=None)
+    _material_del_proveedor(cursor, id_material, id_proveedor, tenant_id, linea['lote'])
+    return {**linea, 'id_material': id_material}
 
 
 @recepciones_bp.route('/recepciones/plantilla/<formato>')

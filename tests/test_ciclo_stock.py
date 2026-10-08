@@ -75,6 +75,11 @@ def datos_stock(usuario_superadmin):
             VALUES (%s, %s, 'lote', 'fifo', 1, %s)
         """, ('TEST-MAT-' + sufijo, 'Material ciclo stock', tid))
         datos['id_material'] = cur.lastrowid
+        # Solo se reciben materiales asignados al proveedor de la recepción
+        cur.execute("""
+            INSERT INTO material_proveedor (id_material, id_proveedor, es_habitual, tenant_id)
+            VALUES (%s, %s, 1, %s)
+        """, (datos['id_material'], datos['id_proveedor'], tid))
 
         datos['tenant_id'] = tid
         conn.commit()
@@ -97,7 +102,7 @@ def datos_stock(usuario_superadmin):
 
 @requires_db
 def test_ciclo_stock_recepcion_confirmacion(client, usuario_superadmin, datos_stock):
-    """Recepción -> item -> cerrar (OMC) -> confirmar -> stock disponible."""
+    """Recepción -> item -> cerrar (OMC): el stock queda entrando en el destino hasta confirmar la OMC."""
     resp = client.post('/login', data={
         'username': usuario_superadmin['username'],
         'password': usuario_superadmin['password'],
@@ -163,10 +168,12 @@ def test_ciclo_stock_recepcion_confirmacion(client, usuario_superadmin, datos_st
             cur.close()
             conn.close()
 
-        # confirmar stock -> pasa a Disponible
+        # Con la OMC pendiente, la entrada se confirma desde la OMC: la recepción no mueve el stock
+        # (el ciclo completo, con la confirmación de la OMC, está en tests/test_recepciones.py)
         resp = client.post(f'/recepciones/confirmar_stock/{id_recepcion}',
                            follow_redirects=True)
         assert resp.status_code == 200
+        assert 'se confirma confirmando la OMC' in resp.get_data(as_text=True)
 
         conn = get_db_connection()
         cur = conn.cursor()
@@ -177,9 +184,9 @@ def test_ciclo_stock_recepcion_confirmacion(client, usuario_superadmin, datos_st
             """, (datos_stock['id_ubic_dest'], datos_stock['id_material'],
                   datos_stock['tenant_id']))
             fila = cur.fetchone()
-            assert fila, 'No hay registro de stock tras confirmar'
-            assert fila['StockDisponible'] == 100
-            assert fila['StockEntrando'] == 0
+            assert fila, 'No hay registro de stock tras cerrar'
+            assert fila['StockDisponible'] == 0
+            assert fila['StockEntrando'] == 100
         finally:
             cur.close()
             conn.close()
