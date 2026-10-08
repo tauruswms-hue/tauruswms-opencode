@@ -43,7 +43,7 @@
             </thead>
             <tbody>
                 {% for z in zonas %}
-                <tr>
+                <tr{% if not z.activo %} style="color:#999;"{% endif %}>
                     <td><strong>{{ z.codigo }}</strong></td>
                     <td>{{ z.nombre }}</td>
                     <td>{{ z.descripcion or '—' }}</td>
@@ -54,9 +54,9 @@
                     </td>
                     <td>
                         {% if z.activo %}
-                        <span class="badge badge-success">Activa</span>
+                        <span style="background:#27ae60; color:white; padding:2px 8px; border-radius:10px; font-size:0.8rem;">Activa</span>
                         {% else %}
-                        <span class="badge badge-danger">Inactiva</span>
+                        <span title="No se ofrece para ubicaciones nuevas" style="background:#95a5a6; color:white; padding:2px 8px; border-radius:10px; font-size:0.8rem;">Inactiva</span>
                         {% endif %}
                     </td>
                     <td class="actions-cell" style="text-align:center;">
@@ -93,14 +93,14 @@
                     <label style="font-size:0.85rem; font-weight:bold; color:#666; display:block; margin-bottom:4px;">
                         Código <span style="color:red;">*</span>
                     </label>
-                    <input type="text" name="codigo" id="form_codigo" required maxlength="20"
+                    <input type="text" name="codigo" id="form_codigo" required maxlength="{{ largos.codigo }}"
                            style="width:100%; padding:9px; border:1px solid #ddd; border-radius:4px; box-sizing:border-box; text-transform:uppercase;">
                 </div>
                 <div>
                     <label style="font-size:0.85rem; font-weight:bold; color:#666; display:block; margin-bottom:4px;">
                         Nombre <span style="color:red;">*</span>
                     </label>
-                    <input type="text" name="nombre" id="form_nombre" required maxlength="100"
+                    <input type="text" name="nombre" id="form_nombre" required maxlength="{{ largos.nombre }}"
                            style="width:100%; padding:9px; border:1px solid #ddd; border-radius:4px; box-sizing:border-box;">
                 </div>
             </div>
@@ -112,9 +112,13 @@
             </div>
 
             <div style="margin-bottom:20px;">
-                <label style="font-size:0.85rem; font-weight:bold; color:#666;">
-                    <input type="checkbox" name="activo" id="form_activo" checked> Activa
-                </label>
+                <label style="font-size:0.85rem; font-weight:bold; color:#666; display:block; margin-bottom:4px;">Estado</label>
+                <select name="activo" id="form_activo"
+                        style="width:100%; padding:9px; border:1px solid #ddd; border-radius:4px; box-sizing:border-box; background:white;">
+                    <option value="1">Activa</option>
+                    <option value="0">Inactiva</option>
+                </select>
+                <small style="color:#888; display:block; margin-top:4px;">Una zona inactiva no se ofrece para ubicaciones nuevas; las que ya la tienen la conservan.</small>
             </div>
 
             </div><!-- /scroll body -->
@@ -148,7 +152,7 @@ $(document).ready(function() {
 function openModal() {
     document.getElementById('formZonas').reset();
     document.getElementById('form_id').value = '';
-    document.getElementById('form_activo').checked = true;
+    document.getElementById('form_activo').value = '1';   // una zona nueva se propone Activa
     document.getElementById('modalTitle').textContent = 'Nueva Zona';
     document.getElementById('modalZonas').style.display = 'flex';
 }
@@ -164,7 +168,7 @@ function editZona(data) {
     document.getElementById('form_codigo').value  = data.codigo;
     document.getElementById('form_nombre').value  = data.nombre;
     document.getElementById('form_descripcion').value = data.descripcion || '';
-    document.getElementById('form_activo').checked = data.activo == 1;
+    document.getElementById('form_activo').value = data.activo ? '1' : '0';
 }
 
 document.getElementById('modalZonas').addEventListener('click', function(e) {

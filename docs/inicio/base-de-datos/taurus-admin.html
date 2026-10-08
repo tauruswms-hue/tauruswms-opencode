@@ -45,7 +45,7 @@
 
         <h2>Script</h2>
         <p>Archivo: <a href="../../migrations/create_admin_mysql.sql"><code>docs/migrations/create_admin_mysql.sql</code></a>
-        (279 líneas). Lo genera <code>modules/schema_generator.py</code>; no se edita a mano.</p>
+        (292 líneas). Lo genera <code>modules/schema_generator.py</code>; no se edita a mano.</p>
         <details class="script">
             <summary>Ver el script completo</summary>
 <pre><code>SET NAMES utf8mb4;
@@ -201,6 +201,19 @@ INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/tipoubica
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/tipoubicacion/importar');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/tipoubicacion/exportar/*');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/tipoubicacion/plantilla/*');
+INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/zonas');
+INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/zonas/guardar');
+INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/zonas/eliminar/*');
+INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/zonas/importar');
+INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/zonas/exportar/*');
+INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/zonas/plantilla/*');
+INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/clases-pedido');
+INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/clases-pedido/guardar');
+INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/clases-pedido/eliminar/*');
+INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/clases-pedido/importar');
+INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/clases-pedido/exportar/*');
+INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/clases-pedido/plantilla/*');
+INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/clases-pedido/plantilla-datos/*');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/proveedores');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/proveedores/guardar');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/proveedores/eliminar/*');

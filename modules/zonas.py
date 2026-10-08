@@ -1,4 +1,4 @@
-﻿from flask import (
+from flask import (
     Blueprint,
     flash,
     jsonify,
@@ -9,7 +9,7 @@
 )
 
 from modules.batch_utils import (
-    bool_col,
+    DatoInvalido,
     export_csv,
     export_json,
     export_xlsx,
@@ -20,8 +20,41 @@ from modules.batch_utils import (
 )
 from modules.context import get_tenant_filter
 from modules.db_config import get_db_connection
+from modules.sql_dialect import is_duplicate_key_error
 
 zonas_bp = Blueprint('zonas', __name__)
+
+# Largo máximo de cada texto (el de su columna)
+LARGOS = {'codigo': 20, 'nombre': 100}
+
+
+def _validar(datos):
+    """Código (siempre en mayúsculas), nombre y descripción de una zona, verificados."""
+    codigo = str(datos.get('codigo') or '').strip().upper()
+    nombre = str(datos.get('nombre') or '').strip()
+    if not codigo:
+        raise DatoInvalido('Código: es obligatorio.')
+    if not nombre:
+        raise DatoInvalido('Nombre: es obligatorio.')
+    if len(codigo) > LARGOS['codigo']:
+        raise DatoInvalido(f'Código: admite hasta {LARGOS["codigo"]} caracteres.')
+    if len(nombre) > LARGOS['nombre']:
+        raise DatoInvalido(f'Nombre: admite hasta {LARGOS["nombre"]} caracteres.')
+    return {'codigo': codigo, 'nombre': nombre, 'descripcion': str(datos.get('descripcion') or '').strip() or None}
+
+
+def _activo(valor, por_defecto=True):
+    """Estado: True = Activa. Acepta 1/0 (lista Estado, archivos) y on (casilla, formularios anteriores)."""
+    valor = str(valor if valor is not None else '').strip().lower()
+    if not valor:
+        return bool(por_defecto)
+    return valor in ('1', 'on', 'true', 'si', 'sí', 'yes')
+
+
+def _codigo_en_uso(cursor, codigo, tenant_id, excluir_id=0):
+    cursor.execute("SELECT id FROM zonas WHERE codigo = %s AND id <> %s AND (%s IS NULL OR tenant_id = %s)",
+                   (codigo, excluir_id, tenant_id, tenant_id))
+    return cursor.fetchone() is not None
 
 
 @zonas_bp.route('/zonas')
@@ -38,7 +71,7 @@ def listar():
                 ORDER BY z.codigo
             """, (tenant_id, tenant_id, tenant_id, tenant_id))
             zonas = cursor.fetchall()
-        return render_template('zonas.html', zonas=zonas)
+        return render_template('zonas.html', zonas=zonas, largos=LARGOS)
     finally:
         conn.close()
 
@@ -47,29 +80,54 @@ def listar():
 def guardar():
     tenant_id = get_tenant_filter()
     d = request.form
-    z_id = d.get('id')
     conn = get_db_connection()
     try:
+        # Sin id o vacío: es un alta
+        try:
+            z_id = int((d.get('id') or '0').strip() or 0)
+        except ValueError:
+            raise DatoInvalido('Zona inválida.') from None
+        datos = _validar(d)
+
         with conn.cursor() as cursor:
-            if z_id and z_id.strip():
-                cursor.execute("""
-                    UPDATE zonas SET codigo=%s, nombre=%s, descripcion=%s, activo=%s
-                    WHERE id=%s AND (%s IS NULL OR tenant_id = %s)
-                """, (d.get('codigo'), d.get('nombre'),
-                      d.get('descripcion') or None,
-                      1 if d.get('activo') else 0, z_id, tenant_id, tenant_id))
+            anterior = None
+            if z_id:
+                cursor.execute("SELECT activo FROM zonas WHERE id = %s AND (%s IS NULL OR tenant_id = %s)",
+                               (z_id, tenant_id, tenant_id))
+                anterior = cursor.fetchone()
+                if not anterior:
+                    raise DatoInvalido('La zona que se intenta modificar no existe.')
+            if _codigo_en_uso(cursor, datos['codigo'], tenant_id, excluir_id=z_id):
+                raise DatoInvalido(f'Ya existe una zona con el código "{datos["codigo"]}".')
+            # Una zona nueva nace activa; al editar sin el dato se conserva el estado
+            activo = _activo(d.get('activo'), por_defecto=bool(anterior['activo']) if anterior else True)
+
+            aviso = ''
+            if z_id:
+                cursor.execute("UPDATE zonas SET codigo=%s, nombre=%s, descripcion=%s, activo=%s WHERE id=%s",
+                               (datos['codigo'], datos['nombre'], datos['descripcion'], activo, z_id))
+                if anterior['activo'] and not activo:
+                    cursor.execute("SELECT COUNT(*) AS n FROM ubicaciones WHERE id_zona = %s", (z_id,))
+                    n = cursor.fetchone()['n']
+                    if n:
+                        aviso = ('La zona quedó inactiva: no se ofrece para ubicaciones nuevas. La tiene '
+                                 + ('1 ubicación, que la conserva.' if n == 1 else f'{n} ubicaciones, que la conservan.'))
             else:
-                cursor.execute("""
-                    INSERT INTO zonas (codigo, nombre, descripcion, activo, tenant_id)
-                    VALUES (%s, %s, %s, %s, %s)
-                """, (d.get('codigo'), d.get('nombre'),
-                      d.get('descripcion') or None,
-                      1 if d.get('activo') else 0, tenant_id))
+                cursor.execute("INSERT INTO zonas (codigo, nombre, descripcion, activo, tenant_id) VALUES (%s, %s, %s, %s, %s)",
+                               (datos['codigo'], datos['nombre'], datos['descripcion'], activo, tenant_id))
             conn.commit()
             flash("Zona guardada correctamente.", "success")
+            if aviso:
+                flash(aviso, "warning")
+    except DatoInvalido as e:
+        conn.rollback()
+        flash(str(e), "danger")
     except Exception as e:
         conn.rollback()
-        flash(f"Error: {e!s}", "danger")
+        if is_duplicate_key_error(e):
+            flash("Ya existe una zona con ese código.", "danger")
+        else:
+            flash(f"Error al guardar la zona: {e!s}", "danger")
     finally:
         conn.close()
     return redirect(url_for('zonas.listar'))
@@ -81,20 +139,25 @@ def eliminar(id):
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            cursor.execute(
-                "SELECT COUNT(*) AS total FROM ubicaciones WHERE id_zona = %s AND (%s IS NULL OR tenant_id = %s)", 
-                (id, tenant_id, tenant_id)
-            )
-            if cursor.fetchone()['total'] > 0:
-                flash("No se puede eliminar: la zona tiene ubicaciones asignadas.", "danger")
+            cursor.execute("SELECT codigo FROM zonas WHERE id = %s AND (%s IS NULL OR tenant_id = %s)",
+                           (id, tenant_id, tenant_id))
+            zona = cursor.fetchone()
+            if not zona:
+                flash("Zona no encontrada.", "warning")
+                return redirect(url_for('zonas.listar'))
+            cursor.execute("SELECT COUNT(*) AS total FROM ubicaciones WHERE id_zona = %s", (id,))
+            total = cursor.fetchone()['total']
+            if total:
+                flash(f'No se puede eliminar la zona "{zona["codigo"]}": tiene '
+                      + ('1 ubicación asignada.' if total == 1 else f'{total} ubicaciones asignadas.')
+                      + ' Se puede inactivar desde su edición.', "danger")
             else:
-                cursor.execute("DELETE FROM zonas WHERE id = %s AND (%s IS NULL OR tenant_id = %s)", 
-                               (id, tenant_id, tenant_id))
+                cursor.execute("DELETE FROM zonas WHERE id = %s", (id,))
                 conn.commit()
                 flash("Zona eliminada.", "success")
     except Exception as e:
         conn.rollback()
-        flash(f"Error: {e!s}", "danger")
+        flash(f"No se pudo eliminar la zona: {e!s}", "danger")
     finally:
         conn.close()
     return redirect(url_for('zonas.listar'))
@@ -127,22 +190,16 @@ def importar():
                                 'razon': 'Código y Nombre son obligatorios'})
                 continue
             try:
+                datos = _validar(row)
                 with conn.cursor() as cursor:
-                    cursor.execute(
-                        "SELECT id FROM zonas WHERE codigo = %s AND (%s IS NULL OR tenant_id = %s)",
-                        (codigo, tenant_id, tenant_id))
-                    if cursor.fetchone():
+                    if _codigo_en_uso(cursor, codigo, tenant_id):
                         omitidos.append(codigo)
                         continue
+                    # Sin dato en activo, la zona nace activa
                     cursor.execute("""
                         INSERT INTO zonas (codigo, nombre, descripcion, activo, tenant_id)
                         VALUES (%s, %s, %s, %s, %s)
-                    """, (
-                        codigo, nombre,
-                        str(row.get('descripcion', '') or '').strip() or None,
-                        bool_col(row.get('activo', '1')),
-                        tenant_id
-                    ))
+                    """, (datos['codigo'], datos['nombre'], datos['descripcion'], _activo(row.get('activo')), tenant_id))
                     insertados += 1
             except Exception as e:
                 errores.append({'fila': i, 'codigo': codigo, 'razon': str(e)})
