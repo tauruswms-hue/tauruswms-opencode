@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Taurus WMS - {% block title %}Inicio{% endblock %}</title>
-    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <script src="{{ url_for('static', filename='vendor/jquery/jquery-3.7.0.min.js') }}"></script>
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <script>
     // CSRF global: cabecera en AJAX (jQuery y fetch) y campo oculto en formularios.
@@ -58,7 +58,7 @@
     })();
     </script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome/css/all.min.css') }}">
     {% if session.user_id and session.login_timestamp %}
     <meta name="session-expires" content="{{ (session.login_timestamp + 28800)|int }}">
     {% endif %}

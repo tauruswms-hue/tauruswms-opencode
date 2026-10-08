@@ -1,7 +1,7 @@
 ﻿{% extends "base.html" %}
 
 {% block content %}
-<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/datatables/css/jquery.dataTables.min.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/unidades.css') }}">
 <style>
 #tablaUnidades_wrapper .dataTables_scrollHead thead th { background: #f8f9fa; }
@@ -88,7 +88,7 @@
 {% include "partials/_modal_unidades.html" %}
 {% include "partials/_modal_importar_unidades.html" %}
 
-<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="{{ url_for('static', filename='vendor/datatables/js/jquery.dataTables.min.js') }}"></script>
 <script>
     // Unidades cargadas, para armar la lista de "Unidad Base" según la magnitud
     const unidadesCargadas = {{ unidades | tojson }};

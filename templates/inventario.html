@@ -3,7 +3,7 @@
 {% block title %}Inventarios{% endblock %}
 
 {% block content %}
-<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/datatables/css/jquery.dataTables.min.css') }}">
 
 <style>
 .badge { padding: 3px 10px; border-radius: 12px; font-size: .78rem; font-weight: 600; }
@@ -212,7 +212,7 @@
     </div>
 </div>
 
-<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="{{ url_for('static', filename='vendor/datatables/js/jquery.dataTables.min.js') }}"></script>
 <script>
 $(document).ready(function () {
     $('#tablaInv').DataTable({
