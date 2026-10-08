@@ -308,7 +308,16 @@ function autoGTIN14(btn) {
 }
 
 // ─── MODAL ────────────────────────────────────────────────────────────────────
+// Las categorías inactivas no se ofrecen, salvo la que el material ya tiene (para no quitársela al editar)
+function mostrarCategoriasInactivas(idCategoriaDelMaterial) {
+    $('#form_categoria option[data-inactiva]').each(function() {
+        var oculta = this.value != idCategoriaDelMaterial;
+        $(this).prop('hidden', oculta).prop('disabled', oculta);
+    });
+}
+
 function openModal() {
+    mostrarCategoriasInactivas(null);
     $('#formMateriales')[0].reset();
     $('#form_id_material').val('');
     $('#form_peso_bruto').val('');
@@ -354,6 +363,7 @@ function editMaterial(data) {
     $('#form_imagen_ruta').val(data.imagen_ruta || '');
     imagenGuardada = { id: data.id, ruta: data.imagen_ruta || '' };
     actualizarVistaImagen();
+    mostrarCategoriasInactivas(data.categoria_id);
     $('#form_categoria').val(data.categoria_id);
     $('#form_unidad').val(data.unidad_medida_id);
     $('#form_stock_min').val(numeroLimpio(data.stock_minimo) || '0');

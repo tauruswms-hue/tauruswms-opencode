@@ -1123,6 +1123,7 @@ ROUTES_OPERADOR = [
     "/clientes", "/clientes/guardar", "/clientes/eliminar/*",
     "/clientes/importar", "/clientes/exportar/*", "/clientes/plantilla/*",
     "/categorias", "/categorias/guardar", "/categorias/eliminar/*",
+    "/categorias/importar", "/categorias/exportar/*", "/categorias/plantilla/*",
     "/unidades", "/unidades/guardar", "/unidades/eliminar/*",
     "/unidades/importar", "/unidades/exportar/*", "/unidades/plantilla/*",
     "/transportes", "/transportes/guardar", "/transportes/eliminar/*",

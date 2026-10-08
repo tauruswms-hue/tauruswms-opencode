@@ -47,22 +47,34 @@
                     <th>Código</th>
                     <th>Nombre</th>
                     <th>Descripción</th>
+                    <th title="Materiales que tienen esta categoría">Materiales</th>
+                    <th>Estado</th>
                     <th>Acciones</th>
                 </tr>
             </thead>
             <tbody>
                 {% for c in categorias %}
-                <tr>
+                <tr{% if not c.activo %} style="color:#999;"{% endif %}>
                     <td><code>{{ c.codigo or '-' }}</code></td>
                     <td><strong>{{ c.nombre }}</strong></td>
                     <td>{{ c.descripcion or '-' }}</td>
+                    <td style="text-align:center;">{{ c.materiales or '-' }}</td>
+                    <td style="text-align:center;">
+                        {% if c.activo %}
+                            <span style="background:#27ae60; color:white; padding:2px 8px; border-radius:10px; font-size:0.8rem;">Activa</span>
+                        {% else %}
+                            <span title="No se ofrece al cargar materiales" style="background:#95a5a6; color:white; padding:2px 8px; border-radius:10px; font-size:0.8rem;">Inactiva</span>
+                        {% endif %}
+                    </td>
                     <td class="actions-cell">
-                        <button class="btn-icon edit" onclick='editCategoria({{ c | tojson }})'>
+                        <button class="btn-icon edit" title="Editar" onclick='editCategoria({{ c | tojson }})'>
                             <i class="fas fa-edit"></i>
                         </button>
-                        <form method="POST" action="{{ url_for('categorias.eliminar', id=c.id_categoria) }}" style="display:inline;" onsubmit="return confirm('¿Inactivar categoría?')">
-                            <button type="submit" class="btn-icon delete"><i class="fas fa-trash"></i></button>
+                        {% if c.activo %}
+                        <form method="POST" action="{{ url_for('categorias.eliminar', id=c.id_categoria) }}" style="display:inline;" onsubmit="return confirm('¿Inactivar esta categoría?\n\nNo se borra: deja de ofrecerse al cargar materiales. Los materiales que la tienen la conservan, y se puede reactivar desde su edición.')">
+                            <button type="submit" class="btn-icon delete" title="Inactivar"><i class="fas fa-trash"></i></button>
                         </form>
+                        {% endif %}
                     </td>
                 </tr>
                 {% endfor %}

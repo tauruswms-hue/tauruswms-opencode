@@ -62,7 +62,7 @@
                         <select name="categoria_id" id="form_categoria">
                             <option value="">Seleccionar...</option>
                             {% for cat in categorias %}
-                            <option value="{{ cat.id_categoria }}">{{ cat.nombre }}</option>
+                            <option value="{{ cat.id_categoria }}"{% if not cat.activo %} data-inactiva="1"{% endif %}>{{ cat.nombre }}{% if not cat.activo %} (inactiva){% endif %}</option>
                             {% endfor %}
                         </select>
                     </div>

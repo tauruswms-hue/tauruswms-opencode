@@ -3,13 +3,14 @@ $(document).ready(function() {
         "paging": false,                    // todas las filas en el cuerpo; el scroll lo maneja la grilla
         "scrollY": "calc(100vh - 300px)",   // cuerpo con scroll vertical; el header queda fijo
         "scrollCollapse": true,
-        "language": { "url": "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json" }
+        "language": DataTablesEs
     });
 });
 
 function openModal() {
     $('#formCategorias')[0].reset();
     $('#form_id_cat').val('');
+    $('#form_activo').val('1');   // una categoría nueva se propone Activa
     $('#modalTitle').text('Nueva Categoría');
     $('#modalCategorias').css('display', 'flex').hide().fadeIn(150);
 }
@@ -23,5 +24,5 @@ function editCategoria(data) {
     $('#form_codigo').val(data.codigo);
     $('#form_nombre').val(data.nombre);
     $('#form_desc').val(data.descripcion);
-    $('#form_activo').prop('checked', data.activo == 1);
+    $('#form_activo').val(data.activo ? '1' : '0');
 }
