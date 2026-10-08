@@ -3,7 +3,7 @@ $(document).ready(function() {
         "paging": false,                    // todas las filas en el cuerpo; el scroll lo maneja la grilla
         "scrollY": "calc(100vh - 300px)",   // cuerpo con scroll vertical; el header queda fijo
         "scrollCollapse": true,
-        "language": { "url": "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json" }
+        "language": DataTablesEs
     });
 });
 
