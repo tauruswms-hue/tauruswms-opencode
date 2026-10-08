@@ -297,6 +297,9 @@ def test_ciclo_completo_cerrar_y_confirmar_la_omc(logged_client, wms, datos, usu
     assert _stock(wms, datos, datos['material_lote']) == {'RECEP': ('LOTE-A', 0, 0, 0, 17), 'DEST': ('LOTE-A', 0, 0, 17, 0)}
     omc = _omc(wms, id_recepcion)
     assert omc['estado'].capitalize() == 'Pendiente'
+    cur = wms.cursor()                                                   # sus contenedores llevan la empresa
+    cur.execute("SELECT tenant_id FROM omc_contenedores WHERE id_omc = %s", (omc['id_omc'],))
+    assert [r['tenant_id'] for r in cur.fetchall()] == [datos['tenant']]
 
     # La recepción no confirma por su cuenta mientras la OMC está pendiente
     logged_client.post(f'/recepciones/confirmar_stock/{id_recepcion}')

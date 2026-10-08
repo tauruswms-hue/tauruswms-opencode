@@ -13,6 +13,7 @@ from flask import (
 from werkzeug.security import check_password_hash
 
 from modules.auditoria import registrar_movimiento
+from modules.batch_utils import DatoInvalido
 from modules.context import get_tenant_filter
 from modules.db_config import _get_admin_connection, get_db_connection
 from modules.sql_dialect import (
@@ -29,6 +30,64 @@ from modules.sql_dialect import (
 from modules.sql_dialect import year as year_func
 
 omc_bp = Blueprint('omc', __name__)
+
+# Roles que pueden confirmar una OMC (además se pide la contraseña del usuario)
+ROLES_CONFIRMAN = ('ADMIN', 'SUPERADMIN')
+
+
+def _puede_confirmar():
+    return session.get('rol', '').upper() in ROLES_CONFIRMAN
+
+
+def _id(valor):
+    """Id entero de un formulario, o 0 si no es un id."""
+    try:
+        return int(str(valor if valor is not None else '').strip() or 0)
+    except ValueError:
+        return 0
+
+
+def _ubicacion_destino(cursor, valor, tenant_id):
+    """Id de la ubicación destino: tiene que existir, ser de la empresa y estar activa."""
+    id_destino = _id(valor)
+    if not id_destino:
+        raise DatoInvalido('Debe seleccionar una ubicación destino.')
+    cursor.execute("SELECT codigo, activo FROM ubicaciones WHERE id = %s AND (%s IS NULL OR tenant_id = %s)",
+                   (id_destino, tenant_id, tenant_id))
+    fila = cursor.fetchone()
+    if not fila:
+        raise DatoInvalido('La ubicación destino elegida no existe.')
+    if not fila['activo']:
+        raise DatoInvalido(f'La ubicación destino "{fila["codigo"]}" está inactiva.')
+    return id_destino
+
+
+def _verificar_contenedor_destino(cursor, contenedor_destino, id_destino, tenant_id):
+    """Un contenedor destino que ya tiene stock tiene que estar en la ubicación destino.
+
+    Si estaba en otra, al confirmar quedaba el mismo contenedor con stock en dos ubicaciones.
+    """
+    cursor.execute("""
+        SELECT u.codigo FROM stockcontable sc
+        JOIN ubicaciones u ON u.id = sc.Ubicacion
+        WHERE sc.IDContenedor = %s AND sc.Ubicacion <> %s
+          AND (sc.StockTotal <> 0 OR sc.StockDisponible <> 0)
+          AND (%s IS NULL OR sc.tenant_id = %s)
+    """, (contenedor_destino, id_destino, tenant_id, tenant_id))
+    otra = cursor.fetchone()
+    if otra:
+        raise DatoInvalido(f'El contenedor destino {contenedor_destino} está en la ubicación {otra["codigo"]}, '
+                           'no en la ubicación destino elegida.')
+
+
+def _borrar_filas_en_cero(cursor, contenedor, id_ubicacion, tenant_id):
+    """Quita las filas de stock que quedaron con todas sus cantidades en cero."""
+    cursor.execute("""
+        DELETE FROM stockcontable
+        WHERE IDContenedor = %s AND Ubicacion = %s
+          AND StockTotal = 0 AND StockDisponible = 0 AND StockEntrando = 0 AND StockSaliendo = 0
+          AND (%s IS NULL OR tenant_id = %s)
+    """, (contenedor, id_ubicacion, tenant_id, tenant_id))
 
 
 def _generar_numero_omc(cursor, tenant_id):
@@ -195,8 +254,6 @@ def guardar():
         flash("Debe seleccionar una ubicación destino.", "warning")
         return redirect(url_for('omc.nueva'))
 
-    id_destino = int(id_destino)
-
     # Build and validate pairs (contenedor, id_origen)
     pares = []
     seen = set()
@@ -211,7 +268,10 @@ def guardar():
             flash(f"El contenedor {cont} está duplicado.", "warning")
             return redirect(url_for('omc.nueva'))
         seen.add(cont)
-        pares.append({'contenedor': cont, 'id_origen': int(origenes_input[i])})
+        if not _id(origenes_input[i]):
+            flash(f"El contenedor {cont} tiene una ubicación origen inválida.", "warning")
+            return redirect(url_for('omc.nueva'))
+        pares.append({'contenedor': cont, 'id_origen': _id(origenes_input[i])})
 
     if not pares:
         flash("Debe agregar al menos un contenedor.", "warning")
@@ -223,6 +283,7 @@ def guardar():
             ahora   = datetime.now()
             usuario = session.get('nombre', 'sistema')
             tenant_id = get_tenant_filter()
+            id_destino = _ubicacion_destino(cursor, id_destino, tenant_id)
 
             # Validate each container
             for par in pares:
@@ -272,6 +333,7 @@ def guardar():
                 if row_dest and (row_dest['total_sal'] or row_dest['total_ent']):
                     flash(f"El contenedor destino {contenedor_destino} tiene movimientos pendientes.", "warning")
                     return redirect(url_for('omc.nueva'))
+                _verificar_contenedor_destino(cursor, contenedor_destino, id_destino, tenant_id)
 
             numero = _generar_numero_omc(cursor, tenant_id)
 
@@ -301,6 +363,10 @@ def guardar():
             flash(f"OMC {numero} creada con {len(pares)} contenedor(es).", "success")
             return redirect(url_for('omc.ver', id_omc=id_omc))
 
+    except DatoInvalido as e:
+        conn.rollback()
+        flash(str(e), "warning")
+        return redirect(url_for('omc.nueva'))
     except Exception as e:
         conn.rollback()
         flash(f"Error al crear la OMC: {e!s}", "danger")
@@ -376,7 +442,7 @@ def ver(id_omc):
                            (omc['id_ubicacion_destino'] or 0, tenant_id, tenant_id))
             ubicaciones = cursor.fetchall()
 
-        es_admin = session.get('rol', '').upper() == 'ADMIN'
+        es_admin = _puede_confirmar()
         return render_template('omc_ver.html',
                                omc=omc,
                                contenedores=contenedores,
@@ -394,7 +460,7 @@ def ver(id_omc):
 @omc_bp.route('/omc/confirmar/<int:id_omc>', methods=['POST'])
 def confirmar(id_omc):
     tenant_id = get_tenant_filter()
-    if session.get('rol', '').upper() != 'ADMIN':
+    if not _puede_confirmar():
         flash("Solo un administrador puede confirmar una OMC.", "danger")
         return redirect(url_for('omc.ver', id_omc=id_omc))
 
@@ -440,7 +506,7 @@ def confirmar(id_omc):
                 for cont in contenedores:
                     cont_dest = cont.get('id_contenedor_destino') or cont['id_contenedor']
                     cursor.execute("""
-                        SELECT Material, StockEntrando AS cantidad
+                        SELECT Material, TipoStock, StockEntrando AS cantidad
                         FROM stockcontable
                         WHERE IDContenedor = %s AND Ubicacion = %s AND StockEntrando > 0
                           AND (%s IS NULL OR tenant_id = %s)
@@ -524,12 +590,14 @@ def confirmar(id_omc):
             # Si vino de un pedido: actualizar Cantidad_preparada y verificar si está completo
             if omc.get('id_pedido'):
                 for mat in materiales_confirmados:
+                    # Solo el renglón del mismo tipo de stock: con el material pedido en dos tipos,
+                    # lo preparado se sumaba a los dos renglones
                     cursor.execute("""
                         UPDATE pedidos_detalle
                         SET Cantidad_preparada = Cantidad_preparada + %s
-                        WHERE id_pedido = %s AND id_material = %s
+                        WHERE id_pedido = %s AND id_material = %s AND LOWER(tipo_stock) = LOWER(%s)
                           AND (%s IS NULL OR tenant_id = %s)
-                    """, (mat['cantidad'], omc['id_pedido'], mat['Material'], tenant_id, tenant_id))
+                    """, (mat['cantidad'], omc['id_pedido'], mat['Material'], mat['TipoStock'], tenant_id, tenant_id))
 
                 cursor.execute("""
                     SELECT COUNT(*) AS total,
@@ -585,12 +653,19 @@ def modificar(id_omc):
                 return redirect(url_for('omc.listar'))
 
             old_destino     = omc['id_ubicacion_destino']
-            new_destino_int = int(new_destino)
+            new_destino_int = _ubicacion_destino(cursor, new_destino, tenant_id)
             ahora           = datetime.now()
             usuario         = session.get('nombre', 'sistema')
             contenedores = _get_contenedores_omc(cursor, id_omc, tenant_id)
 
+            # Mismas reglas que al crear: con el origen como destino, al confirmar se borraba el stock
             for cont in contenedores:
+                if cont.get('id_contenedor_destino'):
+                    _verificar_contenedor_destino(cursor, cont['id_contenedor_destino'], new_destino_int, tenant_id)
+                elif cont['id_ubicacion_origen'] == new_destino_int:
+                    raise DatoInvalido(f'Contenedor {cont["id_contenedor"]}: origen y destino no pueden ser la misma ubicación.')
+
+            for cont in contenedores if new_destino_int != old_destino else []:
                 cont_dest = cont.get('id_contenedor_destino') or cont['id_contenedor']
 
                 cursor.execute("""
@@ -615,6 +690,7 @@ def modificar(id_omc):
                         id_contenedor=cont_dest, lote=rec['Lote'], tipo_stock=rec['TipoStock'],
                         cantidad=-rec['cantidad'],
                         detalle=f"Stock entrando removido del destino anterior (OMC {omc['numero']})")
+                _borrar_filas_en_cero(cursor, cont_dest, old_destino, tenant_id)
 
                 # Crear StockEntrando en nuevo destino
                 _crear_stock_entrando(cursor, cont['id_contenedor'], cont['id_ubicacion_origen'],
@@ -630,6 +706,9 @@ def modificar(id_omc):
             conn.commit()
             flash(f"OMC {omc['numero']} modificada correctamente.", "success")
 
+    except DatoInvalido as e:
+        conn.rollback()
+        flash(str(e), "warning")
     except Exception as e:
         conn.rollback()
         flash(f"Error al modificar la OMC: {e!s}", "danger")
@@ -703,6 +782,8 @@ def anular(id_omc):
                       AND (%s IS NULL OR tenant_id = %s)
                 """, (ahora, ahora, usuario, cont['id_contenedor'], cont['id_ubicacion_origen'], tenant_id, tenant_id))
 
+                _borrar_filas_en_cero(cursor, cont_dest, omc['id_ubicacion_destino'], tenant_id)
+
                 for rec in dest_entrantes:
                     registrar_movimiento(
                         conn, tenant_id=tenant_id, accion='ANULAR_OMC', usuario=usuario,
@@ -729,20 +810,30 @@ def anular(id_omc):
                       AND (%s IS NULL OR tenant_id = %s)
                 """, (omc['id_recepcion'], tenant_id, tenant_id))
 
-            # Si vino de un pedido, anular el pedido
-            if omc.get('id_pedido'):
-                cursor.execute("""
-                    UPDATE pedidos_cabecera
-                    SET estado = 'Anulado'
-                    WHERE id_pedido = %s AND estado NOT IN ('Despachado', 'Anulado')
-                      AND (%s IS NULL OR tenant_id = %s)
-                """, (omc['id_pedido'], tenant_id, tenant_id))
-
             cursor.execute("""
                 UPDATE omc
                 SET estado = 'Anulada', fecha_anulacion = %s, usuario_anulacion = %s
                 WHERE id_omc = %s AND (%s IS NULL OR tenant_id = %s)
             """, (ahora, usuario, id_omc, tenant_id, tenant_id))
+
+            # Si vino de un pedido (antes se anulaba el pedido entero, aunque tuviera otras OMC):
+            #   - sin otras OMC en curso ni confirmadas, vuelve a Pendiente;
+            #   - si las que le quedan están todas confirmadas, queda Preparado (la misma regla que al
+            #     confirmar: sin esto quedaba en Trabajo para siempre);
+            #   - con alguna todavía pendiente, no cambia.
+            if omc.get('id_pedido'):
+                cursor.execute("""SELECT SUM(CASE WHEN estado = 'Pendiente'  THEN 1 ELSE 0 END) AS pendientes,
+                                         SUM(CASE WHEN estado = 'Confirmada' THEN 1 ELSE 0 END) AS confirmadas
+                                  FROM omc WHERE id_pedido = %s""", (omc['id_pedido'],))
+                quedan = cursor.fetchone()
+                if not (quedan['pendientes'] or 0):
+                    nuevo_estado = 'Preparado' if (quedan['confirmadas'] or 0) else 'Pendiente'
+                    cursor.execute("""
+                        UPDATE pedidos_cabecera
+                        SET estado = %s
+                        WHERE id_pedido = %s AND estado IN ('Trabajo', 'Trabajo OMC')
+                          AND (%s IS NULL OR tenant_id = %s)
+                    """, (nuevo_estado, omc['id_pedido'], tenant_id, tenant_id))
 
             conn.commit()
             flash(f"OMC {omc['numero']} anulada. Stock liberado en todos los orígenes.", "success")

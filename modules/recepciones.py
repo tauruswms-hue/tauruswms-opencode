@@ -692,9 +692,9 @@ def cerrar(id_recepcion):
             ))
             cursor.execute("""
                 INSERT INTO omc_contenedores
-                    (id_omc, id_contenedor, id_contenedor_destino, id_ubicacion_origen)
-                VALUES (%s, %s, NULL, %s)
-            """, (id_omc_rec, contenedor, recepcion['id_ubicacion_recep']))
+                    (id_omc, id_contenedor, id_contenedor_destino, id_ubicacion_origen, tenant_id)
+                VALUES (%s, %s, NULL, %s, %s)
+            """, (id_omc_rec, contenedor, recepcion['id_ubicacion_recep'], tenant_id))
 
             # Cerrar cabecera
             cursor.execute("""
