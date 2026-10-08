@@ -37,25 +37,37 @@
         <table id="tablaRutas" class="display cell-border hover stripe" style="width:100%; min-width: 700px;">
             <thead>
                 <tr>
-                    <th>ID</th>
                     <th>Nombre de Ruta / Zona</th>
                     <th>Descripción</th>
+                    <th title="Transportes que cubren la ruta">Transportes</th>
+                    <th title="Clientes que la tienen como ruta de entrega">Clientes</th>
+                    <th>Estado</th>
                     <th style="width: 100px;">Acciones</th>
                 </tr>
             </thead>
             <tbody>
                 {% for r in rutas %}
-                <tr>
-                    <td><code>#{{ r.id_ruta }}</code></td>
+                <tr{% if not r.activo %} style="color:#999;"{% endif %}>
                     <td><strong>{{ r.nombre_ruta }}</strong></td>
                     <td>{{ r.descripcion or '-' }}</td>
+                    <td style="text-align:center;">{{ r.transportes or '-' }}</td>
+                    <td style="text-align:center;">{{ r.clientes or '-' }}</td>
+                    <td style="text-align:center;">
+                        {% if r.activo %}
+                            <span style="background:#27ae60; color:white; padding:2px 8px; border-radius:10px; font-size:0.8rem;">Activa</span>
+                        {% else %}
+                            <span title="No se ofrece al cargar clientes, transportes ni pedidos" style="background:#95a5a6; color:white; padding:2px 8px; border-radius:10px; font-size:0.8rem;">Inactiva</span>
+                        {% endif %}
+                    </td>
                     <td class="actions-cell" style="text-align: center;">
-                        <button class="btn-icon edit" onclick='editRuta({{ r | tojson }})' style="color: #3498db; background: none; border: none; cursor: pointer; font-size: 1.1rem;">
+                        <button class="btn-icon edit" title="Editar" onclick='editRuta({{ r | tojson }})' style="color: #3498db; background: none; border: none; cursor: pointer; font-size: 1.1rem;">
                             <i class="fas fa-edit"></i>
                         </button>
-                        <form method="POST" action="{{ url_for('rutas.eliminar', id=r.id_ruta) }}" style="display:inline;" onsubmit="return confirm('¿Eliminar esta ruta?')">
-                            <button type="submit" class="btn-icon delete" style="color: #e74c3c; margin-left: 12px; font-size: 1.1rem; border:none; background:none; cursor:pointer;"><i class="fas fa-trash"></i></button>
+                        {% if r.activo %}
+                        <form method="POST" action="{{ url_for('rutas.eliminar', id=r.id_ruta) }}" style="display:inline;" onsubmit="return confirm('¿Inactivar esta ruta?\n\nNo se borra: deja de ofrecerse al cargar clientes, transportes y pedidos. Lo que ya la tiene la conserva, y se puede reactivar desde su edición.')">
+                            <button type="submit" class="btn-icon delete" title="Inactivar" style="color: #e74c3c; margin-left: 12px; font-size: 1.1rem; border:none; background:none; cursor:pointer;"><i class="fas fa-trash"></i></button>
                         </form>
+                        {% endif %}
                     </td>
                 </tr>
                 {% endfor %}

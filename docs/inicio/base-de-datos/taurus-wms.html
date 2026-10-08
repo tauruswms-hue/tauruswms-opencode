@@ -38,7 +38,7 @@
 
         <h2>Script</h2>
         <p>Archivo: <a href="../../migrations/create_wms_mysql.sql"><code>docs/migrations/create_wms_mysql.sql</code></a>
-        (506 líneas). Lo genera <code>modules/schema_generator.py</code>; no se edita a mano.</p>
+        (508 líneas). Lo genera <code>modules/schema_generator.py</code>; no se edita a mano.</p>
         <details class="script">
             <summary>Ver el script completo</summary>
 <pre><code>SET NAMES utf8mb4;
@@ -110,7 +110,9 @@ CREATE TABLE `rutas` (
     `id_ruta` int AUTO_INCREMENT PRIMARY KEY,
     `nombre_ruta` varchar(100) NOT NULL,
     `descripcion` text,
-    `tenant_id` int
+    `activo` TINYINT(1) DEFAULT TRUE,
+    `tenant_id` int,
+    UNIQUE KEY `uk_rutas_nombre_tenant` (`nombre_ruta`, `tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE INDEX `idx_rutas_tenant` ON `rutas` (`tenant_id`);
 

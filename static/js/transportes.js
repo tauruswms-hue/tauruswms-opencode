@@ -41,8 +41,10 @@ function actualizarRutas() {
 function agregarFilaRuta(idRuta, obs) {
     var options = '<option value="">Seleccionar ruta…</option>';
     listaRutasDB.forEach(function(r) {
+        // Las inactivas no se ofrecen, salvo la que el transporte ya tiene
+        if (!r.activo && r.id_ruta != idRuta) return;
         options += '<option value="' + escTra(r.id_ruta) + '"' + (r.id_ruta == idRuta ? ' selected' : '') + '>' +
-            escTra(r.nombre_ruta) + '</option>';
+            escTra(r.nombre_ruta) + (r.activo ? '' : ' (inactiva)') + '</option>';
     });
     $('#listaRutasCuerpo').append('<tr>' +
         '<td><select name="rutas_ids[]" required>' + options + '</select></td>' +

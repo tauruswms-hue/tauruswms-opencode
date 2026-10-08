@@ -69,9 +69,11 @@ CREATE TABLE [rutas] (
     [id_ruta] INT IDENTITY(1,1) PRIMARY KEY,
     [nombre_ruta] NVARCHAR(100) NOT NULL,
     [descripcion] NVARCHAR(MAX),
+    [activo] BIT DEFAULT 1,
     [tenant_id] INT
 );
 CREATE INDEX [idx_rutas_tenant] ON [rutas] ([tenant_id]);
+CREATE UNIQUE INDEX [uk_rutas_nombre_tenant] ON [rutas] ([nombre_ruta], [tenant_id]);
 
 -- --- unidades_medida ---;
 CREATE TABLE [unidades_medida] (

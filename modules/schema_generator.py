@@ -248,10 +248,12 @@ WMS_TABLES = [
             {"name": "id_ruta",     "type": "int",          "pk": True, "autoincrement": True},
             {"name": "nombre_ruta", "type": "varchar(100)", "not_null": True},
             {"name": "descripcion", "type": "text"},
+            {"name": "activo",      "type": "boolean", "default": True},
             {"name": "tenant_id",   "type": "int"},
         ],
         "indexes": [
             {"columns": ["tenant_id"], "name": "idx_rutas_tenant"},
+            {"columns": ["nombre_ruta", "tenant_id"], "name": "uk_rutas_nombre_tenant", "unique": True},
         ],
     },
     {

@@ -99,11 +99,20 @@ $(document).on('submit', '#formCliente', function(e) {
     }
 });
 
+// Las rutas inactivas no se ofrecen, salvo la que el cliente ya tiene (para no quitársela al editar)
+function mostrarRutasInactivas(idRutaDelCliente) {
+    $('#form_id_ruta option[data-inactiva]').each(function() {
+        var oculta = this.value != idRutaDelCliente;
+        $(this).prop('hidden', oculta).prop('disabled', oculta);
+    });
+}
+
 function openModalCliente() {
     $('#formCliente')[0].reset();
     $('#form_id_cliente').val('');
     $('#form_activo').val('1');   // un cliente nuevo se propone Activo
     $('#form_id_transporte').empty().append('<option value="">-- Seleccionar Transporte --</option>');
+    mostrarRutasInactivas(null);
     $('#listaContactosCuerpo').empty();
     actualizarCuentaContactos();
     mostrarPestanaCliente('tab-cli-datos');
@@ -129,6 +138,7 @@ function editCliente(data) {
     $('#form_sitio_web').val(data.sitio_web || '');
     contactosClientes.filter(function(c) { return c.id_cliente == data.id_cliente; }).forEach(agregarFilaContacto);
 
+    mostrarRutasInactivas(data.id_ruta);
     $('#form_id_ruta').val(data.id_ruta);
     filtrarTransportes(data.id_ruta, data.id_transporte_predeterminado);
 }

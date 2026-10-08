@@ -344,9 +344,11 @@ CREATE TABLE "rutas" (
     "id_ruta" SERIAL,
     "nombre_ruta" VARCHAR(100) NOT NULL,
     "descripcion" text,
+    "activo" BOOLEAN DEFAULT TRUE,
     "tenant_id" INTEGER
 );
 CREATE INDEX "idx_rutas_tenant" ON "rutas" ("tenant_id");
+CREATE UNIQUE INDEX "uk_rutas_nombre_tenant" ON "rutas" ("nombre_ruta", "tenant_id");
 
 -- --- unidades_medida ---;
 CREATE TABLE "unidades_medida" (

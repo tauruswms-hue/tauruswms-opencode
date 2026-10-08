@@ -295,14 +295,15 @@ def _aplicar_registro_ruta(reg, conn_wms, cursor_wms, cursor_admin):
 
     if accion == 'baja':
         if ruta_id:
-            cursor_wms.execute("DELETE FROM rutas WHERE id_ruta = %s", (ruta_id,))
+            # No se borra: el borrado la quitaba de transportes, clientes y pedidos
+            cursor_wms.execute("UPDATE rutas SET activo = %s WHERE id_ruta = %s", (False, ruta_id))
         return True, 'baja aplicada', ruta_id
 
     descripcion = (reg.get('descripcion') or '').strip() or None
     if ruta_id:
         cursor_wms.execute(
-            "UPDATE rutas SET descripcion = %s WHERE id_ruta = %s",
-            (descripcion, ruta_id))
+            "UPDATE rutas SET descripcion = %s, activo = %s WHERE id_ruta = %s",
+            (descripcion, True, ruta_id))   # un alta o modificación la deja activa
         return True, 'actualizado', ruta_id
 
     ruta_id = execute_insert(cursor_wms, """

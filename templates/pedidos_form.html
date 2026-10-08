@@ -114,7 +114,7 @@
                         <option value="">-- Seleccionar --</option>
                         {% for r in rutas %}
                         <option value="{{ r.id_ruta }}" {% if edit_mode and pedido.id_ruta == r.id_ruta %}selected{% endif %}>
-                            {{ r.nombre_ruta }}
+                            {{ r.nombre_ruta }}{% if not r.activo %} (inactiva){% endif %}
                         </option>
                         {% endfor %}
                     </select>

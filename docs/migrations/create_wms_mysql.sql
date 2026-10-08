@@ -67,7 +67,9 @@ CREATE TABLE `rutas` (
     `id_ruta` int AUTO_INCREMENT PRIMARY KEY,
     `nombre_ruta` varchar(100) NOT NULL,
     `descripcion` text,
-    `tenant_id` int
+    `activo` TINYINT(1) DEFAULT TRUE,
+    `tenant_id` int,
+    UNIQUE KEY `uk_rutas_nombre_tenant` (`nombre_ruta`, `tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE INDEX `idx_rutas_tenant` ON `rutas` (`tenant_id`);
 

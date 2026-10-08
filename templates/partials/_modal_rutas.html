@@ -12,13 +12,21 @@
             <div class="modal-scroll-body" style="overflow-y:auto; flex:1; padding:20px 25px;">
                 <div class="form-group" style="margin-bottom:15px;">
                     <label style="display:block; font-size:0.8rem; font-weight:bold; color:#666; margin-bottom:5px;">Nombre de la Ruta / Zona *</label>
-                    <input type="text" name="nombre_ruta" id="form_nombre_ruta" required placeholder="Ej: Zona Norte, Rosario, GBA"
+                    <input type="text" name="nombre_ruta" id="form_nombre_ruta" required maxlength="{{ nombre_max }}" placeholder="Ej: Zona Norte, Rosario, GBA"
                            style="width:100%; padding:10px; border:1px solid #ddd; border-radius:4px; box-sizing:border-box;">
                 </div>
                 <div class="form-group" style="margin-bottom:10px;">
                     <label style="display:block; font-size:0.8rem; font-weight:bold; color:#666; margin-bottom:5px;">Descripción / Notas</label>
                     <textarea name="descripcion" id="form_descripcion" rows="3" placeholder="Detalles adicionales sobre la logística en esta zona..."
                               style="width:100%; padding:10px; border:1px solid #ddd; border-radius:4px; box-sizing:border-box; resize:vertical;"></textarea>
+                </div>
+                <div class="form-group" style="margin:15px 0 10px;">
+                    <label for="form_ruta_activo" style="display:block; font-size:0.8rem; font-weight:bold; color:#666; margin-bottom:5px;">Estado</label>
+                    <select name="activo" id="form_ruta_activo" title="Una ruta inactiva no se ofrece al cargar clientes, transportes ni pedidos"
+                            style="padding:10px; border:1px solid #ddd; border-radius:4px; min-width:160px;">
+                        <option value="1">Activa</option>
+                        <option value="0">Inactiva</option>
+                    </select>
                 </div>
             </div>
 

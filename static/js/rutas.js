@@ -25,12 +25,20 @@ $(document).ready(function() {
     });
 });
 
+// Escapa un valor para insertarlo en HTML
+function escRuta(valor) {
+    return String(valor === null || valor === undefined ? '' : valor)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 /**
  * Abre el modal en modo "Crear"
  */
 function openModalRuta() {
     $('#formRuta')[0].reset();
     $('#form_id_ruta').val('');
+    $('#form_ruta_activo').val('1');   // una ruta nueva se propone Activa
     $('#modalTitleRuta').html('<i class="fas fa-plus-circle"></i> Nueva Ruta');
     $('#modalRuta').css('display', 'flex').hide().fadeIn(200);
 }
@@ -48,10 +56,11 @@ function closeModalRuta() {
  */
 function editRuta(data) {
     openModalRuta();
-    $('#modalTitleRuta').html('<i class="fas fa-edit"></i> Editar Ruta: ' + data.nombre_ruta);
+    $('#modalTitleRuta').html('<i class="fas fa-edit"></i> Editar Ruta: ' + escRuta(data.nombre_ruta));
     $('#form_id_ruta').val(data.id_ruta);
     $('#form_nombre_ruta').val(data.nombre_ruta);
     $('#form_descripcion').val(data.descripcion);
+    $('#form_ruta_activo').val(data.activo ? '1' : '0');
 }
 
 // Cerrar modal al hacer click fuera de la tarjeta

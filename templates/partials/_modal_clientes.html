@@ -114,7 +114,7 @@
                             <select name="id_ruta" id="form_id_ruta" style="width:100%; padding: 10px; border: 1px solid #ddd; border-radius:4px;" onchange="filtrarTransportes(this.value)">
                                 <option value="">-- Seleccionar Ruta --</option>
                                 {% for r in rutas %}
-                                <option value="{{ r.id_ruta }}">{{ r.nombre_ruta }}</option>
+                                <option value="{{ r.id_ruta }}"{% if not r.activo %} data-inactiva="1"{% endif %}>{{ r.nombre_ruta }}{% if not r.activo %} (inactiva){% endif %}</option>
                                 {% endfor %}
                             </select>
                         </div>

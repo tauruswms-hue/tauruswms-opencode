@@ -342,7 +342,9 @@ CREATE TABLE IF NOT EXISTS "rutas" (
     "id_ruta" INTEGER PRIMARY KEY AUTOINCREMENT,
     "nombre_ruta" TEXT NOT NULL,
     "descripcion" text,
-    "tenant_id" INTEGER
+    "activo" INTEGER DEFAULT 1,
+    "tenant_id" INTEGER,
+    UNIQUE ("nombre_ruta", "tenant_id")
 );
 CREATE INDEX IF NOT EXISTS "idx_rutas_tenant" ON "rutas" ("tenant_id");
 
