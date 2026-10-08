@@ -67,23 +67,32 @@ def _activo(valor, por_defecto=True):
     return valor in ('1', 'on', 'true', 'si', 'sí', 'yes')
 
 
-def _muelle(cursor, valor, tenant_id, por_codigo=False):
-    """Id del muelle de salida: una ubicación del tenant cuyo tipo es de salida (operación 'S'). None si no se indica."""
+def _muelle(cursor, valor, tenant_id, por_codigo=False, actual=None):
+    """Id del muelle de salida: una ubicación activa del tenant cuyo tipo es de salida (operación 'S').
+
+    None si no se indica. `actual` es el muelle que el transporte ya tiene: se conserva aunque la
+    ubicación haya quedado inactiva o ya no sea de salida (la ficha lo avisa), para que eso no impida
+    guardar otros cambios del transporte.
+    """
     valor = str(valor if valor is not None else '').strip()
     if not valor:
         return None
     columna = 'u.codigo' if por_codigo else 'u.id'
     if not por_codigo and not valor.isdigit():
         raise DatoInvalido('Muelle de salida: valor inválido.')
-    cursor.execute(f"""SELECT u.id, t.operacion FROM ubicaciones u
+    cursor.execute(f"""SELECT u.id, u.activo, t.operacion FROM ubicaciones u
                        LEFT JOIN tipoubicacion t ON u.tipoubicacion = t.id
                        WHERE {columna} = %s AND (%s IS NULL OR u.tenant_id = %s)""", (valor, tenant_id, tenant_id))
     fila = cursor.fetchone()
     if not fila:
         raise DatoInvalido(f'Muelle de salida: no existe la ubicación "{valor}".' if por_codigo
                            else 'Muelle de salida: la ubicación elegida no existe.')
+    if actual and fila['id'] == actual:
+        return fila['id']
     if (fila['operacion'] or '').upper() != 'S':
         raise DatoInvalido('Muelle de salida: la ubicación tiene que ser de un tipo de salida.')
+    if not fila['activo']:
+        raise DatoInvalido('Muelle de salida: la ubicación está inactiva.')
     return fila['id']
 
 
@@ -142,9 +151,13 @@ def listar():
     try:
         with conn.cursor() as cursor:
             cursor.execute("""
-                SELECT t.*, u.codigo AS muelle_codigo, u.descipcion AS muelle_descripcion
+                SELECT t.*, u.codigo AS muelle_codigo, u.descipcion AS muelle_descripcion,
+                       u.activo AS muelle_activo, tu.operacion AS muelle_operacion,
+                       (SELECT COUNT(*) FROM clientes c WHERE c.id_transporte_predeterminado = t.id_transporte) AS clientes,
+                       (SELECT COUNT(*) FROM pedidos_cabecera p WHERE p.id_transporte = t.id_transporte) AS pedidos
                 FROM transportes t
                 LEFT JOIN ubicaciones u ON t.id_muelle_salida = u.id
+                LEFT JOIN tipoubicacion tu ON u.tipoubicacion = tu.id
                 WHERE (%s IS NULL OR t.tenant_id = %s)
                 ORDER BY t.razonsocial
             """, (tenant_id, tenant_id))
@@ -157,15 +170,22 @@ def listar():
                 SELECT u.id, u.codigo, u.descipcion
                 FROM ubicaciones u
                 JOIN tipoubicacion t ON u.tipoubicacion = t.id
-                WHERE t.operacion = 'S' AND (%s IS NULL OR u.tenant_id = %s)
+                WHERE t.operacion = 'S' AND u.activo = 1 AND (%s IS NULL OR u.tenant_id = %s)
                 ORDER BY u.codigo
             """, (tenant_id, tenant_id))
             muelles = cursor.fetchall()
 
-        nombre_ruta = {r['id_ruta']: r['nombre_ruta'] for r in rutas_lista}
+        nombre_ruta = {r['id_ruta']: r['nombre_ruta'] + ('' if r['activo'] else ' (inactiva)') for r in rutas_lista}
         for t in transportes:
             # Los CUIT cargados antes como 11 dígitos se muestran y editan ya formateados
             t['cuit'] = cuit_para_mostrar(t.get('cuit'))
+            # El muelle asignado puede haber dejado de servir: la ubicación quedó inactiva o cambió de tipo
+            t['muelle_aviso'] = ''
+            if t['id_muelle_salida'] and t['muelle_codigo']:
+                if (t.pop('muelle_operacion') or '').upper() != 'S':
+                    t['muelle_aviso'] = 'ya no es una ubicación de salida'
+                elif not t['muelle_activo']:
+                    t['muelle_aviso'] = 'ubicación inactiva'
             t['rutas_nombres'] = sorted(nombre_ruta[r['id_ruta']] for r in relaciones
                                         if r['id_transporte'] == t['id_transporte'] and r['id_ruta'] in nombre_ruta)
         return render_template('transportes.html', transportes=transportes, rutas_lista=rutas_lista,
@@ -185,18 +205,22 @@ def guardar():
         except ValueError:
             raise DatoInvalido('Transporte inválido.') from None
         datos = _validar(d)
-        # Sin el campo Estado, un alta nace activa; en una edición equivale a Inactivo (casilla sin tildar)
-        activo = _activo(d.get('activo'), por_defecto=not t_id)
 
         with conn.cursor() as cursor:
+            anterior = None
             if t_id:
-                cursor.execute("SELECT id_transporte FROM transportes WHERE id_transporte = %s AND (%s IS NULL OR tenant_id = %s)",
+                cursor.execute("""SELECT activo, id_muelle_salida FROM transportes
+                                  WHERE id_transporte = %s AND (%s IS NULL OR tenant_id = %s)""",
                                (t_id, tenant_id, tenant_id))
-                if not cursor.fetchone():
+                anterior = cursor.fetchone()
+                if not anterior:
                     raise DatoInvalido('El transporte que se intenta modificar no existe.')
             if _codigo_en_uso(cursor, datos['codigo'], tenant_id, excluir_id=t_id):
                 raise DatoInvalido(f'Ya existe un transporte con el código "{datos["codigo"]}".')
-            muelle = _muelle(cursor, d.get('id_muelle_salida'), tenant_id)
+            # Un transporte nuevo nace activo; al editar sin el dato se conserva el estado
+            activo = _activo(d.get('activo'), por_defecto=bool(anterior['activo']) if anterior else True)
+            muelle = _muelle(cursor, d.get('id_muelle_salida'), tenant_id,
+                             actual=anterior['id_muelle_salida'] if anterior else None)
             rutas = _rutas_por_id(cursor, request.form.getlist('rutas_ids[]'), request.form.getlist('rutas_obs[]'),
                                   tenant_id)
 
@@ -250,13 +274,19 @@ def eliminar(id_transporte):
             cursor.execute("UPDATE transportes SET activo = %s WHERE id_transporte = %s", (False, id_transporte))
             cursor.execute("SELECT COUNT(*) AS n FROM clientes WHERE id_transporte_predeterminado = %s", (id_transporte,))
             clientes = cursor.fetchone()['n']
+            cursor.execute("""SELECT COUNT(*) AS n FROM pedidos_cabecera
+                              WHERE id_transporte = %s AND estado NOT IN ('Despachado', 'Anulado')""", (id_transporte,))
+            pedidos = cursor.fetchone()['n']
             conn.commit()
 
             mensaje = f'El transporte "{transporte["codigo"]}" quedó inactivo: ya no se ofrece para clientes ni pedidos nuevos.'
             if clientes:
                 mensaje += (f' Lo tiene{"n" if clientes != 1 else ""} como transporte habitual {clientes} '
                             f'cliente{"s" if clientes != 1 else ""}, que lo conserva{"n" if clientes != 1 else ""}.')
-            flash(mensaje + ' Se puede reactivar desde su edición.', "warning" if clientes else "success")
+            if pedidos:
+                mensaje += (' Lo usa 1 pedido sin despachar, que lo conserva.' if pedidos == 1 else
+                            f' Lo usan {pedidos} pedidos sin despachar, que lo conservan.')
+            flash(mensaje + ' Se puede reactivar desde su edición.', "warning" if clientes or pedidos else "success")
     except Exception as e:
         conn.rollback()
         flash(f"No se pudo inactivar el transporte: {e!s}", "danger")

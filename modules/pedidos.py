@@ -175,7 +175,10 @@ def editar(id_pedido):
             cursor.execute("""SELECT * FROM rutas WHERE (activo = 1 OR id_ruta = %s) AND (%s IS NULL OR tenant_id = %s)
                               ORDER BY nombre_ruta""", (pedido['id_ruta'] or 0, tenant_id, tenant_id))
             rutas = cursor.fetchall()
-            cursor.execute("SELECT id_transporte, razonsocial FROM transportes WHERE activo = 1 AND (%s IS NULL OR tenant_id = %s)", (tenant_id, tenant_id))
+            # Los activos, más el que ya tiene el pedido aunque esté inactivo (si no, se perdería al guardar)
+            cursor.execute("""SELECT id_transporte, razonsocial, activo FROM transportes
+                              WHERE (activo = 1 OR id_transporte = %s) AND (%s IS NULL OR tenant_id = %s)
+                              ORDER BY razonsocial""", (pedido['id_transporte'] or 0, tenant_id, tenant_id))
             transportes = cursor.fetchall()
             cursor.execute("SELECT id_transporte, id_ruta FROM transporte_rutas WHERE (%s IS NULL OR tenant_id = %s)", (tenant_id, tenant_id))
             rel_transp_rutas = cursor.fetchall()

@@ -70,9 +70,15 @@ $(document).on('submit', '#formTransportes', function(e) {
     }
 });
 
-function _poblarSelectMuelles(idSeleccionado) {
+// `actual` es el transporte que se edita: si su muelle ya no está entre los que se ofrecen (la
+// ubicación quedó inactiva o dejó de ser de salida) se lo agrega marcado, para no quitárselo al guardar.
+function _poblarSelectMuelles(idSeleccionado, actual) {
     const $sel = $('#form_id_muelle_salida');
     $sel.empty().append('<option value="">-- Sin muelle asignado --</option>');
+    if (actual && idSeleccionado && !muelles.some(function(m) { return m.id == idSeleccionado; })) {
+        $sel.append($('<option>').val(idSeleccionado).prop('selected', true)
+            .text((actual.muelle_codigo || idSeleccionado) + ' — ' + (actual.muelle_aviso || 'ya no se ofrece')));
+    }
     muelles.forEach(function(m) {
         // La descripción del muelle es opcional
         var texto = m.codigo + (m.descipcion ? ' - ' + m.descipcion : '');
@@ -106,7 +112,7 @@ function editTransporte(data) {
     $('#form_telefono').val(data.telefono);
     $('#form_email').val(data.email);
     $('#form_activo').val(data.activo ? '1' : '0');
-    _poblarSelectMuelles(data.id_muelle_salida);
+    _poblarSelectMuelles(data.id_muelle_salida, data);
 
     relacionesExistentes.filter(function(r) { return r.id_transporte == data.id_transporte; })
         .forEach(function(rel) { agregarFilaRuta(rel.id_ruta, rel.observaciones || ''); });

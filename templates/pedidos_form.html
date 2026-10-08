@@ -175,7 +175,9 @@
             const $comboT = $('#log_id_transporte');
             $comboT.empty().append('<option value="">-- Seleccionar --</option>');
             transportesDB.forEach(t => {
-                $comboT.append(`<option value="${t.id_transporte}">${t.razonsocial}</option>`);
+                // .text() escapa el nombre; el inactivo solo llega si es el que el pedido ya tiene
+                $comboT.append($('<option>').val(t.id_transporte)
+                    .text(t.razonsocial + (t.activo === 0 || t.activo === false ? ' — inactivo' : '')));
             });
             $comboT.val(preSeleccion || '');
         }
@@ -201,11 +203,12 @@
         });
 
         // Carga inicial
-        if (editMode && detalleExistente.length > 0) {
-            // Si editamos, cargar filas grabadas
+        if (editMode) {
+            // Si editamos, cargar filas grabadas (o una vacía, si el pedido todavía no tiene renglones)
             detalleExistente.forEach(item => {
                 agregarFila(item.id_material, item.cantidad, item.tipo_stock || 'Libre Venta');
             });
+            if (detalleExistente.length === 0) agregarFila();
             // Mostrar el transporte guardado del pedido, o el configurado de su ruta
             const idRutaGuardada = {{ pedido.id_ruta|tojson if edit_mode else 'null' }};
             const idTranspGuardado = {{ pedido.id_transporte|tojson if edit_mode else 'null' }};

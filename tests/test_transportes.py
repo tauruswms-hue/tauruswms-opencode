@@ -22,6 +22,7 @@ def wms(usuario_wms):
     yield conn
     conn.commit()
     cur = conn.cursor()
+    cur.execute("DELETE FROM pedidos_cabecera WHERE nro_pedido LIKE %s", (PREFIJO + '%',))
     cur.execute("DELETE FROM clientes WHERE codigo LIKE %s", (PREFIJO + '%',))
     cur.execute("DELETE FROM transportes WHERE codigo LIKE %s", (PREFIJO + '%',))
     cur.execute("DELETE FROM rutas WHERE nombre_ruta LIKE %s", (PREFIJO + '%',))
@@ -292,3 +293,121 @@ def test_la_plantilla_se_puede_importar(logged_client, wms, formato):
     plantilla = logged_client.get(f'/transportes/plantilla/{formato}')
     filas = parse_file(FileStorage(io.BytesIO(plantilla.data), filename=f'p.{formato}'))
     assert [f['codigo'] for f in filas] == ['TRA001'] and 'rutas' in filas[0] and 'muelle_salida' in filas[0]
+
+
+# --- Estado, uso en clientes y pedidos, muelle que deja de servir ---
+
+def _pedido(conn, tenant, id_transporte, estado='Pendiente'):
+    """Un cliente y un pedido suyo con el transporte dado. Devuelve el id del pedido."""
+    cur = conn.cursor()
+    cliente, nro = _codigo(), _codigo()
+    cur.execute("INSERT INTO clientes (codigo, razonsocial, tenant_id) VALUES (%s, 'Cliente de prueba', %s)", (cliente, tenant))
+    cur.execute("SELECT id_cliente FROM clientes WHERE codigo = %s", (cliente,))
+    cur.execute("""INSERT INTO pedidos_cabecera (nro_pedido, id_cliente, id_transporte, fecha_pedido, estado, tenant_id)
+                   VALUES (%s, %s, %s, CURRENT_DATE, %s, %s)""", (nro, cur.fetchone()['id_cliente'], id_transporte, estado, tenant))
+    conn.commit()
+    cur.execute("SELECT id_pedido FROM pedidos_cabecera WHERE nro_pedido = %s", (nro,))
+    return cur.fetchone()['id_pedido']
+
+
+@requires_db
+def test_editar_sin_el_estado_lo_conserva(logged_client, wms):
+    codigo = _codigo()
+    _guardar(logged_client, codigo=codigo, activo='0')
+    tid = _transporte(wms, codigo)['id_transporte']
+    _guardar(logged_client, id_transporte=tid, codigo=codigo)
+    assert not _transporte(wms, codigo)['activo']
+    _guardar(logged_client, id_transporte=tid, codigo=codigo, activo='1')
+    _guardar(logged_client, id_transporte=tid, codigo=codigo)       # antes, sin el dato, quedaba inactivo
+    assert _transporte(wms, codigo)['activo']
+
+
+@requires_db
+def test_inactivar_avisa_los_pedidos_sin_despachar_y_el_listado_cuenta_el_uso(logged_client, wms, usuario_wms):
+    tenant = usuario_wms['tenant_id']
+    codigo = _codigo()
+    id_ruta, nombre_ruta = _ruta(wms, tenant)
+    _guardar(logged_client, codigo=codigo, **{'rutas_ids[]': [str(id_ruta)], 'rutas_obs[]': ['']})
+    tid = _transporte(wms, codigo)['id_transporte']
+    _pedido(wms, tenant, tid, 'Pendiente')
+    _pedido(wms, tenant, tid, 'Preparado')
+    _pedido(wms, tenant, tid, 'Despachado')
+    cur = wms.cursor()
+    cur.execute("UPDATE rutas SET activo = 0 WHERE id_ruta = %s", (id_ruta,))
+    wms.commit()
+
+    def fila():
+        html = logged_client.get('/transportes').get_data(as_text=True)
+        recorte = html[html.index(f'<code>{codigo}</code>'):]
+        return recorte[:recorte.index('</tr>')]
+
+    antes = fila()
+    assert '>0</td>' in antes and '>3</td>' in antes                 # 0 clientes y 3 pedidos
+    assert f'{nombre_ruta} (inactiva)</span>' in antes and f'/transportes/eliminar/{tid}"' in antes
+
+    logged_client.post(f'/transportes/eliminar/{tid}')
+    (mensaje,) = _flashes(logged_client)
+    assert 'Lo usan 2 pedidos sin despachar, que lo conservan.' in mensaje
+    assert '/transportes/eliminar/' not in fila()                    # un inactivo no tiene el botón de inactivar
+
+
+@requires_db
+def test_el_pedido_conserva_su_transporte_inactivo_al_editarlo(logged_client, wms, usuario_wms):
+    """El formulario de edición cargaba solo los activos: el del pedido se perdía al guardar."""
+    tenant = usuario_wms['tenant_id']
+    codigo, otro = _codigo(), _codigo()
+    _guardar(logged_client, codigo=codigo, razonsocial=f'Tra <{codigo}>')
+    _guardar(logged_client, codigo=otro, razonsocial=f'Otro {otro}', activo='0')
+    tid = _transporte(wms, codigo)['id_transporte']
+    id_pedido = _pedido(wms, tenant, tid)
+    logged_client.post(f'/transportes/eliminar/{tid}')
+    _flashes(logged_client)
+
+    html = logged_client.get(f'/pedidos/editar/{id_pedido}').get_data(as_text=True)
+    datos = html[html.index('const transportesDB = '):]
+    datos = datos[:datos.index('</script>')]
+    assert f'"id_transporte": {tid}' in datos and '"activo": 0' in datos
+    assert f'Otro {otro}' not in datos                               # otro inactivo no se ofrece
+    # El nombre se inserta como texto, no como HTML
+    assert ".text(t.razonsocial" in html and '>${t.razonsocial}<' not in html
+    # En un pedido nuevo, el inactivo no aparece
+    assert f'"id_transporte": {tid}' not in logged_client.get('/pedidos/nuevo').get_data(as_text=True)
+
+
+@requires_db
+def test_muelle_que_dejo_de_servir_se_conserva_y_se_avisa(logged_client, wms, usuario_wms):
+    tenant = usuario_wms['tenant_id']
+    muelle, cod_muelle = _ubicacion(wms, tenant, 'S')
+    inactivo, _ = _ubicacion(wms, tenant, 'S')
+    codigo, otro = _codigo(), _codigo()
+    _guardar(logged_client, codigo=codigo, id_muelle_salida=muelle)
+    tid = _transporte(wms, codigo)['id_transporte']
+    cur = wms.cursor()
+    cur.execute("UPDATE ubicaciones SET activo = 0 WHERE id IN (%s, %s)", (muelle, inactivo))
+    wms.commit()
+
+    # Una ubicación inactiva no se puede asignar de nuevo, pero el transporte que ya la tiene la conserva
+    assert _guardar(logged_client, codigo=otro, id_muelle_salida=inactivo) == ['Muelle de salida: la ubicación está inactiva.']
+    assert _guardar(logged_client, id_transporte=tid, codigo=codigo, id_muelle_salida=inactivo) == [
+        'Muelle de salida: la ubicación está inactiva.']
+    assert _guardar(logged_client, id_transporte=tid, codigo=codigo, razonsocial='Renombrado',
+                    id_muelle_salida=muelle) == ['Transporte guardado exitosamente.']
+    assert _transporte(wms, codigo)['id_muelle_salida'] == muelle
+
+    html = logged_client.get('/transportes').get_data(as_text=True)
+    fila = html[html.index(f'<code>{codigo}</code>'):]
+    fila = fila[:fila.index('</tr>')]
+    assert 'ubicación inactiva' in fila and '"muelle_aviso": "ubicaci' in fila
+    # La lista de muelles que se ofrecen ya no la trae
+    ofrecidos = html[html.index('const muelles = '):]
+    assert f'"codigo": "{cod_muelle}"' not in ofrecidos[:ofrecidos.index('</script>')]
+
+    # Si la ubicación deja de ser de salida, también se conserva y se avisa
+    cur.execute("UPDATE ubicaciones SET activo = 1 WHERE id = %s", (muelle,))
+    cur.execute("UPDATE tipoubicacion SET operacion = 'R' WHERE id = (SELECT tipoubicacion FROM ubicaciones WHERE id = %s)", (muelle,))
+    wms.commit()
+    assert _guardar(logged_client, id_transporte=tid, codigo=codigo, id_muelle_salida=muelle) == ['Transporte guardado exitosamente.']
+    assert 'ya no es una ubicación de salida' in logged_client.get('/transportes').get_data(as_text=True)
+    # Y se le puede quitar
+    _guardar(logged_client, id_transporte=tid, codigo=codigo, id_muelle_salida='')
+    assert _transporte(wms, codigo)['id_muelle_salida'] is None
