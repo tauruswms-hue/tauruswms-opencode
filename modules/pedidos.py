@@ -1,5 +1,7 @@
 ﻿import json
+import math
 import os
+import re
 from collections import OrderedDict, defaultdict
 from datetime import date, datetime
 from decimal import Decimal
@@ -19,7 +21,7 @@ from flask import (
 
 from modules.auditoria import registrar_movimiento
 from modules.batch_utils import (
-    float_or_zero,
+    DatoInvalido,
     parse_file,
     plantilla_csv,
     plantilla_json,
@@ -31,6 +33,7 @@ from modules.sql_dialect import (
     cast_as_int,
     execute_insert,
     in_clause_sql,
+    is_duplicate_key_error,
     limit_sql,
     quote,
     substring_index,
@@ -39,6 +42,113 @@ from modules.sql_dialect import (
 from modules.sql_dialect import year as year_func
 
 pedidos_bp = Blueprint('pedidos', __name__)
+
+TIPOS_STOCK = ('Libre Venta', 'Calidad', 'Bloqueado', 'Mal Estado')
+CANTIDAD_MAX = 99999999999.9999   # mayor valor de pedidos_detalle.cantidad, decimal(15,4)
+DIRECCION_MAX = 255               # largo de pedidos_cabecera.direccion_entrega
+# Estados en los que un pedido ya no admite cambios
+ESTADOS_FINALES = ('Despachado', 'Anulado')
+
+
+def _id(valor):
+    """Id entero de un formulario o JSON, o 0 si no es un id."""
+    try:
+        return int(str(valor if valor is not None else '').strip() or 0)
+    except ValueError:
+        return 0
+
+
+def _ids(valores):
+    """Ids enteros de una lista recibida por JSON, sin repetir; los que no son ids se descartan."""
+    ids = []
+    for v in valores if isinstance(valores, (list, tuple)) else []:
+        i = _id(v)
+        if i and i not in ids:
+            ids.append(i)
+    return ids
+
+
+def _numero_siguiente(cursor, tenant_id, anio):
+    """Próximo número de pedido de la empresa: el mayor ya usado con el prefijo del año, más uno.
+
+    No se cuenta la cantidad de pedidos: con un pedido borrado, o con uno fechado en
+    otro año, la cuenta daba un número ya usado y no se podía crear ningún pedido más.
+    """
+    prefijo = f'PED-{anio}-'
+    cursor.execute("SELECT nro_pedido FROM pedidos_cabecera WHERE nro_pedido LIKE %s AND (%s IS NULL OR tenant_id = %s)",
+                   (prefijo + '%', tenant_id, tenant_id))
+    usados = [int(m.group(1)) for m in (re.fullmatch(re.escape(prefijo) + r'(\d+)', r['nro_pedido']) for r in cursor.fetchall()) if m]
+    return f'{prefijo}{max(usados, default=0) + 1:05d}'
+
+
+def _fecha(valor):
+    texto = str(valor or '').strip()[:10]
+    if not texto:
+        raise DatoInvalido('Fecha del pedido: es obligatoria.')
+    try:
+        datetime.strptime(texto, '%Y-%m-%d')
+    except ValueError:
+        raise DatoInvalido(f'Fecha del pedido: "{valor}" no es una fecha válida (formato AAAA-MM-DD).') from None
+    return texto
+
+
+def _referencia(cursor, tabla, columna_id, columna_nombre, valor, tenant_id, rotulo, actual=None, obligatorio=False):
+    """Id de un registro de otro maestro (cliente, clase, ruta, transporte), de la empresa y activo.
+
+    `actual` es el que el pedido ya tiene: se conserva aunque haya quedado inactivo.
+    """
+    id_ref = _id(valor)
+    if not id_ref:
+        if str(valor or '').strip() or obligatorio:
+            raise DatoInvalido(f'{rotulo}: {"hay que elegirlo" if not str(valor or "").strip() else "el valor elegido no existe"}.')
+        return None
+    cursor.execute(f"SELECT {columna_nombre} AS nombre, activo FROM {tabla} WHERE {columna_id} = %s AND (%s IS NULL OR tenant_id = %s)",
+                   (id_ref, tenant_id, tenant_id))
+    fila = cursor.fetchone()
+    if not fila:
+        raise DatoInvalido(f'{rotulo}: el valor elegido no existe.')
+    if not fila['activo'] and id_ref != actual:
+        raise DatoInvalido(f'{rotulo}: "{fila["nombre"]}" está inactivo.')
+    return id_ref
+
+
+def _cantidad(valor):
+    try:
+        n = float(str(valor if valor is not None else '').strip().replace(',', '.'))
+    except ValueError:
+        n = math.nan
+    if not math.isfinite(n):
+        raise DatoInvalido(f'Cantidad: "{valor}" no es un número válido.')
+    if n <= 0:
+        raise DatoInvalido('Cantidad: tiene que ser mayor que cero.')
+    if n > CANTIDAD_MAX:
+        raise DatoInvalido('Cantidad: el valor es demasiado grande.')
+    return n
+
+
+def _renglon(cursor, id_material, cantidad, tipo_stock, tenant_id, renglones, ya_en_el_pedido=()):
+    """Verifica un renglón y lo agrega a `renglones`: material activo de la empresa, cantidad y tipo de stock.
+
+    El mismo material se puede pedir en tipos de stock distintos, pero no dos veces en el mismo.
+    Los materiales que el pedido ya tenía (`ya_en_el_pedido`) se conservan aunque estén inactivos.
+    """
+    cursor.execute("SELECT codigo, activo FROM materiales WHERE id = %s AND (%s IS NULL OR tenant_id = %s)",
+                   (id_material, tenant_id, tenant_id))
+    material = cursor.fetchone()
+    if not material:
+        raise DatoInvalido('Renglones: el material elegido no existe.')
+    if not material['activo'] and id_material not in ya_en_el_pedido:
+        raise DatoInvalido(f'Renglones: el material "{material["codigo"]}" está inactivo.')
+    tipo_stock = str(tipo_stock or '').strip() or TIPOS_STOCK[0]
+    if tipo_stock not in TIPOS_STOCK:
+        raise DatoInvalido(f'Tipo de stock: "{tipo_stock}" no es válido. Usar: {", ".join(TIPOS_STOCK)}.')
+    try:
+        cantidad = _cantidad(cantidad)
+    except DatoInvalido as e:
+        raise DatoInvalido(f'Material "{material["codigo"]}": {str(e)[0].lower()}{str(e)[1:]}') from None
+    if any(r['id_material'] == id_material and r['tipo_stock'] == tipo_stock for r in renglones):
+        raise DatoInvalido(f'El material "{material["codigo"]}" está repetido con el mismo tipo de stock ({tipo_stock}).')
+    renglones.append({'id_material': id_material, 'cantidad': cantidad, 'tipo_stock': tipo_stock})
 
 
 # --- LISTADO Y CONSOLA DE GESTIÓN ---
@@ -102,6 +212,9 @@ def ver_detalle(id_pedido):
             """
             cursor.execute(sql_cab, (id_pedido, tenant_id, tenant_id))
             pedido = cursor.fetchone()
+            if not pedido:
+                flash("El pedido no existe.", "warning")
+                return redirect(url_for('pedidos.listar'))
 
             sql_det = """
                 SELECT d.*, m.nombre as material_nombre, m.codigo as material_sku,
@@ -217,43 +330,64 @@ def guardar():
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
+            anterior, materiales_previos = None, set()
             if id_pedido:
-                cursor.execute("SELECT estado FROM pedidos_cabecera WHERE id_pedido = %s AND (%s IS NULL OR tenant_id = %s)", (id_pedido, tenant_id, tenant_id))
-                rec = cursor.fetchone()
-                if not rec or rec['estado'] != 'Pendiente':
+                cursor.execute("""SELECT estado, id_cliente, id_clase, id_ruta, id_transporte FROM pedidos_cabecera
+                                  WHERE id_pedido = %s AND (%s IS NULL OR tenant_id = %s)""", (_id(id_pedido), tenant_id, tenant_id))
+                anterior = cursor.fetchone()
+                if not anterior or anterior['estado'] != 'Pendiente':
                     flash("No se puede modificar un pedido procesado.", "danger")
                     return redirect(url_for('pedidos.listar'))
+                id_pedido = _id(id_pedido)
+                cursor.execute("SELECT id_material FROM pedidos_detalle WHERE id_pedido = %s", (id_pedido,))
+                materiales_previos = {r['id_material'] for r in cursor.fetchall()}
+            previo = anterior or {}
 
-                sql_cab = """UPDATE pedidos_cabecera SET id_cliente=%s, id_clase=%s, fecha_pedido=%s,
-                             id_ruta=%s, id_transporte=%s, direccion_entrega=%s, observaciones=%s
-                             WHERE id_pedido=%s AND (%s IS NULL OR tenant_id = %s)"""
-                cursor.execute(sql_cab, (d.get('id_cliente'), d.get('id_clase') or None,
-                                         d.get('fecha_pedido'),
-                                         d.get('id_ruta') or None, d.get('id_transporte') or None,
-                                         d.get('direccion_entrega'), d.get('observaciones'), id_pedido, tenant_id, tenant_id))
-                cursor.execute("DELETE FROM pedidos_detalle WHERE id_pedido = %s AND (%s IS NULL OR tenant_id = %s)", (id_pedido, tenant_id, tenant_id))
+            # --- Validaciones (cualquier DatoInvalido corta sin guardar nada) ---
+            id_cliente = _referencia(cursor, 'clientes', 'id_cliente', 'razonsocial', d.get('id_cliente'), tenant_id,
+                                     'Cliente', actual=previo.get('id_cliente'), obligatorio=True)
+            fecha_pedido = _fecha(d.get('fecha_pedido'))
+            id_clase = _referencia(cursor, 'clases_pedido', 'id_clase', 'nombre', d.get('id_clase'), tenant_id,
+                                   'Clase de pedido', actual=previo.get('id_clase'))
+            id_ruta = _referencia(cursor, 'rutas', 'id_ruta', 'nombre_ruta', d.get('id_ruta'), tenant_id,
+                                  'Ruta', actual=previo.get('id_ruta'))
+            id_transporte = _referencia(cursor, 'transportes', 'id_transporte', 'razonsocial', d.get('id_transporte'),
+                                        tenant_id, 'Transporte', actual=previo.get('id_transporte'))
+            direccion = (d.get('direccion_entrega') or '').strip() or None
+            if direccion and len(direccion) > DIRECCION_MAX:
+                raise DatoInvalido(f'Dirección de entrega: admite hasta {DIRECCION_MAX} caracteres.')
+            observaciones = (d.get('observaciones') or '').strip() or None
+
+            renglones = []
+            for i, item in enumerate(items):
+                cantidad = cantidades[i] if i < len(cantidades) else ''
+                if not str(item or '').strip() and not str(cantidad or '').strip():
+                    continue                      # fila vacía del formulario
+                if not _id(item):
+                    raise DatoInvalido('Renglones: hay una fila sin material.')
+                _renglon(cursor, _id(item), cantidad, tipos_stock[i] if i < len(tipos_stock) else '', tenant_id,
+                         renglones, ya_en_el_pedido=materiales_previos)
+            if not renglones:
+                raise DatoInvalido('El pedido tiene que tener al menos un renglón.')
+
+            # --- Guardado ---
+            if id_pedido:
+                cursor.execute("""UPDATE pedidos_cabecera SET id_cliente=%s, id_clase=%s, fecha_pedido=%s,
+                                  id_ruta=%s, id_transporte=%s, direccion_entrega=%s, observaciones=%s
+                                  WHERE id_pedido=%s""",
+                               (id_cliente, id_clase, fecha_pedido, id_ruta, id_transporte, direccion, observaciones, id_pedido))
+                cursor.execute("DELETE FROM pedidos_detalle WHERE id_pedido = %s", (id_pedido,))
             else:
-                anio = datetime.now().year
-                cursor.execute(
-                    f"SELECT COUNT(*) AS total FROM pedidos_cabecera WHERE {year_func('fecha_pedido')} = %s AND (%s IS NULL OR tenant_id = %s)",
-                    (anio, tenant_id, tenant_id)
-                )
-                seq = cursor.fetchone()['total'] + 1
-                nro_pedido = f"PED-{anio}-{seq:05d}"
-
+                nro_pedido = _numero_siguiente(cursor, tenant_id, datetime.now().year)
                 sql_cab = """INSERT INTO pedidos_cabecera (nro_pedido, id_cliente, id_clase, fecha_pedido, id_ruta,
                              id_transporte, direccion_entrega, observaciones, estado, tenant_id)
                              VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'Pendiente', %s)"""
-                id_pedido = execute_insert(cursor, sql_cab, (nro_pedido, d.get('id_cliente'), d.get('id_clase') or None,
-                                         d.get('fecha_pedido'),
-                                         d.get('id_ruta') or None, d.get('id_transporte') or None,
-                                         d.get('direccion_entrega'), d.get('observaciones'), tenant_id))
+                id_pedido = execute_insert(cursor, sql_cab, (nro_pedido, id_cliente, id_clase, fecha_pedido, id_ruta,
+                                                             id_transporte, direccion, observaciones, tenant_id))
 
             sql_det = "INSERT INTO pedidos_detalle (id_pedido, id_material, cantidad, tipo_stock, tenant_id) VALUES (%s, %s, %s, %s, %s)"
-            for i in range(len(items)):
-                if items[i] and cantidades[i]:
-                    ts = tipos_stock[i] if i < len(tipos_stock) else 'Libre Venta'
-                    cursor.execute(sql_det, (id_pedido, items[i], cantidades[i], ts or 'Libre Venta', tenant_id))
+            for r in renglones:
+                cursor.execute(sql_det, (id_pedido, r['id_material'], r['cantidad'], r['tipo_stock'], tenant_id))
 
             # --- OMC AUTOMÁTICA con todos los contenedores (solo pedidos nuevos) ---
             if not d.get('id_pedido'):
@@ -261,21 +395,24 @@ def guardar():
                 ahora   = datetime.now()
                 usuario = session.get('nombre', 'sistema')
 
+                # Muelle del transporte: sirve si es una ubicación activa de un tipo de salida
                 muelle_id = None
-                id_transporte = d.get('id_transporte') or None
                 if id_transporte:
-                    cursor.execute(
-                        "SELECT id_muelle_salida FROM transportes WHERE id_transporte = %s AND (%s IS NULL OR tenant_id = %s)",
-                        (id_transporte, tenant_id, tenant_id)
-                    )
+                    cursor.execute("""
+                        SELECT u.id FROM transportes t
+                        JOIN ubicaciones u    ON u.id = t.id_muelle_salida
+                        JOIN tipoubicacion tu ON tu.id = u.tipoubicacion
+                        WHERE t.id_transporte = %s AND u.activo = 1 AND tu.operacion = 'S'
+                          AND (%s IS NULL OR t.tenant_id = %s)
+                    """, (id_transporte, tenant_id, tenant_id))
                     row_t = cursor.fetchone()
                     if row_t:
-                        muelle_id = row_t['id_muelle_salida']
+                        muelle_id = row_t['id']
 
                 contenedores_validos = []
                 for contenedor in contenedores:
                     if not muelle_id:
-                        flash(f"Contenedor {contenedor}: sin OMC — el transporte no tiene muelle de salida.", "warning")
+                        flash(f"Contenedor {contenedor}: sin OMC — el transporte no tiene un muelle de salida activo.", "warning")
                         continue
 
                     cursor.execute(f"""
@@ -401,9 +538,18 @@ def guardar():
                 flash("Pedido guardado con éxito.", "success")
 
             conn.commit()
+    except DatoInvalido as e:
+        conn.rollback()
+        # Lo que se haya avisado de los contenedores no vale: no se guardó nada
+        session.pop('_flashes', None)
+        flash(str(e), "danger")
     except Exception as e:
         conn.rollback()
-        flash(f"Error: {e!s}", "danger")
+        session.pop('_flashes', None)
+        if is_duplicate_key_error(e):
+            flash("No se pudo guardar el pedido: otro usuario tomó el mismo número. Volver a intentar.", "danger")
+        else:
+            flash(f"Error al guardar el pedido: {e!s}", "danger")
     finally:
         conn.close()
     return redirect(url_for('pedidos.listar'))
@@ -415,14 +561,28 @@ def eliminar(id_pedido):
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            cursor.execute("SELECT estado FROM pedidos_cabecera WHERE id_pedido = %s AND (%s IS NULL OR tenant_id = %s)", (id_pedido, tenant_id, tenant_id))
+            cursor.execute("SELECT nro_pedido, estado FROM pedidos_cabecera WHERE id_pedido = %s AND (%s IS NULL OR tenant_id = %s)", (id_pedido, tenant_id, tenant_id))
             p = cursor.fetchone()
-            if p and p['estado'] == 'Pendiente':
-                cursor.execute("UPDATE pedidos_cabecera SET estado = 'Anulado' WHERE id_pedido = %s AND (%s IS NULL OR tenant_id = %s)", (id_pedido, tenant_id, tenant_id))
+            if not p:
+                flash("El pedido no existe.", "warning")
+                return redirect(url_for('pedidos.listar'))
+            # Se anula un pedido Pendiente, o uno en Trabajo que todavía no tiene una OMC en curso o confirmada
+            anulable = p['estado'] == 'Pendiente'
+            if p['estado'] == 'Trabajo':
+                cursor.execute("SELECT COUNT(*) AS n FROM omc WHERE id_pedido = %s AND estado IN ('Pendiente', 'Confirmada')",
+                               (id_pedido,))
+                anulable = cursor.fetchone()['n'] == 0
+            if anulable:
+                cursor.execute("UPDATE pedidos_cabecera SET estado = 'Anulado' WHERE id_pedido = %s", (id_pedido,))
                 conn.commit()
-                flash("Pedido anulado.", "success")
+                flash(f"Pedido {p['nro_pedido']} anulado.", "success")
+            elif p['estado'] == 'Trabajo':
+                flash(f"No se puede anular el pedido {p['nro_pedido']}: tiene una OMC pendiente o confirmada.", "warning")
             else:
-                flash("No se puede anular un pedido que no está pendiente.", "warning")
+                flash(f"No se puede anular el pedido {p['nro_pedido']}: está en estado {p['estado']}.", "warning")
+    except Exception as e:
+        conn.rollback()
+        flash(f"No se pudo anular el pedido: {e!s}", "danger")
     finally:
         conn.close()
     return redirect(url_for('pedidos.listar'))
@@ -431,7 +591,7 @@ def eliminar(id_pedido):
 # --- ACCIONES MASIVAS (CONSOLA) ---
 @pedidos_bp.route('/pedidos/verificar_stock_masivo', methods=['POST'])
 def verificar_stock_masivo():
-    ids = request.json.get('ids', [])
+    ids = _ids((request.get_json(silent=True) or {}).get('ids'))
     if not ids:
         return jsonify({"status": "error", "message": "No hay pedidos seleccionados"}), 400
 
@@ -475,17 +635,23 @@ def verificar_stock_masivo():
             stock_map = {}  # key: (id_material, tipo_stock)
             if material_ids:
                 ph2 = in_clause_sql(material_ids)
+                # Solo lo que se puede pickear: ubicaciones activas de un tipo que soporta picking.
+                # Con el stock de recepción o de los muelles el informe decía que alcanzaba cuando no.
                 cursor.execute(f"""
-                    SELECT Material, TipoStock,
-                           SUM(StockDisponible) AS stock_disponible,
-                           SUM(StockEntrando)   AS stock_entrando
-                    FROM stockcontable
-                    WHERE Material IN ({ph2})
-                      AND (%s IS NULL OR tenant_id = %s)
-                    GROUP BY Material, TipoStock
+                    SELECT sc.Material, sc.TipoStock,
+                           SUM(sc.StockDisponible) AS stock_disponible,
+                           SUM(sc.StockEntrando)   AS stock_entrando
+                    FROM stockcontable sc
+                    JOIN ubicaciones u    ON sc.Ubicacion    = u.id
+                    JOIN tipoubicacion tu ON u.tipoubicacion = tu.id
+                    WHERE sc.Material IN ({ph2})
+                      AND tu.soporte_picking = 1 AND u.activo = 1
+                      AND (%s IS NULL OR sc.tenant_id = %s)
+                    GROUP BY sc.Material, sc.TipoStock
                 """, (*tuple(material_ids), tenant_id, tenant_id))
                 for row in cursor.fetchall():
-                    stock_map[(row['Material'], row['TipoStock'])] = {
+                    # El tipo se compara sin distinguir mayúsculas: hay bases con el enum en mayúsculas ('LIBRE VENTA')
+                    stock_map[(row['Material'], str(row['TipoStock'] or '').lower())] = {
                         'stock_disponible': float(row['stock_disponible'] or 0),
                         'stock_entrando':   float(row['stock_entrando']   or 0),
                     }
@@ -510,7 +676,7 @@ def verificar_stock_masivo():
             # Construir líneas del informe
             lineas = []
             for (mid, ts), t in totales.items():
-                st = stock_map.get((mid, ts), {'stock_disponible': 0.0, 'stock_entrando': 0.0})
+                st = stock_map.get((mid, str(ts or '').lower()), {'stock_disponible': 0.0, 'stock_entrando': 0.0})
                 diferencia = st['stock_disponible'] - t['cantidad_total']
                 lineas.append({
                     'id_material':      mid,
@@ -546,7 +712,7 @@ def verificar_stock_masivo():
 
 @pedidos_bp.route('/pedidos/preparar_masivo', methods=['POST'])
 def preparar_masivo():
-    ids = request.json.get('ids', [])
+    ids = _ids((request.get_json(silent=True) or {}).get('ids'))
     if not ids:
         return jsonify({"status": "error", "message": "No hay pedidos seleccionados"}), 400
 
@@ -567,7 +733,7 @@ def preparar_masivo():
 
 @pedidos_bp.route('/pedidos/resumen_preparar', methods=['POST'])
 def resumen_preparar():
-    ids = request.json.get('ids', [])
+    ids = _ids((request.get_json(silent=True) or {}).get('ids'))
     if not ids:
         return jsonify({"status": "error", "message": "No hay pedidos seleccionados"}), 400
 
@@ -618,8 +784,8 @@ def resumen_preparar():
 # ============================================================================
 @pedidos_bp.route('/pedidos/cambiar_ruta_transporte', methods=['POST'])
 def cambiar_ruta_transporte():
-    data         = request.json or {}
-    ids          = data.get('ids', [])
+    data         = request.get_json(silent=True) or {}
+    ids          = _ids(data.get('ids'))
     id_ruta      = data.get('id_ruta')      # None = sin cambio
     id_transporte= data.get('id_transporte') # None = sin cambio
     tenant_id    = get_tenant_filter()
@@ -629,28 +795,43 @@ def cambiar_ruta_transporte():
     if id_ruta is None and id_transporte is None:
         return jsonify({"status": "error", "message": "Debe seleccionar al menos un campo a modificar"}), 400
 
-    campos, valores = [], []
-    if id_ruta is not None:
-        campos.append("id_ruta = %s")
-        valores.append(id_ruta if id_ruta != '' else None)
-    if id_transporte is not None:
-        campos.append("id_transporte = %s")
-        valores.append(id_transporte if id_transporte != '' else None)
-
-    ph = in_clause_sql(ids)
-    valores.extend(ids)
-
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
+            campos, valores = [], []
+            if id_ruta is not None:
+                campos.append("id_ruta = %s")
+                valores.append(_referencia(cursor, 'rutas', 'id_ruta', 'nombre_ruta', id_ruta, tenant_id, 'Ruta'))
+            if id_transporte is not None:
+                campos.append("id_transporte = %s")
+                valores.append(_referencia(cursor, 'transportes', 'id_transporte', 'razonsocial', id_transporte,
+                                           tenant_id, 'Transporte'))
+
+            # Un pedido despachado o anulado ya no cambia de ruta ni de transporte
+            ph = in_clause_sql(ids)
             cursor.execute(
-                f"UPDATE pedidos_cabecera SET {', '.join(campos)} WHERE id_pedido IN ({ph}) AND (%s IS NULL OR tenant_id = %s)",
-                (*tuple(valores), tenant_id, tenant_id)
+                f"UPDATE pedidos_cabecera SET {', '.join(campos)} WHERE id_pedido IN ({ph}) "
+                f"AND estado NOT IN (%s, %s) AND (%s IS NULL OR tenant_id = %s)",
+                (*valores, *ids, *ESTADOS_FINALES, tenant_id, tenant_id)
             )
+            actualizados = cursor.rowcount
+            cursor.execute(
+                f"SELECT COUNT(*) AS n FROM pedidos_cabecera WHERE id_pedido IN ({ph}) "
+                f"AND estado IN (%s, %s) AND (%s IS NULL OR tenant_id = %s)",
+                (*ids, *ESTADOS_FINALES, tenant_id, tenant_id)
+            )
+            omitidos = cursor.fetchone()['n']
             conn.commit()
-            return jsonify({"status": "success",
-                            "message": f"{cursor.rowcount} pedido(s) actualizados.",
-                            "updated": cursor.rowcount})
+            mensaje = f"{actualizados} pedido(s) actualizados."
+            if omitidos:
+                mensaje += f" {omitidos} no se modificaron por estar despachados o anulados."
+            return jsonify({"status": "success", "message": mensaje, "updated": actualizados})
+    except DatoInvalido as e:
+        conn.rollback()
+        return jsonify({"status": "error", "message": str(e)}), 400
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"status": "error", "message": f"No se pudo aplicar el cambio: {e!s}"}), 500
     finally:
         conn.close()
 
@@ -667,7 +848,8 @@ def buscar_contenedores():
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            sql = """
+            # f-string: sin él, {quote(...)} llegaba tal cual a la base y la consulta fallaba siempre
+            sql = f"""
                 SELECT sc.IDContenedor,
                        u.id              AS ubicacion_id,
                        u.codigo          AS ubicacion_codigo,
@@ -688,7 +870,7 @@ def buscar_contenedores():
                 params += [f'%{ubi}%', f'%{ubi}%']
             if tipo:
                 sql += " AND tu.id = %s"
-                params.append(int(tipo))
+                params.append(_id(tipo))
             sql += f"""
                 GROUP BY sc.IDContenedor, sc.Ubicacion, u.id, u.codigo, u.descipcion, tu.id, tu.{quote('descripcion')}
                 HAVING SUM(sc.StockDisponible) > 0
@@ -697,8 +879,11 @@ def buscar_contenedores():
                 ORDER BY u.codigo, sc.IDContenedor
                 {limit_sql(30)}
             """
-            cursor.execute(f"{sql}", params)
-            return jsonify(cursor.fetchall())
+            cursor.execute(sql, params)
+            filas = [dict(r) for r in cursor.fetchall()]
+            for r in filas:
+                r['total_disponible'] = float(r['total_disponible'] or 0)
+            return jsonify(filas)
     finally:
         conn.close()
 
@@ -888,8 +1073,8 @@ def picking_json():
     con stock de los materiales pedidos, y el stock en esas ubicaciones.
     Guarda el archivo en picking_docs/YYYY-MM/ y lo devuelve como descarga.
     """
-    data_req  = request.json or {}
-    ids       = data_req.get('ids', [])
+    data_req  = request.get_json(silent=True) or {}
+    ids       = _ids(data_req.get('ids'))
     modo      = data_req.get('modo', 'directa')
     tenant_id = get_tenant_filter()
 
@@ -1087,64 +1272,62 @@ def importar():
         tenant_id = get_tenant_filter()
 
         for agrupador, filas in grupos.items():
-            _, primera = filas[0]
+            # Cada grupo es un pedido: se verifica entero antes de guardar nada, y se guarda todo o nada
+            fila_cabecera, primera = filas[0]
             cliente_cod   = str(primera.get('cliente_codigo', '') or '').strip()
-            fecha_pedido  = str(primera.get('fecha_pedido', '') or '').strip() or datetime.now().strftime('%Y-%m-%d')
             observaciones = str(primera.get('observaciones', '') or '').strip() or None
-
-            if not cliente_cod:
-                errores.append({'fila': filas[0][0], 'codigo': agrupador, 'razon': 'cliente_codigo es obligatorio'})
-                continue
-
+            errores_grupo, id_pedido = [], None
             try:
+                if not cliente_cod:
+                    raise DatoInvalido('cliente_codigo es obligatorio')
+                fecha_pedido = _fecha(str(primera.get('fecha_pedido', '') or '').strip() or datetime.now().strftime('%Y-%m-%d'))
                 with conn.cursor() as cursor:
                     cursor.execute("SELECT id_cliente FROM clientes WHERE codigo = %s AND (%s IS NULL OR tenant_id = %s)", (cliente_cod, tenant_id, tenant_id))
                     cliente = cursor.fetchone()
                     if not cliente:
-                        errores.append({'fila': filas[0][0], 'codigo': agrupador, 'razon': f'Cliente "{cliente_cod}" no encontrado'})
-                        continue
+                        raise DatoInvalido(f'Cliente "{cliente_cod}" no encontrado')
+                    id_cliente = _referencia(cursor, 'clientes', 'id_cliente', 'razonsocial', cliente['id_cliente'],
+                                             tenant_id, 'Cliente', obligatorio=True)
 
-                    cursor.execute(
-                        f"SELECT COUNT(*) AS total FROM pedidos_cabecera WHERE {year_func('fecha_pedido')} = %s AND (%s IS NULL OR tenant_id = %s)",
-                        (anio, tenant_id, tenant_id)
-                    )
-                    seq = cursor.fetchone()['total'] + 1
-                    nro_pedido = f"PED-{anio}-{seq:05d}"
+                    renglones = []
+                    for fila_num, row in filas:
+                        material_cod = str(row.get('material_codigo', '') or '').strip()
+                        if not material_cod:
+                            continue
+                        try:
+                            cursor.execute("SELECT id FROM materiales WHERE codigo = %s AND (%s IS NULL OR tenant_id = %s)", (material_cod, tenant_id, tenant_id))
+                            mat = cursor.fetchone()
+                            if not mat:
+                                raise DatoInvalido(f'Material "{material_cod}" no encontrado')
+                            _renglon(cursor, mat['id'], row.get('cantidad'), row.get('tipo_stock'), tenant_id, renglones)
+                        except DatoInvalido as e:
+                            errores_grupo.append({'fila': fila_num, 'codigo': agrupador, 'razon': str(e)})
+                    if not renglones and not errores_grupo:
+                        errores_grupo.append({'fila': fila_cabecera, 'codigo': agrupador,
+                                              'razon': 'Ninguna línea de material válida'})
+                    if errores_grupo:
+                        errores.extend(errores_grupo)
+                        continue
 
                     id_pedido = execute_insert(cursor, """
                         INSERT INTO pedidos_cabecera
                             (nro_pedido, id_cliente, fecha_pedido, observaciones, estado, tenant_id)
                         VALUES (%s, %s, %s, %s, 'Pendiente', %s)
-                    """, (nro_pedido, cliente['id_cliente'], fecha_pedido, observaciones, tenant_id))
-
-                    lineas_ok = 0
-                    for fila_num, row in filas:
-                        material_cod = str(row.get('material_codigo', '') or '').strip()
-                        if not material_cod:
-                            continue
-                        cursor.execute("SELECT id FROM materiales WHERE codigo = %s AND (%s IS NULL OR tenant_id = %s)", (material_cod, tenant_id, tenant_id))
-                        mat = cursor.fetchone()
-                        if not mat:
-                            errores.append({'fila': fila_num, 'codigo': agrupador, 'razon': f'Material "{material_cod}" no encontrado'})
-                            continue
+                    """, (_numero_siguiente(cursor, tenant_id, anio), id_cliente, fecha_pedido, observaciones, tenant_id))
+                    for r in renglones:
                         cursor.execute(
                             "INSERT INTO pedidos_detalle (id_pedido, id_material, cantidad, tipo_stock, tenant_id) VALUES (%s, %s, %s, %s, %s)",
-                            (
-                                id_pedido, mat['id'],
-                                float_or_zero(row.get('cantidad')),
-                                str(row.get('tipo_stock', '') or '').strip() or 'Libre Venta',
-                                tenant_id
-                            )
-                        )
-                        lineas_ok += 1
-
-                    if lineas_ok == 0:
-                        errores.append({'fila': filas[0][0], 'codigo': agrupador, 'razon': 'Ninguna línea de material válida'})
-                    else:
-                        insertados += 1
-
+                            (id_pedido, r['id_material'], r['cantidad'], r['tipo_stock'], tenant_id))
+                    insertados += 1
+            except DatoInvalido as e:
+                errores.append({'fila': fila_cabecera, 'codigo': agrupador, 'razon': str(e)})
             except Exception as e:
-                errores.append({'fila': filas[0][0], 'codigo': agrupador, 'razon': str(e)})
+                # Lo que se haya llegado a guardar de este grupo no queda
+                if id_pedido:
+                    with conn.cursor() as cursor:
+                        cursor.execute("DELETE FROM pedidos_detalle WHERE id_pedido = %s", (id_pedido,))
+                        cursor.execute("DELETE FROM pedidos_cabecera WHERE id_pedido = %s", (id_pedido,))
+                errores.append({'fila': fila_cabecera, 'codigo': agrupador, 'razon': str(e)})
 
         conn.commit()
     except Exception as e:
