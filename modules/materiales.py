@@ -2,6 +2,7 @@ import contextlib
 import csv
 import io
 import json
+import math
 import os
 import re
 from urllib.parse import urlparse
@@ -26,7 +27,6 @@ from modules.batch_utils import (
     export_csv,
     export_json,
     export_xlsx,
-    float_or_zero,
     parse_file,
 )
 from modules.context import get_tenant_filter
@@ -101,27 +101,31 @@ TRAZABILIDADES = ('ninguna', 'lote', 'serie')
 
 
 def _referencia(cursor, tabla, columna_id, columna_codigo, valor, tenant_id, rotulo):
-    """Id de un registro de otra tabla indicado, en un archivo importado, por su id o por su código.
+    """Id de un registro de otra tabla indicado, en un archivo importado, por su código o por su id.
 
-    Un valor numérico se busca primero como id y, si no existe, como código
-    (hay códigos numéricos). Devuelve None si el valor está vacío.
+    Se busca primero por código, que es lo que trae la exportación y lo que vale
+    en cualquier servidor; un número que no es el código de nadie se toma como id
+    (hay códigos numéricos: el código manda). Devuelve None si el valor está vacío.
     """
     valor = str(valor if valor is not None else '').strip()
     if not valor:
         return None
     filtro = "(%s IS NULL OR tenant_id = %s)"
+    # Un número leído de una planilla puede llegar como "5.0"
+    candidatos = [valor] + ([str(int(float(valor)))] if re.fullmatch(r'\d+\.0+', valor) else [])
+    for candidato in candidatos:
+        cursor.execute(f"SELECT {columna_id} AS id FROM {tabla} WHERE {columna_codigo} = %s AND {filtro}",
+                       (candidato, tenant_id, tenant_id))
+        fila = cursor.fetchone()
+        if fila:
+            return fila['id']
     if re.fullmatch(r'\d+(\.0+)?', valor):
         cursor.execute(f"SELECT {columna_id} AS id FROM {tabla} WHERE {columna_id} = %s AND {filtro}",
                        (int(float(valor)), tenant_id, tenant_id))
         fila = cursor.fetchone()
         if fila:
             return fila['id']
-    cursor.execute(f"SELECT {columna_id} AS id FROM {tabla} WHERE {columna_codigo} = %s AND {filtro}",
-                   (valor, tenant_id, tenant_id))
-    fila = cursor.fetchone()
-    if not fila:
-        raise DatoInvalido(f'{rotulo}: no existe "{valor}" (se puede indicar el id o el código).')
-    return fila['id']
+    raise DatoInvalido(f'{rotulo}: no existe "{valor}" (se puede indicar el id o el código).')
 
 
 def _stocks(minimo, reposicion, maximo):
@@ -130,9 +134,9 @@ def _stocks(minimo, reposicion, maximo):
     Los tres son opcionales (0 = sin definir). Si están definidos tienen que
     quedar ordenados: mínimo <= reposición <= máximo.
     """
-    minimo = _numero(minimo, 'Stock mínimo')
-    reposicion = _numero(reposicion, 'Stock de reposición')
-    maximo = _numero(maximo, 'Stock máximo')
+    minimo = _numero(minimo, 'Stock mínimo', maximo=STOCK_MAX)
+    reposicion = _numero(reposicion, 'Stock de reposición', maximo=STOCK_MAX)
+    maximo = _numero(maximo, 'Stock máximo', maximo=STOCK_MAX)
     if maximo and minimo > maximo:
         raise DatoInvalido('El stock mínimo no puede ser mayor que el stock máximo.')
     if reposicion and reposicion < minimo:
@@ -188,7 +192,34 @@ def _tipo_de_imagen(cabecera):
     return None
 
 
-CODIGO_MAX = 100   # largo de materiales.codigo_alternativo y codigo_proveedor
+CODIGO_MAX = 100   # largo de materiales.codigo, codigo_alternativo y codigo_proveedor
+NOMBRE_MAX = 255   # largo de materiales.nombre
+PRESENTACION_NOMBRE_MAX = 100       # largo de material_presentaciones.nombre
+REFERENCIA_PROVEEDOR_MAX = 100      # largo de material_proveedor.codigo_referencia_prov
+# Mayor valor que entra en cada columna numérica
+STOCK_MAX = 999999999.999     # decimal(12,3)
+PESO_MAX = 9999999.999        # decimal(10,3); también las unidades de una presentación
+VOLUMEN_MAX = 99999999.9999   # decimal(12,4)
+
+
+def _identificacion(codigo, nombre):
+    """Código y nombre del material, verificados (formulario o fila importada)."""
+    if not codigo or not nombre:
+        raise DatoInvalido('Código y Nombre son obligatorios.')
+    if len(codigo) > CODIGO_MAX:
+        raise DatoInvalido(f'Código: admite hasta {CODIGO_MAX} caracteres.')
+    if len(nombre) > NOMBRE_MAX:
+        raise DatoInvalido(f'Nombre: admite hasta {NOMBRE_MAX} caracteres.')
+
+
+def _pesos(bruto, neto, rotulo=''):
+    """Peso bruto y neto (None si no se indican). El neto no puede superar al bruto."""
+    bruto = _numero(bruto, f'{rotulo}Peso bruto' if not rotulo else f'{rotulo}peso bruto', maximo=PESO_MAX) or None
+    neto = _numero(neto, f'{rotulo}Peso neto' if not rotulo else f'{rotulo}peso neto', maximo=PESO_MAX) or None
+    if bruto and neto and neto > bruto:
+        raise DatoInvalido(f'{rotulo}el peso neto no puede ser mayor que el peso bruto.' if rotulo
+                           else 'El peso neto no puede ser mayor que el peso bruto.')
+    return bruto, neto
 
 
 def _codigo_secundario(valor, rotulo, codigo):
@@ -205,7 +236,7 @@ def _volumen(cursor, valor, unidad, tenant_id):
     El volumen se guarda siempre con su unidad, que tiene que ser una unidad de
     medida del tenant de magnitud VOLUMEN.
     """
-    volumen = _numero(valor, 'Volumen') or None
+    volumen = _numero(valor, 'Volumen', maximo=VOLUMEN_MAX) or None
     if volumen is None:
         return None, None
     try:
@@ -240,15 +271,38 @@ _USOS_MATERIAL = (
 )
 
 
-def _numero(valor, rotulo, minimo=0.0):
-    """Número de un campo del formulario (vacío = 0)."""
+def _numero(valor, rotulo, minimo=0.0, maximo=None):
+    """Número de un campo del formulario o de un archivo (vacío = 0).
+
+    `maximo` es el mayor valor que entra en la columna: pasarse daba el error de la base.
+    """
     try:
         n = float(valor or 0)
     except (TypeError, ValueError):
-        raise DatoInvalido(f'{rotulo}: "{valor}" no es un número válido.') from None
+        n = math.nan
+    if not math.isfinite(n):     # texto, o los "números" nan e inf
+        raise DatoInvalido(f'{rotulo}: "{valor}" no es un número válido.')
     if n < minimo:
         raise DatoInvalido(f'{rotulo} no puede ser menor que {minimo:g}.')
+    if maximo is not None and n > maximo:
+        raise DatoInvalido(f'{rotulo}: el valor es demasiado grande.')
     return n
+
+
+def _uso_actual(cursor, id_material):
+    """Texto con el stock y los pedidos sin despachar de un material ('' si no tiene)."""
+    cursor.execute("SELECT COUNT(*) AS n FROM stockcontable WHERE Material = %s AND StockTotal <> 0", (id_material,))
+    posiciones = cursor.fetchone()['n']
+    cursor.execute("""SELECT COUNT(DISTINCT p.id_pedido) AS n FROM pedidos_detalle d
+                      JOIN pedidos_cabecera p ON p.id_pedido = d.id_pedido
+                      WHERE d.id_material = %s AND p.estado NOT IN ('Despachado', 'Anulado')""", (id_material,))
+    pedidos = cursor.fetchone()['n']
+    partes = []
+    if posiciones:
+        partes.append('stock en 1 posición' if posiciones == 1 else f'stock en {posiciones} posiciones')
+    if pedidos:
+        partes.append('1 pedido sin despachar' if pedidos == 1 else f'{pedidos} pedidos sin despachar')
+    return ' y '.join(partes)
 
 
 def _id_del_tenant(cursor, tabla, columna_id, valor, tenant_id, rotulo):
@@ -407,21 +461,23 @@ def guardar():
             tenant_id = get_tenant_filter()
 
             # --- Validaciones (cualquier DatoInvalido corta sin guardar nada) ---
-            if not codigo or not nombre:
-                raise DatoInvalido('Código y Nombre son obligatorios.')
+            _identificacion(codigo, nombre)
             valido, error_msg = validar_ean(barcode)
             if not valido:
                 raise DatoInvalido(error_msg or 'Código de barras inválido')
 
+            estaba_activo = None
             if m_id:
                 try:
                     m_id = int(m_id)
                 except ValueError:
                     raise DatoInvalido('Material inválido.') from None
-                cursor.execute("SELECT id FROM materiales WHERE id = %s AND (%s IS NULL OR tenant_id = %s)",
+                cursor.execute("SELECT activo FROM materiales WHERE id = %s AND (%s IS NULL OR tenant_id = %s)",
                                (m_id, tenant_id, tenant_id))
-                if not cursor.fetchone():
+                anterior = cursor.fetchone()
+                if not anterior:
                     raise DatoInvalido('El material que se intenta modificar no existe.')
+                estaba_activo = bool(anterior['activo'])
             else:
                 m_id = None
             otro = m_id or 0   # id a excluir al buscar duplicados
@@ -441,8 +497,7 @@ def guardar():
 
             stock_min, stock_repo, stock_max = _stocks(d.get('stock_minimo'), d.get('stock_reposicion'),
                                                        d.get('stock_maximo'))
-            peso_bruto = _numero(d.get('peso_bruto'), 'Peso bruto') or None
-            peso_neto = _numero(d.get('peso_neto'), 'Peso neto') or None
+            peso_bruto, peso_neto = _pesos(d.get('peso_bruto'), d.get('peso_neto'))
             codigo_alternativo = _codigo_secundario(d.get('codigo_alternativo'), 'Código alternativo', codigo)
             codigo_proveedor = _codigo_secundario(d.get('codigo_proveedor'), 'Código proveedor', codigo)
             volumen, volumen_unidad_id = _volumen(cursor, d.get('volumen'), d.get('volumen_unidad_id'), tenant_id)
@@ -473,8 +528,12 @@ def guardar():
                 prov_id = _id_del_tenant(cursor, 'proveedores', 'id', prov_id, tenant_id, 'Proveedor')
                 if any(p['id'] == prov_id for p in proveedores):
                     raise DatoInvalido('Hay un proveedor repetido en la lista de proveedores.')
+                referencia = (prov_codigos[i] if i < len(prov_codigos) else '').strip()
+                if len(referencia) > REFERENCIA_PROVEEDOR_MAX:
+                    raise DatoInvalido('Proveedores: el código del material para el proveedor admite hasta '
+                                       f'{REFERENCIA_PROVEEDOR_MAX} caracteres.')
                 proveedores.append({'id': prov_id,
-                                    'codigo': (prov_codigos[i] if i < len(prov_codigos) else '').strip(),
+                                    'codigo': referencia,
                                     'habitual': 1 if fila_habitual == i else 0})
 
             # Presentaciones
@@ -483,6 +542,8 @@ def guardar():
                 nombre_p = (nombre_p or '').strip()
                 if not nombre_p:
                     continue
+                if len(nombre_p) > PRESENTACION_NOMBRE_MAX:
+                    raise DatoInvalido(f'Presentaciones: el nombre admite hasta {PRESENTACION_NOMBRE_MAX} caracteres.')
                 gtin = (pres_barcodes[i] if i < len(pres_barcodes) else '').strip()
                 valido_gtin, error_gtin = validar_gtin14(gtin)
                 if not valido_gtin:
@@ -501,13 +562,14 @@ def guardar():
                                            f'"{usado["codigo"]}".')
                 rotulo = f'Presentación "{nombre_p}"'
                 cantidad = (pres_cantidades[i] if i < len(pres_cantidades) else '') or 1
+                pres_bruto, pres_neto = _pesos(pres_pesos_brutos[i] if i < len(pres_pesos_brutos) else '',
+                                               pres_pesos_netos[i] if i < len(pres_pesos_netos) else '',
+                                               rotulo=f'{rotulo}: ')
                 presentaciones.append({
                     'nombre': nombre_p, 'gtin': gtin,
-                    'cantidad': _numero(cantidad, f'{rotulo}: unidades', minimo=0.001),
-                    'peso_bruto': _numero(pres_pesos_brutos[i] if i < len(pres_pesos_brutos) else '',
-                                          f'{rotulo}: peso bruto') or None,
-                    'peso_neto': _numero(pres_pesos_netos[i] if i < len(pres_pesos_netos) else '',
-                                         f'{rotulo}: peso neto') or None,
+                    'cantidad': _numero(cantidad, f'{rotulo}: unidades', minimo=0.001, maximo=PESO_MAX),
+                    'peso_bruto': pres_bruto,
+                    'peso_neto': pres_neto,
                 })
 
             # --- Guardado ---
@@ -559,8 +621,13 @@ def guardar():
                 """, (current_id, p['nombre'], p['gtin'] or None, p['cantidad'], p['peso_bruto'], p['peso_neto'],
                       tenant_id))
 
+            # Si esta edición lo deja inactivo, se avisa lo que tiene pendiente
+            pendiente = _uso_actual(cursor, current_id) if estaba_activo and estado is False else ''
             conn.commit()
             flash("Material guardado correctamente", "success")
+            if pendiente:
+                flash(f'El material quedó inactivo y tiene {pendiente}. No se ofrece para pedidos ni recepciones '
+                      'nuevos; lo que ya tiene sigue su curso.', "warning")
             if imagen_ruta and not _es_url(imagen_ruta) and not os.path.isfile(imagen_ruta):
                 flash(f'El material se guardó, pero el servidor no encuentra la imagen "{imagen_ruta}". '
                       'Revisar que la ruta exista y que el servidor pueda leerla.', "warning")
@@ -618,13 +685,22 @@ def importar():
                         omitidos.append(codigo)
                         continue
 
-                    traz = str(row.get('trazabilidad', '') or '').strip().lower()
-                    if traz not in ('lote', 'serie', 'ninguna'):
-                        traz = 'ninguna'
-
-                    metodo_picking = _metodo_picking_valido(str(row.get('metodo_picking', '') or '').strip().lower(),
-                                                            metodo_default, metodos_habilitados)
                     try:
+                        _identificacion(codigo, nombre)
+                        # Vacío vale el valor por defecto; un valor mal escrito es un error, no se corrige solo
+                        traz = str(row.get('trazabilidad', '') or '').strip().lower() or 'ninguna'
+                        if traz not in TRAZABILIDADES:
+                            raise DatoInvalido(f'trazabilidad: "{row.get("trazabilidad")}" no es válida. '
+                                               f'Usar: {", ".join(TRAZABILIDADES)}.')
+                        metodo_picking = str(row.get('metodo_picking', '') or '').strip().lower() or metodo_default
+                        if metodo_picking not in metodos_habilitados:
+                            raise DatoInvalido(f'metodo_picking: "{row.get("metodo_picking")}" no es válido. '
+                                               f'Usar: {", ".join(metodos_habilitados)}.')
+                        peso_bruto, peso_neto = _pesos(*(str(row.get(c) or '').replace(',', '.')
+                                                         for c in ('peso_bruto', 'peso_neto')))
+                        codigo_referencia = str(row.get('codigo_referencia_prov', '') or '').strip()
+                        if len(codigo_referencia) > REFERENCIA_PROVEEDOR_MAX:
+                            raise DatoInvalido(f'codigo_referencia_prov: admite hasta {REFERENCIA_PROVEEDOR_MAX} caracteres.')
                         # Las referencias a otros maestros se pueden indicar por id o por código
                         categoria_id = _referencia(cursor, 'categorias', 'id_categoria', 'codigo',
                                                    row.get('categoria_id'), tenant_id, 'categoria_id')
@@ -679,8 +755,8 @@ def importar():
                         unidad_id,
                         traz,
                         metodo_picking,
-                        float_or_zero(row.get('peso_bruto')) or None,
-                        float_or_zero(row.get('peso_neto')) or None,
+                        peso_bruto,
+                        peso_neto,
                         codigo_alternativo, codigo_proveedor, volumen, volumen_unidad_id,
                         stock_repo, imagen_ruta,
                         bool(bool_col(row.get('activo') if str(row.get('activo') or '').strip() else '1')),
@@ -688,7 +764,7 @@ def importar():
                     ))
 
                     if id_prov_hab:
-                        cod_ref_prov = str(row.get('codigo_referencia_prov', '') or '').strip() or None
+                        cod_ref_prov = codigo_referencia or None
                         cursor.execute("""
                             INSERT INTO material_proveedor (id_material, id_proveedor, codigo_referencia_prov, es_habitual, tenant_id)
                             VALUES (%s, %s, %s, 1, %s)
@@ -730,7 +806,9 @@ def exportar(formato):
                        m.peso_bruto, m.peso_neto,
                        mp.id_proveedor AS id_proveedor_habitual,
                        p.razonsocial AS proveedor_habitual_nombre,
-                       mp.codigo_referencia_prov
+                       mp.codigo_referencia_prov,
+                       c.codigo AS categoria_codigo, u.codigo AS unidad_codigo,
+                       uv.codigo AS volumen_unidad_codigo, p.codigo AS proveedor_codigo
                 FROM materiales m
                 LEFT JOIN categorias c ON m.categoria_id = c.id_categoria
                 LEFT JOIN unidades_medida u ON m.unidad_medida_id = u.id_unidad
@@ -740,9 +818,17 @@ def exportar(formato):
                 WHERE (%s IS NULL OR m.tenant_id = %s)
                 ORDER BY m.codigo
             """, (tenant_id, tenant_id))
-            rows = cursor.fetchall()
+            rows = [dict(r) for r in cursor.fetchall()]
     finally:
         conn.close()
+    for r in rows:
+        # Las referencias a otros maestros van por su código, que es como las lee la importación:
+        # los ID internos cambian de un servidor a otro y el archivo no se podía reimportar.
+        # Un registro sin código (datos anteriores) conserva su ID.
+        for columna, codigo in (('categoria_id', 'categoria_codigo'), ('unidad_medida_id', 'unidad_codigo'),
+                                ('volumen_unidad_id', 'volumen_unidad_codigo'),
+                                ('id_proveedor_habitual', 'proveedor_codigo')):
+            r[columna] = r.pop(codigo) or r[columna]
 
     if formato == 'csv':
         return export_csv(rows, CAMPOS, 'materiales.csv')
@@ -770,11 +856,11 @@ def plantilla(formato):
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            cursor.execute("SELECT id_categoria, nombre FROM categorias WHERE activo = 1 AND (%s IS NULL OR tenant_id = %s) ORDER BY nombre", (tenant_id, tenant_id))
+            cursor.execute("SELECT id_categoria, codigo, nombre FROM categorias WHERE activo = 1 AND (%s IS NULL OR tenant_id = %s) ORDER BY nombre", (tenant_id, tenant_id))
             categorias = cursor.fetchall()
-            cursor.execute("SELECT id_unidad, nombre, simbolo, tipo_magnitud FROM unidades_medida WHERE activo = 1 AND (%s IS NULL OR tenant_id = %s) ORDER BY nombre", (tenant_id, tenant_id))
+            cursor.execute("SELECT id_unidad, codigo, nombre, simbolo, tipo_magnitud FROM unidades_medida WHERE activo = 1 AND (%s IS NULL OR tenant_id = %s) ORDER BY nombre", (tenant_id, tenant_id))
             unidades = cursor.fetchall()
-            cursor.execute("SELECT id, razonsocial FROM proveedores WHERE activo = 1 AND (%s IS NULL OR tenant_id = %s) ORDER BY razonsocial", (tenant_id, tenant_id))
+            cursor.execute("SELECT id, codigo, razonsocial FROM proveedores WHERE activo = 1 AND (%s IS NULL OR tenant_id = %s) ORDER BY razonsocial", (tenant_id, tenant_id))
             proveedores = cursor.fetchall()
     finally:
         conn.close()
@@ -786,21 +872,21 @@ def plantilla(formato):
         writer.writerow(HEADERS)
         writer.writerow(EJEMPLO)
         writer.writerow([])
-        writer.writerow(['# REFERENCIAS'])
+        writer.writerow(['# REFERENCIAS: en el archivo se indica el codigo (o el id) de cada una'])
         writer.writerow(['# CATEGORIAS (categoria_id)'])
-        writer.writerow(['id_categoria', 'nombre'])
+        writer.writerow(['codigo', 'id_categoria', 'nombre'])
         for c in categorias:
-            writer.writerow([c['id_categoria'], c['nombre']])
+            writer.writerow([c['codigo'], c['id_categoria'], c['nombre']])
         writer.writerow([])
         writer.writerow(['# UNIDADES DE MEDIDA (unidad_medida_id; para volumen_unidad_id, las de magnitud VOLUMEN)'])
-        writer.writerow(['id_unidad', 'nombre', 'simbolo', 'tipo_magnitud'])
+        writer.writerow(['codigo', 'id_unidad', 'nombre', 'simbolo', 'tipo_magnitud'])
         for u in unidades:
-            writer.writerow([u['id_unidad'], u['nombre'], u['simbolo'], u['tipo_magnitud']])
+            writer.writerow([u['codigo'], u['id_unidad'], u['nombre'], u['simbolo'], u['tipo_magnitud']])
         writer.writerow([])
         writer.writerow(['# PROVEEDORES (id_proveedor_habitual)'])
-        writer.writerow(['id', 'razonsocial'])
+        writer.writerow(['codigo', 'id', 'razonsocial'])
         for p in proveedores:
-            writer.writerow([p['id'], p['razonsocial']])
+            writer.writerow([p['codigo'], p['id'], p['razonsocial']])
         out = io.BytesIO(buf.getvalue().encode('utf-8-sig'))
         return send_file(out, mimetype='text/csv', as_attachment=True,
                          download_name='plantilla_materiales.csv')
@@ -808,10 +894,12 @@ def plantilla(formato):
     elif formato == 'json':
         data = {
             'materiales': [dict(zip(HEADERS, EJEMPLO, strict=False))],
-            'categorias': [{'id_categoria': c['id_categoria'], 'nombre': c['nombre']} for c in categorias],
-            'unidades': [{'id': u['id_unidad'], 'nombre': u['nombre'], 'abreviatura': u['simbolo'],
-                          'tipo_magnitud': u['tipo_magnitud']} for u in unidades],
-            'proveedores': [{'id': p['id'], 'razonsocial': p['razonsocial']} for p in proveedores]
+            'categorias': [{'codigo': c['codigo'], 'id_categoria': c['id_categoria'], 'nombre': c['nombre']}
+                           for c in categorias],
+            'unidades': [{'codigo': u['codigo'], 'id': u['id_unidad'], 'nombre': u['nombre'],
+                          'abreviatura': u['simbolo'], 'tipo_magnitud': u['tipo_magnitud']} for u in unidades],
+            'proveedores': [{'codigo': p['codigo'], 'id': p['id'], 'razonsocial': p['razonsocial']}
+                            for p in proveedores]
         }
         out = io.BytesIO(json.dumps(data, ensure_ascii=False, indent=2).encode('utf-8'))
         return send_file(out, mimetype='application/json', as_attachment=True,
@@ -842,37 +930,37 @@ def plantilla(formato):
         
         # Hoja de Categorías
         ws_cat = wb.create_sheet('Categorias')
-        ws_cat.append(['id_categoria', 'nombre'])
+        ws_cat.append(['codigo', 'id_categoria', 'nombre'])
         for cell in ws_cat[1]:
             cell.font = header_font
             cell.fill = header_fill
             cell.alignment = Alignment(horizontal='center')
         for c in categorias:
-            ws_cat.append([c['id_categoria'], c['nombre']])
+            ws_cat.append([c['codigo'], c['id_categoria'], c['nombre']])
         for col in ws_cat.columns:
             ws_cat.column_dimensions[col[0].column_letter].width = 15
         
         # Hoja de Unidades
         ws_uni = wb.create_sheet('Unidades')
-        ws_uni.append(['id_unidad', 'nombre', 'simbolo', 'tipo_magnitud'])
+        ws_uni.append(['codigo', 'id_unidad', 'nombre', 'simbolo', 'tipo_magnitud'])
         for cell in ws_uni[1]:
             cell.font = header_font
             cell.fill = header_fill
             cell.alignment = Alignment(horizontal='center')
         for u in unidades:
-            ws_uni.append([u['id_unidad'], u['nombre'], u['simbolo'], u['tipo_magnitud']])
+            ws_uni.append([u['codigo'], u['id_unidad'], u['nombre'], u['simbolo'], u['tipo_magnitud']])
         for col in ws_uni.columns:
             ws_uni.column_dimensions[col[0].column_letter].width = 15
 
         # Hoja de Proveedores
         ws_prov = wb.create_sheet('Proveedores')
-        ws_prov.append(['id', 'razonsocial'])
+        ws_prov.append(['codigo', 'id', 'razonsocial'])
         for cell in ws_prov[1]:
             cell.font = header_font
             cell.fill = header_fill
             cell.alignment = Alignment(horizontal='center')
         for p in proveedores:
-            ws_prov.append([p['id'], p['razonsocial']])
+            ws_prov.append([p['codigo'], p['id'], p['razonsocial']])
         for col in ws_prov.columns:
             ws_prov.column_dimensions[col[0].column_letter].width = 20
 
@@ -1000,7 +1088,7 @@ def eliminar(id):
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            cursor.execute("SELECT codigo FROM materiales WHERE id = %s AND (%s IS NULL OR tenant_id = %s)",
+            cursor.execute("SELECT codigo, activo FROM materiales WHERE id = %s AND (%s IS NULL OR tenant_id = %s)",
                            (id, tenant_id, tenant_id))
             material = cursor.fetchone()
             if not material:
@@ -1014,11 +1102,16 @@ def eliminar(id):
                     en_uso = True
                     break
 
-            if en_uso:
+            if en_uso and not material['activo']:
+                flash(f'El material "{material["codigo"]}" ya estaba inactivo. No se puede borrar porque tiene '
+                      'stock o movimientos.', "info")
+            elif en_uso:
+                pendiente = _uso_actual(cursor, id)
                 cursor.execute("UPDATE materiales SET activo = %s WHERE id = %s", (False, id))
                 conn.commit()
-                flash(f'El material "{material["codigo"]}" tiene stock o movimientos: no se borró, quedó inactivo. '
-                      'Se puede reactivar desde su edición.', "warning")
+                flash(f'El material "{material["codigo"]}" tiene stock o movimientos: no se borró, quedó inactivo.'
+                      + (f' Tiene {pendiente}, que sigue{"n" if " y " in pendiente else ""} su curso.' if pendiente else '')
+                      + ' Se puede reactivar desde su edición.', "warning")
             else:
                 cursor.execute("DELETE FROM materiales WHERE id = %s", (id,))
                 conn.commit()

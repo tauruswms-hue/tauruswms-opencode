@@ -42,12 +42,17 @@ def wms(usuario_wms):
     cur = conn.cursor()
     cur.execute("SELECT id FROM materiales WHERE codigo LIKE %s AND tenant_id = %s", (PREFIJO + '%', tenant))
     ids = [r['id'] for r in cur.fetchall()]
+    cur.execute("DELETE FROM pedidos_cabecera WHERE nro_pedido LIKE %s AND tenant_id = %s", (PREFIJO + '%', tenant))
+    cur.execute("DELETE FROM clientes WHERE codigo LIKE %s AND tenant_id = %s", (PREFIJO + '%', tenant))
     for mid in ids:
+        cur.execute("DELETE FROM stockcontable WHERE Material = %s", (mid,))
         cur.execute("DELETE FROM stock_movimientos WHERE id_material = %s", (mid,))
         cur.execute("DELETE FROM materiales WHERE id = %s", (mid,))
     cur.execute("DELETE FROM materiales WHERE codigo = 'MAT001' AND nombre = 'Ejemplo Material' AND tenant_id = %s",
                 (tenant,))
     cur.execute("DELETE FROM proveedores WHERE codigo LIKE %s AND tenant_id = %s", (PREFIJO + '%', tenant))
+    cur.execute("DELETE FROM categorias WHERE codigo LIKE %s AND tenant_id = %s", (PREFIJO + '%', tenant))
+    cur.execute("DELETE FROM unidades_medida WHERE codigo LIKE %s AND tenant_id = %s", (PREFIJO + '%', tenant))
     conn.commit()
     conn.close()
 
@@ -299,7 +304,7 @@ def test_la_plantilla_descargada_se_puede_importar(logged_client, wms, formato):
 def test_importar_csv(logged_client, wms):
     bueno, sin_categoria = _codigo(), _codigo()
     csv = ('codigo,nombre,categoria_id,metodo_picking\n'
-           f'{bueno},Importado,,inventado\n'
+           f'{bueno},Importado,,\n'
            f'{sin_categoria},Con categoría inexistente,999999999,\n'
            f'{bueno},Repetido en el archivo,,\n'
            ',Sin código,,\n')
@@ -778,3 +783,227 @@ def test_la_ruta_de_distribucion_esta_en_el_catalogo_de_permisos():
     from modules.schema_generator import ROUTE_CATALOG, ROUTES_CONSULTA, ROUTES_OPERADOR
     assert any('/materiales/distribucion/*' in g['rutas'] for g in ROUTE_CATALOG)
     assert '/materiales/distribucion/*' in ROUTES_OPERADOR and '/materiales/distribucion/*' in ROUTES_CONSULTA
+
+
+# --- Largos y rangos, pesos, importación estricta, exportación por código ---
+
+@requires_db
+@pytest.mark.parametrize('datos, mensaje', [
+    ({'nombre': 'x' * 256}, 'Nombre: admite hasta 255 caracteres.'),
+    ({'codigo': PREFIJO + 'x' * 100}, 'Código: admite hasta 100 caracteres.'),
+    ({'stock_minimo': 'nan'}, 'Stock mínimo: "nan" no es un número válido.'),
+    ({'stock_maximo': 'inf'}, 'Stock máximo: "inf" no es un número válido.'),
+    ({'stock_maximo': '1e12'}, 'Stock máximo: el valor es demasiado grande.'),
+    ({'peso_bruto': '1e9'}, 'Peso bruto: el valor es demasiado grande.'),
+    ({'peso_neto': 'nan'}, 'Peso neto: "nan" no es un número válido.'),
+    ({'peso_bruto': '1', 'peso_neto': '5'}, 'El peso neto no puede ser mayor que el peso bruto.'),
+])
+def test_largos_y_rangos_con_mensaje_propio(logged_client, wms, datos, mensaje):
+    """Antes salía el error de la base (Data too long, Out of range, nan can not be used with MySQL)."""
+    codigo = _codigo()
+    assert _guardar(logged_client, **{'codigo': codigo, **datos}) == [mensaje]
+    assert _material(wms, datos.get('codigo', codigo)) is None
+
+
+@requires_db
+def test_presentaciones_y_referencia_del_proveedor_validan_largos_y_pesos(logged_client, wms, usuario_wms):
+    def presentacion(**cambios):
+        base = {'pres_nombres[]': ['Caja'], 'pres_cantidades[]': ['12'], 'pres_barcodes[]': [''],
+                'pres_pesos_brutos[]': [''], 'pres_pesos_netos[]': ['']}
+        return {**base, **{f'pres_{k}[]': [v] for k, v in cambios.items()}}
+
+    codigo = _codigo()
+    assert _guardar(logged_client, codigo=codigo, **presentacion(nombres='p' * 101)) == [
+        'Presentaciones: el nombre admite hasta 100 caracteres.']
+    assert _guardar(logged_client, codigo=codigo, **presentacion(cantidades='nan')) == [
+        'Presentación "Caja": unidades: "nan" no es un número válido.']
+    assert _guardar(logged_client, codigo=codigo, **presentacion(pesos_brutos='1', pesos_netos='2')) == [
+        'Presentación "Caja": el peso neto no puede ser mayor que el peso bruto.']
+    proveedor = _proveedor(wms, usuario_wms['tenant_id'])
+    assert _guardar(logged_client, codigo=codigo, **{'prov_ids[]': [str(proveedor)], 'prov_codigos[]': ['r' * 101]}) == [
+        'Proveedores: el código del material para el proveedor admite hasta 100 caracteres.']
+    assert _material(wms, codigo) is None
+    assert _guardar(logged_client, codigo=codigo, peso_bruto='2', peso_neto='2',
+                    **presentacion(pesos_brutos='3', pesos_netos='2.5')) == ['Material guardado correctamente']
+
+
+def _importar(client, contenido):
+    r = client.post('/materiales/importar', data={
+        'archivo': (io.BytesIO(contenido.encode('utf-8')), 'materiales.csv')}, content_type='multipart/form-data')
+    assert r.status_code == 200, r.get_data(as_text=True)
+    return r.get_json()
+
+
+@requires_db
+def test_importar_no_corrige_en_silencio(logged_client, wms):
+    """Una trazabilidad o un método mal escritos se guardaban con el valor por defecto, sin avisar."""
+    bueno, traz, metodo, peso, neto, largo, rango = (_codigo() for _ in range(7))
+    resultado = _importar(logged_client, '\n'.join([
+        'codigo,nombre,trazabilidad,metodo_picking,peso_bruto,peso_neto,stock_maximo',
+        f'{bueno},Bueno,LOTE,,"1,5","1,2",',
+        f'{traz},Trazabilidad mala,LOTES,,,,',
+        f'{metodo},Método malo,,inventado,,,',
+        f'{peso},Peso malo,,,abc,,',
+        f'{neto},Neto mayor,,,1,5,',
+        f'{largo},{"x" * 256},,,,,',
+        f'{rango},Fuera de rango,,,,,1e12',
+    ]))
+    assert resultado['insertados'] == 1
+    razones = {e['fila']: e['razon'] for e in resultado['errores']}
+    assert razones[2] == 'trazabilidad: "LOTES" no es válida. Usar: ninguna, lote, serie.'
+    assert razones[3].startswith('metodo_picking: "inventado" no es válido. Usar: ')
+    assert razones[4] == 'Peso bruto: "abc" no es un número válido.'
+    assert razones[5] == 'El peso neto no puede ser mayor que el peso bruto.'
+    assert razones[6] == 'Nombre: admite hasta 255 caracteres.'
+    assert razones[7] == 'Stock máximo: el valor es demasiado grande.'
+    m = _material(wms, bueno)
+    assert m['trazabilidad'].lower() == 'lote' and (float(m['peso_bruto']), float(m['peso_neto'])) == (1.5, 1.2)
+
+
+@pytest.fixture
+def maestros(wms, usuario_wms):
+    """Una categoría, una unidad, una unidad de volumen y un proveedor del tenant, con códigos propios."""
+    tenant = usuario_wms['tenant_id']
+    cur = wms.cursor()
+    datos = {clave: _codigo() for clave in ('categoria', 'unidad', 'volumen', 'proveedor')}
+    cur.execute("INSERT INTO categorias (codigo, nombre, tenant_id) VALUES (%s, %s, %s)",
+                (datos['categoria'], 'Cat ' + datos['categoria'], tenant))
+    cur.execute("INSERT INTO unidades_medida (codigo, nombre, simbolo, tipo_magnitud, tenant_id) VALUES (%s, 'Unidad', 'u', 'CANTIDAD', %s)",
+                (datos['unidad'], tenant))
+    cur.execute("INSERT INTO unidades_medida (codigo, nombre, simbolo, tipo_magnitud, tenant_id) VALUES (%s, 'Litro', 'l', 'VOLUMEN', %s)",
+                (datos['volumen'], tenant))
+    cur.execute("INSERT INTO proveedores (codigo, razonsocial, tenant_id) VALUES (%s, 'Proveedor de prueba', %s)",
+                (datos['proveedor'], tenant))
+    wms.commit()
+    ids = {}
+    for clave, tabla, columna in (('categoria', 'categorias', 'id_categoria'), ('unidad', 'unidades_medida', 'id_unidad'),
+                                  ('volumen', 'unidades_medida', 'id_unidad'), ('proveedor', 'proveedores', 'id')):
+        cur.execute(f"SELECT {columna} AS id FROM {tabla} WHERE codigo = %s AND tenant_id = %s", (datos[clave], tenant))
+        ids[clave] = cur.fetchone()['id']
+    return {'codigos': datos, 'ids': ids}
+
+
+@requires_db
+def test_la_exportacion_se_puede_importar_en_otro_servidor(logged_client, wms, maestros):
+    """Las referencias salen por código: los ID internos cambian de un servidor a otro."""
+    import csv as modulo_csv
+    ids, codigos = maestros['ids'], maestros['codigos']
+    codigo = _codigo()
+    assert _guardar(logged_client, codigo=codigo, categoria_id=ids['categoria'], unidad_medida_id=ids['unidad'],
+                    volumen='2', volumen_unidad_id=ids['volumen'],
+                    **{'prov_ids[]': [str(ids['proveedor'])], 'prov_codigos[]': ['REF-1'], 'prov_habitual': '0'}) == [
+        'Material guardado correctamente']
+    exportado = logged_client.get('/materiales/exportar/csv').get_data(as_text=True).lstrip('\ufeff')
+    fila = next(f for f in modulo_csv.DictReader(io.StringIO(exportado)) if f['codigo'] == codigo)
+    assert (fila['categoria_id'], fila['unidad_medida_id'], fila['volumen_unidad_id'], fila['id_proveedor_habitual']) == (
+        codigos['categoria'], codigos['unidad'], codigos['volumen'], codigos['proveedor'])
+    assert fila['categoria_nombre'] == 'Cat ' + codigos['categoria'] and fila['proveedor_habitual_nombre'] == 'Proveedor de prueba'
+
+    # Como si fuera otro servidor: se borra el material y se lo vuelve a cargar desde esa fila
+    cur = wms.cursor()
+    cur.execute("DELETE FROM materiales WHERE codigo = %s", (codigo,))
+    wms.commit()
+    linea = next(x for x in exportado.splitlines() if x.startswith(codigo + ','))
+    resultado = _importar(logged_client, exportado.splitlines()[0] + '\n' + linea + '\n')
+    assert resultado['insertados'] == 1 and resultado['errores'] == []
+    m = _material(wms, codigo)
+    assert (m['categoria_id'], m['unidad_medida_id'], m['volumen_unidad_id']) == (ids['categoria'], ids['unidad'], ids['volumen'])
+    cur.execute("SELECT id_proveedor, codigo_referencia_prov FROM material_proveedor WHERE id_material = %s", (m['id'],))
+    assert tuple(cur.fetchone().values()) == (ids['proveedor'], 'REF-1')
+
+
+@requires_db
+def test_en_la_importacion_el_codigo_manda_sobre_el_id(logged_client, wms, usuario_wms, maestros):
+    """Un número que es el código de una unidad se toma como código, aunque también exista una con ese id."""
+    tenant = usuario_wms['tenant_id']
+    id_unidad = maestros['ids']['unidad']
+    cur = wms.cursor()
+    # Otra unidad cuyo código es, justamente, el id de la primera
+    cur.execute("SELECT id_unidad FROM unidades_medida WHERE codigo = %s AND tenant_id = %s", (str(id_unidad), tenant))
+    assert cur.fetchone() is None
+    cur.execute("INSERT INTO unidades_medida (codigo, nombre, simbolo, tipo_magnitud, tenant_id) VALUES (%s, %s, 'x', 'CANTIDAD', %s)",
+                (str(id_unidad), PREFIJO + ' numerica', tenant))
+    wms.commit()
+    cur.execute("SELECT id_unidad FROM unidades_medida WHERE codigo = %s AND tenant_id = %s", (str(id_unidad), tenant))
+    id_numerica = cur.fetchone()['id_unidad']
+    try:
+        por_codigo, por_id = _codigo(), _codigo()
+        resultado = _importar(logged_client, f'codigo,nombre,unidad_medida_id\n{por_codigo},Uno,{id_unidad}\n{por_id},Dos,{id_numerica}\n')
+        assert resultado['insertados'] == 2
+        assert _material(wms, por_codigo)['unidad_medida_id'] == id_numerica   # "N" es el código de esta unidad
+        assert _material(wms, por_id)['unidad_medida_id'] == id_numerica       # sin código que coincida, vale como id
+    finally:
+        wms.commit()
+        cur.execute("DELETE FROM materiales WHERE codigo LIKE %s AND tenant_id = %s", (PREFIJO + '%', tenant))
+        cur.execute("DELETE FROM unidades_medida WHERE id_unidad = %s", (id_numerica,))
+        wms.commit()
+
+
+@requires_db
+def test_la_plantilla_lista_los_codigos_de_referencia(logged_client, wms, maestros):
+    plantilla = logged_client.get('/materiales/plantilla/csv').get_data(as_text=True)
+    assert 'codigo,id_categoria,nombre' in plantilla and 'codigo,id_unidad,nombre,simbolo,tipo_magnitud' in plantilla
+    assert f'{maestros["codigos"]["categoria"]},{maestros["ids"]["categoria"]},' in plantilla
+    assert f'{maestros["codigos"]["proveedor"]},{maestros["ids"]["proveedor"]},' in plantilla
+
+
+# --- Inactivar: avisos, y el pedido que ya tiene el material ---
+
+def _pedido_con(conn, tenant, id_material, estado='Pendiente'):
+    cur = conn.cursor()
+    cliente, nro = _codigo(), _codigo()
+    cur.execute("INSERT INTO clientes (codigo, razonsocial, tenant_id) VALUES (%s, 'Cliente de prueba', %s)", (cliente, tenant))
+    cur.execute("SELECT id_cliente FROM clientes WHERE codigo = %s AND tenant_id = %s", (cliente, tenant))
+    cur.execute("""INSERT INTO pedidos_cabecera (nro_pedido, id_cliente, fecha_pedido, estado, tenant_id)
+                   VALUES (%s, %s, CURRENT_DATE, %s, %s)""", (nro, cur.fetchone()['id_cliente'], estado, tenant))
+    cur.execute("SELECT id_pedido FROM pedidos_cabecera WHERE nro_pedido = %s AND tenant_id = %s", (nro, tenant))
+    id_pedido = cur.fetchone()['id_pedido']
+    cur.execute("INSERT INTO pedidos_detalle (id_pedido, id_material, cantidad, tenant_id) VALUES (%s, %s, 1, %s)",
+                (id_pedido, id_material, tenant))
+    conn.commit()
+    return id_pedido
+
+
+@requires_db
+def test_inactivar_avisa_los_pedidos_sin_despachar(logged_client, wms, usuario_wms):
+    tenant = usuario_wms['tenant_id']
+    por_edicion, por_baja = _codigo(), _codigo()
+    for codigo in (por_edicion, por_baja):
+        _guardar(logged_client, codigo=codigo)
+        _pedido_con(wms, tenant, _material(wms, codigo)['id'])
+
+    # Desde la edición, con Estado: Inactivo
+    mid = _material(wms, por_edicion)['id']
+    mensajes = _guardar(logged_client, id=mid, codigo=por_edicion, activo='0')
+    assert mensajes[0] == 'Material guardado correctamente'
+    assert 'quedó inactivo y tiene 1 pedido sin despachar' in mensajes[1]
+    assert _guardar(logged_client, id=mid, codigo=por_edicion, activo='0') == ['Material guardado correctamente']   # ya lo estaba
+
+    # Desde el botón de eliminar: tiene un pedido, así que no se borra
+    mid = _material(wms, por_baja)['id']
+    logged_client.post(f'/materiales/eliminar/{mid}')
+    (mensaje,) = _flashes(logged_client)
+    assert 'quedó inactivo' in mensaje and 'Tiene 1 pedido sin despachar, que sigue su curso.' in mensaje
+    logged_client.post(f'/materiales/eliminar/{mid}')
+    assert _flashes(logged_client) == [
+        f'El material "{por_baja}" ya estaba inactivo. No se puede borrar porque tiene stock o movimientos.']
+
+
+@requires_db
+def test_el_pedido_conserva_su_material_inactivo_al_editarlo(logged_client, wms, usuario_wms):
+    """El formulario de edición cargaba solo los materiales activos: el renglón quedaba en blanco."""
+    tenant = usuario_wms['tenant_id']
+    del_pedido, otro = _codigo(), _codigo()
+    _guardar(logged_client, codigo=del_pedido, nombre='Nombre <del> pedido')
+    _guardar(logged_client, codigo=otro, activo='0')
+    mid = _material(wms, del_pedido)['id']
+    id_pedido = _pedido_con(wms, tenant, mid)
+    _guardar(logged_client, id=mid, codigo=del_pedido, nombre='Nombre <del> pedido', activo='0')
+
+    html = logged_client.get(f'/pedidos/editar/{id_pedido}').get_data(as_text=True)
+    datos = html[html.index('const materialesDB = '):]
+    datos = datos[:datos.index('</script>')]
+    assert f'"codigo": "{del_pedido}"' in datos and '"activo": 0' in datos
+    assert f'"codigo": "{otro}"' not in datos                       # otro inactivo no se ofrece
+    assert 'escMat(m.nombre)' in html                                # el nombre se inserta escapado
+    assert f'"codigo": "{del_pedido}"' not in logged_client.get('/pedidos/nuevo').get_data(as_text=True)

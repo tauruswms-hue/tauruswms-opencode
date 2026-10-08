@@ -406,10 +406,14 @@
     const TIPOS_STOCK = ['Libre Venta', 'Calidad', 'Bloqueado', 'Mal Estado'];
 
     function agregarFila(idMat = '', cant = '', tipoStock = 'Libre Venta') {
+        // Código y nombre van escapados; un material inactivo solo se ofrece en el renglón que ya lo tiene
+        const escMat = v => $('<i>').text(v === null || v === undefined ? '' : v).html().replace(/"/g, '&quot;');
         let optsMat = '<option value="">Seleccione material...</option>';
         materialesDB.forEach(m => {
+            const inactivo = m.activo === 0 || m.activo === false;
+            if (inactivo && m.id != idMat) return;
             let sel = (m.id == idMat) ? 'selected' : '';
-            optsMat += `<option value="${m.id}" ${sel}>${m.codigo} - ${m.nombre}</option>`;
+            optsMat += `<option value="${m.id}" ${sel}>${escMat(m.codigo)} - ${escMat(m.nombre)}${inactivo ? ' — inactivo' : ''}</option>`;
         });
 
         let optsTs = TIPOS_STOCK.map(ts => {
