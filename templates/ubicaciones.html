@@ -70,7 +70,7 @@
             <div id="zonaMenu" style="display:none; position:absolute; top:100%; left:0; right:0; background:white; border:1px solid #ccc; border-radius:4px; box-shadow:0 4px 12px rgba(0,0,0,0.12); z-index:1000; padding:6px 0; max-height:220px; overflow-y:auto;">
                 {% for z in zonas %}
                 <label style="display:flex; align-items:center; gap:8px; padding:5px 12px; cursor:pointer; font-size:0.85rem;" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">
-                    <input type="checkbox" value="{{ z.codigo }}" class="chkZona"> {{ z.codigo }}{% if z.nombre %} — {{ z.nombre }}{% endif %}
+                    <input type="checkbox" value="{{ z.codigo }}" class="chkZona"> {{ z.codigo }}{% if z.nombre %} — {{ z.nombre }}{% endif %}{% if not z.activo %} (inactiva){% endif %}
                 </label>
                 {% endfor %}
             </div>
@@ -107,13 +107,14 @@
                     <th>Orden Picking</th>
                     <th>Coordenadas</th>
                     <th>Capacidad</th>
+                    <th title="Si la ubicación admite ingresos y egresos de mercadería">Entrada / Salida</th>
                     <th>Estado</th>
                     <th>Acciones</th>
                 </tr>
             </thead>
             <tbody>
                 {% for u in ubicaciones %}
-                <tr>
+                <tr{% if not u.activo %} style="color:#999;"{% endif %}>
                     <td><strong>{{ u.codigo }}</strong></td>
                     <td>{{ u.descipcion or '-' }}</td>
                     <td>{{ u.tipo_nombre or '-' }}</td>
@@ -138,20 +139,25 @@
                         </small>
                     </td>
                     <td>{{ u.capacidad_maxima }}</td>
+                    <td style="white-space:nowrap;">
+                        {% if u.disponible_entrada %}Entrada{% endif %}{% if u.disponible_entrada and u.disponible_salida %} / {% endif %}{% if u.disponible_salida %}Salida{% endif %}{% if not u.disponible_entrada and not u.disponible_salida %}<span style="color:#ccc;">—</span>{% endif %}
+                    </td>
                     <td>
-                        {% if u.disponible_entrada %}
-                            <span class="badge badge-success">Activa</span>
+                        {% if u.activo %}
+                            <span style="background:#27ae60; color:white; padding:2px 8px; border-radius:10px; font-size:0.8rem;">Activa</span>
                         {% else %}
-                            <span class="badge badge-danger">Inactiva</span>
+                            <span title="No se ofrece en recepciones, OMC ni pedidos" style="background:#95a5a6; color:white; padding:2px 8px; border-radius:10px; font-size:0.8rem;">Inactiva</span>
                         {% endif %}
                     </td>
                     <td class="actions-cell">
-                        <button class="btn-icon edit" onclick='editUbicacion({{ u | tojson }})'>
+                        <button class="btn-icon edit" title="Editar" onclick='editUbicacion({{ u | tojson }})'>
                             <i class="fas fa-edit"></i>
                         </button>
-                        <form method="POST" action="{{ url_for('ubicaciones.eliminar', id=u.id) }}" style="display:inline;" onsubmit="return confirm('¿Inactivar ubicación?')">
-                            <button type="submit" class="btn-icon delete"><i class="fas fa-trash"></i></button>
+                        {% if u.activo %}
+                        <form method="POST" action="{{ url_for('ubicaciones.eliminar', id=u.id) }}" style="display:inline;" onsubmit="return confirm('¿Inactivar esta ubicación?\n\nNo se borra: deja de ofrecerse en recepciones, OMC y pedidos, y se puede reactivar desde su edición. No se puede inactivar si tiene stock u operaciones abiertas.')">
+                            <button type="submit" class="btn-icon delete" title="Inactivar"><i class="fas fa-trash"></i></button>
                         </form>
+                        {% endif %}
                     </td>
                 </tr>
                 {% endfor %}
@@ -218,12 +224,12 @@
             // Tipo (col 2): si hay selección, la celda debe coincidir
             if (tipos.length > 0 && !tipos.some(v => data[2].trim() === v)) return false;
 
-            // Zona (col 3): si hay selección, la celda debe incluir el código
-            if (zonas.length > 0 && !zonas.some(v => data[3].includes(v))) return false;
+            // Zona (col 3): si hay selección, la celda debe ser ese código (Z1 no trae las de Z10)
+            if (zonas.length > 0 && !zonas.some(v => data[3].trim() === v)) return false;
 
-            // Estado (col 7)
+            // Estado (col 8)
             if (estados.length === 0) return false;
-            if (!estados.some(v => data[7].includes(v))) return false;
+            if (!estados.some(v => data[8].trim() === v)) return false;
 
             return true;
         });

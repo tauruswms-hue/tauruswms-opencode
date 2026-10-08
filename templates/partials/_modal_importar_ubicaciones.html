@@ -16,13 +16,14 @@
                     <tbody>
                         <tr><td style="padding:3px 8px;"><code>codigo</code></td><td style="padding:3px 8px; color:#e74c3c;">Sí</td><td style="padding:3px 8px;">Único</td></tr>
                         <tr style="background:#f9f9f9;"><td style="padding:3px 8px;"><code>descipcion</code></td><td style="padding:3px 8px; color:#27ae60;">No</td><td style="padding:3px 8px;"></td></tr>
-                        <tr><td style="padding:3px 8px;"><code>tipoubicacion</code></td><td style="padding:3px 8px; color:#27ae60;">No</td><td style="padding:3px 8px;">ID numérico</td></tr>
-                        <tr style="background:#f9f9f9;"><td style="padding:3px 8px;"><code>id_zona</code></td><td style="padding:3px 8px; color:#27ae60;">No</td><td style="padding:3px 8px;">ID numérico</td></tr>
+                        <tr><td style="padding:3px 8px;"><code>tipoubicacion</code></td><td style="padding:3px 8px; color:#27ae60;">No</td><td style="padding:3px 8px;">Nombre del tipo de ubicación (o su ID). Tiene que existir</td></tr>
+                        <tr style="background:#f9f9f9;"><td style="padding:3px 8px;"><code>id_zona</code></td><td style="padding:3px 8px; color:#27ae60;">No</td><td style="padding:3px 8px;">Código de la zona (o su ID). Tiene que existir</td></tr>
                         <tr><td style="padding:3px 8px;"><code>orden_picking</code></td><td style="padding:3px 8px; color:#27ae60;">No</td><td style="padding:3px 8px;">Entero, default 0</td></tr>
                         <tr style="background:#f9f9f9;"><td style="padding:3px 8px;"><code>coordenadaA / B / C / D</code></td><td style="padding:3px 8px; color:#27ae60;">No</td><td style="padding:3px 8px;"></td></tr>
                         <tr><td style="padding:3px 8px;"><code>capacidad_maxima</code></td><td style="padding:3px 8px; color:#27ae60;">No</td><td style="padding:3px 8px;">Entero, default 0</td></tr>
                         <tr style="background:#f9f9f9;"><td style="padding:3px 8px;"><code>disponible_entrada</code></td><td style="padding:3px 8px; color:#27ae60;">No</td><td style="padding:3px 8px;">1 = sí, 0 = no</td></tr>
                         <tr><td style="padding:3px 8px;"><code>disponible_salida</code></td><td style="padding:3px 8px; color:#27ae60;">No</td><td style="padding:3px 8px;">1 = sí, 0 = no</td></tr>
+                        <tr style="background:#f9f9f9;"><td style="padding:3px 8px;"><code>activo</code></td><td style="padding:3px 8px; color:#27ae60;">No</td><td style="padding:3px 8px;">Estado: 1 = Activa, 0 = Inactiva. Default 1</td></tr>
                     </tbody>
                 </table>
                 <p style="margin:10px 0 0; color:#555;">Las ubicaciones con <strong>código duplicado</strong> serán omitidas.</p>

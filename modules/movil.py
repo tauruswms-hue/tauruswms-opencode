@@ -104,7 +104,7 @@ def recepcion_listar():
                 SELECT u.id, u.codigo, u.descipcion AS nombre
                 FROM ubicaciones u
                 JOIN tipoubicacion t ON u.tipoubicacion = t.id
-                WHERE t.{quote('descripcion')} LIKE %s AND (%s IS NULL OR u.tenant_id = %s)
+                WHERE t.{quote('descripcion')} LIKE %s AND u.activo = 1 AND (%s IS NULL OR u.tenant_id = %s)
                 ORDER BY u.codigo
             """, ('%Recepci%', tenant_id, tenant_id))
             ubicaciones = cursor.fetchall()
@@ -190,7 +190,7 @@ def recepcion_detalle(id_recepcion):
                 SELECT u.id, u.codigo, u.descipcion AS nombre
                 FROM ubicaciones u
                 JOIN tipoubicacion t ON u.tipoubicacion = t.id
-                WHERE (%s IS NULL OR u.tenant_id = %s)
+                WHERE u.activo = 1 AND (%s IS NULL OR u.tenant_id = %s)
                 ORDER BY u.codigo
             """, (tenant_id, tenant_id))
             ubicaciones_destino = cursor.fetchall()

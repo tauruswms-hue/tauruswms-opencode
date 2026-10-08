@@ -94,7 +94,7 @@ def nueva():
                 SELECT u.id, u.codigo, u.descipcion AS nombre, t.{quote('descripcion')} AS tipo
                 FROM ubicaciones u
                 JOIN tipoubicacion t ON u.tipoubicacion = t.id
-                WHERE t.{quote('descripcion')} LIKE %s AND (%s IS NULL OR u.tenant_id = %s)
+                WHERE t.{quote('descripcion')} LIKE %s AND u.activo = 1 AND (%s IS NULL OR u.tenant_id = %s)
                 ORDER BY u.codigo
             """, ('%Recepci%', tenant_id, tenant_id))
             ubicaciones_recep = cursor.fetchall()
@@ -234,7 +234,7 @@ def ver(id_recepcion):
                 SELECT u.id, u.codigo, u.descipcion AS nombre, t.{quote('descripcion')} AS tipo
                 FROM ubicaciones u
                 JOIN tipoubicacion t ON u.tipoubicacion = t.id
-                WHERE (%s IS NULL OR u.tenant_id = %s)
+                WHERE u.activo = 1 AND (%s IS NULL OR u.tenant_id = %s)
                 ORDER BY u.codigo
             """, (tenant_id, tenant_id))
             ubicaciones_destino = cursor.fetchall()
@@ -334,7 +334,7 @@ def buscar_ubicaciones():
                     SELECT u.id, u.codigo, u.descipcion AS nombre, t.{quote('descripcion')} AS tipo
                     FROM ubicaciones u
                     JOIN tipoubicacion t ON u.tipoubicacion = t.id
-                    WHERE t.{quote('descripcion')} LIKE %s
+                    WHERE t.{quote('descripcion')} LIKE %s AND u.activo = 1
                       AND (u.codigo LIKE %s OR u.descipcion LIKE %s)
                       AND (%s IS NULL OR u.tenant_id = %s)
                     ORDER BY u.codigo
@@ -345,7 +345,7 @@ def buscar_ubicaciones():
                     SELECT u.id, u.codigo, u.descipcion AS nombre, t.{quote('descripcion')} AS tipo
                     FROM ubicaciones u
                     JOIN tipoubicacion t ON u.tipoubicacion = t.id
-                    WHERE (u.codigo LIKE %s OR u.descipcion LIKE %s)
+                    WHERE (u.codigo LIKE %s OR u.descipcion LIKE %s) AND u.activo = 1
                       AND (%s IS NULL OR u.tenant_id = %s)
                     ORDER BY u.codigo
                     {limit_sql(20)}

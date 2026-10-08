@@ -755,7 +755,7 @@ def filtros_ubicaciones():
                 SELECT u.id, u.codigo, u.descipcion AS nombre
                 FROM ubicaciones u
                 JOIN tipoubicacion tu ON u.tipoubicacion = tu.id
-                WHERE tu.soporte_picking = 1
+                WHERE tu.soporte_picking = 1 AND u.activo = 1
                   AND (%s IS NULL OR u.tenant_id = %s)
             """
             params = [tenant_id, tenant_id]

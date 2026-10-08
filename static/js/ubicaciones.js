@@ -24,9 +24,19 @@ $(document).ready(function() {
     });
 });
 
+// Las zonas inactivas no se ofrecen, salvo la que la ubicación ya tiene (para no quitársela al editar)
+function mostrarZonasInactivas(idZonaDeLaUbicacion) {
+    $('#form_zona option[data-inactiva]').each(function() {
+        var oculta = this.value != idZonaDeLaUbicacion;
+        $(this).prop('hidden', oculta).prop('disabled', oculta);
+    });
+}
+
 function openModal() {
     $('#formUbicaciones')[0].reset();
     $('#form_id').val('');
+    $('#form_activo').val('1');   // una ubicación nueva se propone Activa
+    mostrarZonasInactivas(null);
     $('#modalTitle').text('Nueva Ubicación');
     $('#form_codigo').prop('readonly', false);
     $('#form_entrada').prop('checked', true);
@@ -45,7 +55,9 @@ function editUbicacion(data) {
     $('#form_codigo').val(data.codigo).prop('readonly', true);
     $('#form_descipcion').val(data.descipcion);
     $('#form_tipo').val(data.tipoubicacion);
+    mostrarZonasInactivas(data.id_zona);
     $('#form_zona').val(data.id_zona || '');
+    $('#form_activo').val(data.activo ? '1' : '0');
     $('#form_orden_picking').val(data.orden_picking ?? 0);
     $('#form_coorA').val(data.coordenadaA);
     $('#form_coorB').val(data.coordenadaB);

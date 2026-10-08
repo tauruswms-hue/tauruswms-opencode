@@ -370,7 +370,10 @@ def ver(id_omc):
                 """, (*tuple(cont_dests), omc['id_ubicacion_destino'], tenant_id, tenant_id))
                 stock_destino = cursor.fetchall()
 
-            cursor.execute("SELECT id, codigo, descipcion AS nombre FROM ubicaciones WHERE (%s IS NULL OR tenant_id = %s) ORDER BY codigo", (tenant_id, tenant_id))
+            # Las activas, más el destino que la OMC ya tiene aunque haya quedado inactivo
+            cursor.execute("""SELECT id, codigo, descipcion AS nombre FROM ubicaciones
+                              WHERE (activo = 1 OR id = %s) AND (%s IS NULL OR tenant_id = %s) ORDER BY codigo""",
+                           (omc['id_ubicacion_destino'] or 0, tenant_id, tenant_id))
             ubicaciones = cursor.fetchall()
 
         es_admin = session.get('rol', '').upper() == 'ADMIN'
@@ -864,7 +867,7 @@ def buscar_ubicaciones():
                 SELECT u.id, u.codigo, u.descipcion AS nombre, t.{quote('descripcion')} AS tipo
                 FROM ubicaciones u
                 JOIN tipoubicacion t ON u.tipoubicacion = t.id
-                WHERE (u.codigo LIKE %s OR u.descipcion LIKE %s)
+                WHERE (u.codigo LIKE %s OR u.descipcion LIKE %s) AND u.activo = 1
                   AND (%s IS NULL OR u.tenant_id = %s)
             """
             params = [like, like, tenant_id, tenant_id]
