@@ -678,6 +678,7 @@ CREATE TABLE [pedidos_cabecera] (
     [observaciones] NVARCHAR(MAX),
     [estado] NVARCHAR(50) NOT NULL DEFAULT 'Pendiente',
     [fecha_despacho] DATETIME2,
+    [usuario_despacho] NVARCHAR(100),
     [tenant_id] INT,
     [created_at] DATETIME2 NOT NULL DEFAULT GETDATE(),
     [updated_at] DATETIME2 NOT NULL DEFAULT GETDATE(),

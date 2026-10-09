@@ -380,6 +380,7 @@ CREATE TABLE IF NOT EXISTS "pedidos_cabecera" (
     "observaciones" text,
     "estado" TEXT NOT NULL DEFAULT 'Pendiente',
     "fecha_despacho" TEXT,
+    "usuario_despacho" TEXT,
     "tenant_id" INTEGER,
     "created_at" TEXT NOT NULL DEFAULT (datetime('now')),
     "updated_at" TEXT NOT NULL DEFAULT (datetime('now')),

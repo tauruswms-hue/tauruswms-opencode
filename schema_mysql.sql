@@ -674,6 +674,7 @@ CREATE TABLE `pedidos_cabecera` (
     `observaciones` text,
     `estado` varchar(50) NOT NULL DEFAULT 'Pendiente',
     `fecha_despacho` datetime,
+    `usuario_despacho` varchar(100),
     `tenant_id` int,
     `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

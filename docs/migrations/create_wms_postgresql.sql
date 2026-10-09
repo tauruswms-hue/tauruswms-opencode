@@ -381,6 +381,7 @@ CREATE TABLE "pedidos_cabecera" (
     "observaciones" text,
     "estado" VARCHAR(50) NOT NULL DEFAULT 'Pendiente',
     "fecha_despacho" datetime,
+    "usuario_despacho" VARCHAR(100),
     "tenant_id" INTEGER,
     "created_at" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,

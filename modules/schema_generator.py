@@ -647,6 +647,7 @@ WMS_TABLES = [
             {"name": "observaciones",     "type": "text"},
             {"name": "estado",            "type": "varchar(50)",  "not_null": True, "default": "'Pendiente'"},
             {"name": "fecha_despacho",    "type": "datetime"},
+            {"name": "usuario_despacho",  "type": "varchar(100)"},
             {"name": "tenant_id",         "type": "int"},
             {"name": "created_at",        "type": "datetime", "not_null": True, "default": "CURRENT_TIMESTAMP"},
             {"name": "updated_at",        "type": "datetime", "not_null": True, "default": "CURRENT_TIMESTAMP_ON_UPDATE"},

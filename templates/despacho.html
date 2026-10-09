@@ -40,12 +40,14 @@
                     <th>Ruta</th>
                     <th>Transporte</th>
                     <th>Clase</th>
+                    <th title="Contenedores que sus OMC dejaron en el muelle: es lo que sale del depósito">Muelle y contenedores</th>
+                    <th title="Si lo preparado cubre lo pedido">Preparación</th>
                     <th>Acciones</th>
                 </tr>
             </thead>
             <tbody>
                 {% for p in pedidos %}
-                <tr data-id="{{ p.id_pedido }}">
+                <tr data-id="{{ p.id_pedido }}" data-incompletos="{{ p.renglones_incompletos }}">
                     <td><input type="checkbox" class="row-select" value="{{ p.id_pedido }}"></td>
                     <td><strong>{{ p.nro_pedido }}</strong></td>
                     <td>{{ p.fecha_pedido }}</td>
@@ -53,6 +55,20 @@
                     <td>{{ p.nombre_ruta or '-' }}</td>
                     <td>{{ p.transporte_nombre or '-' }}</td>
                     <td>{{ p.clase_nombre or '-' }}</td>
+                    <td>
+                        {% if p.contenedores %}
+                            {{ p.muelles }} <span style="color:#888;">· {{ p.contenedores }} contenedor{{ 'es' if p.contenedores != 1 else '' }}</span>
+                        {% else %}
+                            <span style="color:#c0392b;" title="No tiene contenedores preparados: al despachar no sale stock">Sin contenedores</span>
+                        {% endif %}
+                    </td>
+                    <td style="text-align:center;">
+                        {% if p.renglones_incompletos %}
+                            <span title="Hay renglones con menos cantidad preparada que pedida" style="background:#e67e22; color:white; padding:2px 8px; border-radius:10px; font-size:0.8rem;">Incompleta ({{ p.renglones_incompletos }})</span>
+                        {% else %}
+                            <span style="background:#27ae60; color:white; padding:2px 8px; border-radius:10px; font-size:0.8rem;">Completa</span>
+                        {% endif %}
+                    </td>
                     <td style="text-align: center;">
                         <a href="{{ url_for('pedidos.ver_detalle', id_pedido=p.id_pedido) }}"
                            title="Ver Detalle" style="color: #3498db; margin: 0 5px;">
@@ -61,7 +77,7 @@
                         <form method="POST"
                               action="{{ url_for('despacho.despachar', id_pedido=p.id_pedido) }}"
                               style="display:inline;"
-                              onsubmit="return confirm('¿Despachar el pedido {{ p.nro_pedido }}?');">
+                              onsubmit="return confirm('¿Despachar el pedido {{ p.nro_pedido }}?\n\nEl stock de sus contenedores sale del depósito y no se puede deshacer.{% if p.renglones_incompletos %}\n\nATENCIÓN: tiene {{ p.renglones_incompletos }} renglón(es) con menos cantidad preparada que pedida.{% endif %}');">
                             <button type="submit" title="Despachar"
                                     style="background: none; border: none; cursor: pointer; color: #276749; font-size: 1rem; padding: 0 5px;">
                                 <i class="fas fa-truck"></i>
@@ -101,7 +117,14 @@
     function despacharSeleccionados() {
         const ids = getSelectedIds();
         if (ids.length === 0) return alert("Seleccione al menos un pedido.");
-        if (!confirm(`¿Despachar ${ids.length} pedido(s) seleccionado(s)?`)) return;
+        // Los que tienen la preparación incompleta se avisan antes de confirmar
+        let incompletos = 0;
+        $('.row-select:checked').each(function () {
+            if (parseInt($(this).closest('tr').data('incompletos'), 10) > 0) incompletos++;
+        });
+        let pregunta = `¿Despachar ${ids.length} pedido(s) seleccionado(s)?\n\nEl stock de sus contenedores sale del depósito y no se puede deshacer.`;
+        if (incompletos) pregunta += `\n\nATENCIÓN: ${incompletos} tiene(n) renglones con menos cantidad preparada que pedida.`;
+        if (!confirm(pregunta)) return;
 
         fetch('/despacho/despachar_masivo', {
             method: 'POST',
