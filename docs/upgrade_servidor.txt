@@ -1,0 +1,118 @@
+TAURUS WMS - ACTUALIZAR EL SERVIDOR A LA ÚLTIMA VERSIÓN
+=======================================================
+
+Todos los comandos se corren en la PC servidor, en una terminal (PowerShell
+o CMD) ubicada en la carpeta del proyecto: la que contiene app.py,
+migrate.py y conexiones.json.
+
+Para abrir la terminal ya ubicada ahí: abrir la carpeta en el Explorador de
+Windows, hacer clic en la barra de direcciones, escribir "powershell" y Enter.
+
+
+1. DETENER LAS APLICACIONES
+---------------------------
+Cerrar el WMS (puerto 5000) y el panel admin (puerto 5001): Ctrl+C en cada
+ventana donde estén corriendo.
+
+
+2. RESPALDAR LAS BASES (si el servidor tiene datos reales)
+----------------------------------------------------------
+    mysqldump -u root -p taurus_wms         > respaldo_wms.sql
+    mysqldump -u root -p taurus_admin       > respaldo_admin.sql
+    mysqldump -u root -p taurus_intercambio > respaldo_intercambio.sql
+
+Usuario y nombres de las bases: los que figuran en conexiones.json.
+Guardar los respaldos fuera de la carpeta del proyecto.
+
+
+3. TRAER EL CÓDIGO NUEVO
+------------------------
+    git pull
+
+Resultados posibles:
+  - Lista de archivos y "N files changed": se actualizó.
+  - "Already up to date.": ya estaba en la última versión.
+  - Pide usuario y contraseña: son los de GitHub, los mismos del clon.
+  - "Your local changes ... would be overwritten": en el servidor se
+    modificó un archivo del proyecto. No forzar: revisar cuál es antes de
+    seguir.
+
+conexiones.json y .env no se modifican: no forman parte del repositorio.
+
+Para comprobar en qué versión quedó:
+
+    git log -1 --oneline
+
+
+4. ACTIVAR EL ENTORNO DE PYTHON
+-------------------------------
+Si el proyecto usa un entorno virtual (existe la carpeta .venv):
+
+    .venv\Scripts\activate
+
+Queda activo cuando aparece (.venv) al principio de la línea. Si PowerShell
+no deja ejecutar el script, usar en los pasos siguientes
+".venv\Scripts\python.exe" en lugar de "python".
+
+Si un comando responde "No module named ...", el Python que se está usando
+no tiene las librerías: falta activar el entorno o hacer el paso 5.
+
+
+5. ACTUALIZAR LAS LIBRERÍAS
+---------------------------
+    python -m pip install -r requirements.txt
+
+Si no hubo cambios termina enseguida, sin instalar nada.
+
+
+6. VER QUÉ MIGRACIONES ESTÁN PENDIENTES (no aplica nada)
+--------------------------------------------------------
+    python migrate.py --db wms --dry-run
+    python migrate.py --db admin --dry-run
+    python migrate.py --db intercambio --dry-run
+
+Lo normal es que aparezcan pocas: las agregadas desde la última
+actualización. Si aparece una lista larga con migraciones viejas, NO
+aplicarlas: esa base no tiene registradas las anteriores y hay que
+revisarlo antes de seguir.
+
+
+7. APLICAR LAS MIGRACIONES
+--------------------------
+    python migrate.py --db wms
+    python migrate.py --db admin
+    python migrate.py --db intercambio
+
+Si una falla, no levantar las aplicaciones: copiar el mensaje de error
+completo y, si hace falta, restaurar el respaldo del paso 2.
+
+
+8. LEVANTAR LAS APLICACIONES
+----------------------------
+Igual que se arrancan siempre. Por ejemplo, cada una en su ventana:
+
+    python app.py
+    python admin.py
+
+
+9. COMPROBAR
+------------
+  - WMS:          http://localhost:5000
+  - Panel admin:  http://localhost:5001/admin
+
+Iniciar sesión y abrir alguna pantalla (Pedidos, Despacho).
+
+En las demás PC, la primera vez recargar la página con Ctrl+F5 para que el
+navegador no use archivos viejos.
+
+
+RESUMEN RÁPIDO
+--------------
+    (detener las aplicaciones)
+    git pull
+    .venv\Scripts\activate
+    python -m pip install -r requirements.txt
+    python migrate.py --db wms
+    python migrate.py --db admin
+    python migrate.py --db intercambio
+    (levantar las aplicaciones)
