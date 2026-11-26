@@ -44,7 +44,7 @@
             {% if session.admin_rol == 'SUPERADMIN' %}
             <li class="nav-item">
                 <a class="nav-link" href="{{ url_for('admin.usuarios') }}">
-                    <i class="fas fa-users me-1"></i>Todos los Usuarios
+                    <i class="fas fa-users me-1"></i>Usuarios WMS
                 </a>
             </li>
             <li class="nav-item">
@@ -132,7 +132,7 @@
                                             onclick="editarConfig(this)">
                                         <i class="fas fa-edit"></i>
                                     </button>
-                                    <form method="POST" action="{{ url_for('admin.configuracion_eliminar', config_id=config.id) }}" style="display:inline;" data-clave="{{ config.clave }}" onsubmit="return confirmarEliminarConfig(this)">
+                                    <form method="POST" action="{{ url_for('admin.configuracion_eliminar', config_id=config.id) }}" style="display:inline;" onsubmit="return confirm('¿Está seguro de eliminar esta configuración?');">
                                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                         <button type="submit" class="btn btn-outline-danger btn-sm" title="Eliminar">
                                             <i class="fas fa-trash"></i>
@@ -214,10 +214,6 @@
         document.getElementById('configDescripcion').value = d.descripcion;
         var modal = new bootstrap.Modal(document.getElementById('modalConfig'));
         modal.show();
-    }
-
-    function confirmarEliminarConfig(form) {
-        return confirm('¿Está seguro de eliminar la configuración "' + form.dataset.clave + '"?');
     }
     </script>
 </body>

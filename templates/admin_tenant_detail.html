@@ -132,7 +132,13 @@
                                             {% endif %}
                                         </td>
                                         <td style="white-space: nowrap;">
-                                            <button class="btn btn-outline-primary btn-sm" onclick="editarUsuario({{ usuario.id }}, '{{ usuario.username }}', '{{ usuario.nombre }}', '{{ usuario.email or '' }}', '{{ usuario.rol }}', {{ usuario.activo|int }})">
+                                            <button class="btn btn-outline-primary btn-sm btn-editar-usuario"
+                                                    data-id="{{ usuario.id }}"
+                                                    data-username="{{ usuario.username }}"
+                                                    data-nombre="{{ usuario.nombre }}"
+                                                    data-email="{{ usuario.email or '' }}"
+                                                    data-rol="{{ usuario.rol }}"
+                                                    data-activo="{{ usuario.activo|int }}">
                                                 <i class="fas fa-edit"></i>
                                             </button>{% if usuario.activo %}
                                             <form method="POST" action="{{ url_for('admin.usuarios_eliminar', usuario_id=usuario.id, encoded_tenant_id=tenant.id|encode_id) }}" style="display:inline;" onsubmit="return confirm('¿Desactivar este usuario?');">
@@ -147,7 +153,7 @@
                                                     <i class="fas fa-check"></i>
                                                 </button>
                                             </form>{% endif %}
-                                            <form method="POST" action="{{ url_for('admin.usuarios_borrar', usuario_id=usuario.id, encoded_tenant_id=tenant.id|encode_id) }}" style="display:inline;" onsubmit="return confirm('¿Eliminar definitivamente a \'{{ usuario.username }}\'? Esta acción no se puede deshacer.');">
+                                            <form method="POST" action="{{ url_for('admin.usuarios_borrar', usuario_id=usuario.id, encoded_tenant_id=tenant.id|encode_id) }}" style="display:inline;" onsubmit="return confirm('¿Eliminar definitivamente este usuario? Esta acción no se puede deshacer.');">
                                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                                 <button type="submit" class="btn btn-outline-danger btn-sm" title="Eliminar de la BD">
                                                     <i class="fas fa-trash"></i>
@@ -314,7 +320,15 @@
         document.getElementById('tenantCuit').addEventListener('input', function () { formatCuit(this); });
         formatCuit(document.getElementById('tenantCuit'));
 
+        function configurarRoles(rolActual) {
+            document.querySelectorAll('#usuarioRol option').forEach(function(opcion) {
+                var reservado = opcion.value === 'ADMIN' || opcion.value === 'SUPERADMIN';
+                opcion.disabled = reservado && opcion.value !== rolActual;
+            });
+        }
+
         function nuevoUsuario() {
+            configurarRoles(null);
             document.getElementById('modalUsuarioTitulo').textContent = 'Nuevo Usuario';
             document.getElementById('usuarioId').value = '';
             document.getElementById('usuarioUsername').value = '';
@@ -326,6 +340,12 @@
             modalUsuario.show();
         }
         
+        document.querySelectorAll('.btn-editar-usuario').forEach(boton => {
+            boton.addEventListener('click', () => editarUsuario(
+                boton.dataset.id, boton.dataset.username, boton.dataset.nombre,
+                boton.dataset.email, boton.dataset.rol, Number(boton.dataset.activo)));
+        });
+
         function editarUsuario(id, username, nombre, email, rol, activo) {
             document.getElementById('modalUsuarioTitulo').textContent = 'Editar Usuario';
             document.getElementById('usuarioId').value = id;
@@ -333,6 +353,7 @@
             document.getElementById('usuarioUsername').setAttribute('readonly', 'readonly');
             document.getElementById('usuarioNombre').value = nombre;
             document.getElementById('usuarioEmail').value = email;
+            configurarRoles(rol);
             document.getElementById('usuarioRol').value = rol;
             document.getElementById('usuarioActivo').checked = activo === 1;
             document.getElementById('labelPassword').textContent = 'Nueva Contraseña (dejar vacío para no cambiar)';

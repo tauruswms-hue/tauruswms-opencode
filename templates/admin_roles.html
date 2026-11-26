@@ -44,7 +44,7 @@
             {% if session.admin_rol == 'SUPERADMIN' %}
             <li class="nav-item">
                 <a class="nav-link" href="{{ url_for('admin.usuarios') }}">
-                    <i class="fas fa-users me-1"></i>Todos los Usuarios
+                    <i class="fas fa-users me-1"></i>Usuarios WMS
                 </a>
             </li>
             <li class="nav-item">
@@ -131,9 +131,9 @@
                                         <i class="fas fa-edit"></i>
                                     </button>
                                     {% if rol.activo %}
-                                    <form method="POST" action="{{ url_for('admin.roles_eliminar', rol_id=rol.id) }}" style="display:inline;" onsubmit="return confirm('¿Desactivar este rol? Los usuarios con ese rol quedan sin acceso.');">
+                                    <form method="POST" action="{{ url_for('admin.roles_eliminar', rol_id=rol.id) }}" style="display:inline;" onsubmit="return confirm('¿Desactivar este rol? Sus permisos dejarán de aplicar de inmediato.');">
                                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                        <button type="submit" class="btn btn-outline-danger btn-sm" title="Desactivar">
+                                        <button type="submit" class="btn btn-outline-danger btn-sm" title="{{ 'No se puede: tiene usuarios activos' if rol.total_usuarios > 0 else 'Desactivar' }}" {% if rol.total_usuarios > 0 %}disabled{% endif %}>
                                             <i class="fas fa-ban"></i>
                                         </button>
                                     </form>

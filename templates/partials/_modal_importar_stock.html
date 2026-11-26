@@ -17,17 +17,18 @@
                         <th style="padding:4px 8px; text-align:left;">Notas</th>
                     </tr></thead>
                     <tbody>
-                        <tr><td style="padding:3px 8px;"><code>ubicacion_codigo</code></td><td style="padding:3px 8px; color:#e74c3c;">Sí</td><td style="padding:3px 8px;">Código de la ubicación existente</td></tr>
-                        <tr style="background:#f9f9f9;"><td style="padding:3px 8px;"><code>material_codigo</code></td><td style="padding:3px 8px; color:#e74c3c;">Sí</td><td style="padding:3px 8px;">Código del material existente</td></tr>
-                        <tr><td style="padding:3px 8px;"><code>IDContenedor</code></td><td style="padding:3px 8px; color:#e74c3c;">Sí</td><td style="padding:3px 8px;">Identificador del contenedor</td></tr>
-                        <tr style="background:#f9f9f9;"><td style="padding:3px 8px;"><code>Lote</code></td><td style="padding:3px 8px; color:#27ae60;">No</td><td style="padding:3px 8px;">Default: UNICO</td></tr>
-                        <tr><td style="padding:3px 8px;"><code>TipoStock</code></td><td style="padding:3px 8px; color:#27ae60;">No</td><td style="padding:3px 8px;">Libre Venta / Calidad / Bloqueado / Mal Estado</td></tr>
-                        <tr style="background:#f9f9f9;"><td style="padding:3px 8px;"><code>StockTotal</code></td><td style="padding:3px 8px; color:#27ae60;">No</td><td style="padding:3px 8px;">Decimal, default 0</td></tr>
-                        <tr><td style="padding:3px 8px;"><code>StockDisponible</code></td><td style="padding:3px 8px; color:#27ae60;">No</td><td style="padding:3px 8px;">Decimal, default 0</td></tr>
-                        <tr style="background:#f9f9f9;"><td style="padding:3px 8px;"><code>FechaVencimiento</code></td><td style="padding:3px 8px; color:#27ae60;">No</td><td style="padding:3px 8px;">Formato YYYY-MM-DD</td></tr>
+                        <tr><td style="padding:3px 8px;"><code>ubicacion_codigo</code></td><td style="padding:3px 8px; color:#e74c3c;">Sí</td><td style="padding:3px 8px;">Código de una ubicación activa</td></tr>
+                        <tr style="background:#f9f9f9;"><td style="padding:3px 8px;"><code>material_codigo</code></td><td style="padding:3px 8px; color:#e74c3c;">Sí</td><td style="padding:3px 8px;">Código de un material activo</td></tr>
+                        <tr><td style="padding:3px 8px;"><code>IDContenedor</code></td><td style="padding:3px 8px; color:#e74c3c;">Sí</td><td style="padding:3px 8px;">Identificador del contenedor, hasta 10 caracteres</td></tr>
+                        <tr style="background:#f9f9f9;"><td style="padding:3px 8px;"><code>Lote</code></td><td style="padding:3px 8px; color:#27ae60;">No</td><td style="padding:3px 8px;">Hasta 100 caracteres. Default: UNICO</td></tr>
+                        <tr><td style="padding:3px 8px;"><code>TipoStock</code></td><td style="padding:3px 8px; color:#27ae60;">No</td><td style="padding:3px 8px;">Libre Venta / Calidad / Bloqueado / Mal Estado. Default: Libre Venta</td></tr>
+                        <tr style="background:#f9f9f9;"><td style="padding:3px 8px;"><code>StockTotal</code></td><td style="padding:3px 8px; color:#e74c3c;">Sí</td><td style="padding:3px 8px;">Decimal mayor que cero</td></tr>
+                        <tr><td style="padding:3px 8px;"><code>StockDisponible</code></td><td style="padding:3px 8px; color:#27ae60;">No</td><td style="padding:3px 8px;">Decimal, no mayor que StockTotal. Vacío: igual a StockTotal</td></tr>
+                        <tr style="background:#f9f9f9;"><td style="padding:3px 8px;"><code>FechaVencimiento</code></td><td style="padding:3px 8px; color:#27ae60;">No</td><td style="padding:3px 8px;">Formato AAAA-MM-DD</td></tr>
                     </tbody>
                 </table>
-                <p style="margin:10px 0 0; color:#555;">Las posiciones con misma <strong>Ubicación + Material + Contenedor</strong> ya existentes serán omitidas.</p>
+                <p style="margin:10px 0 0; color:#555;">Las posiciones con misma <strong>Ubicación + Material + Contenedor</strong> ya existentes serán omitidas.
+                    Un contenedor que ya está en otra ubicación se rechaza. Las filas con errores se informan y el resto se carga.</p>
             </div>
             <div style="margin-bottom:18px;">
                 <p style="font-size:0.88rem; font-weight:bold; color:#555; margin-bottom:8px;"><i class="fas fa-download"></i> Descargar plantilla:</p>

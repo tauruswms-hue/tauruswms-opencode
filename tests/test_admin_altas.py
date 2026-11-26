@@ -1,10 +1,12 @@
 """Altas desde el panel admin: código de tenant y política de contraseñas."""
 
+import datetime
 import uuid
 
 import pytest
+from werkzeug.security import generate_password_hash
 
-from tests.conftest import requires_db
+from tests.conftest import DB_OK, requires_db
 
 
 @pytest.fixture
@@ -225,3 +227,70 @@ def test_auditoria_muestra_textos_y_oculta_consultas(admin_logged_client, admin_
     cur = admin_conn.cursor()
     cur.execute("DELETE FROM audit_logs WHERE accion = 'LOGIN_FAILED' AND detalle LIKE %s", (f'%{intento}%',))
     admin_conn.commit()
+
+
+@pytest.fixture
+def panel_admin(admin_client):
+    """Cliente del panel con un usuario ADMIN real (el decorator revalidea la BD)."""
+    if not DB_OK:
+        pytest.skip('BD no disponible')
+    from modules.db_config import _get_admin_connection
+    username = 'adminrol' + uuid.uuid4().hex[:8]
+    conn = _get_admin_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO admin_usuarios (username, password_hash, nombre, rol, activo)
+        VALUES (%s, %s, %s, 'ADMIN', 1)
+    """, (username, generate_password_hash('Test@2024!'), 'Administrador test'))
+    conn.commit()
+    cur.execute("SELECT id FROM admin_usuarios WHERE username = %s", (username,))
+    user_id = cur.fetchone()['id']
+    with admin_client.session_transaction() as sess:
+        sess['admin_user_id'] = user_id
+        sess['admin_username'] = username
+        sess['admin_nombre'] = 'Administrador test'
+        sess['admin_rol'] = 'ADMIN'
+        sess['admin_login_at'] = datetime.datetime.now().isoformat()
+    yield admin_client
+    cur.execute("DELETE FROM audit_logs WHERE usuario_id = %s", (user_id,))
+    cur.execute("DELETE FROM admin_usuarios WHERE id = %s", (user_id,))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+@pytest.mark.parametrize('ruta, metodo', [
+    ('/admin/', 'GET'),
+    ('/admin/tenants', 'GET'),
+    ('/admin/tenants/ver/invalido', 'GET'),
+    ('/admin/tenants/guardar', 'POST'),
+    ('/admin/tenants/eliminar/invalido', 'POST'),
+    ('/admin/tenants/activar/invalido', 'POST'),
+    ('/admin/usuarios', 'GET'),
+    ('/admin/usuarios/guardar', 'POST'),
+    ('/admin/usuarios/eliminar/1/invalido', 'POST'),
+    ('/admin/usuarios/borrar/1/invalido', 'POST'),
+    ('/admin/usuarios/activar/1/invalido', 'POST'),
+    ('/admin/roles', 'GET'),
+    ('/admin/roles/guardar', 'POST'),
+    ('/admin/roles/eliminar/1', 'POST'),
+    ('/admin/roles/activar/1', 'POST'),
+    ('/admin/roles/rutas/ADMIN', 'GET'),
+    ('/admin/audit', 'GET'),
+    ('/admin/configuracion', 'GET'),
+    ('/admin/configuracion/guardar', 'POST'),
+    ('/admin/configuracion/eliminar/1', 'POST'),
+    ('/admin/intercambio', 'GET'),
+    ('/admin/intercambio/procesar', 'POST'),
+    ('/admin/intercambio/reintentar', 'POST'),
+    ('/admin/parametros/editar/1', 'GET'),
+    ('/admin/parametros/1/api-token', 'POST'),
+])
+def test_panel_solo_superadmin(panel_admin, ruta, metodo):
+    assert panel_admin.open(ruta, method=metodo).status_code == 403
+
+
+def test_panel_sin_sesion_redirige_a_login(admin_client):
+    resp = admin_client.get('/admin/tenants')
+    assert resp.status_code == 302
+    assert '/admin/login' in resp.headers['Location']

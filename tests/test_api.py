@@ -325,9 +325,7 @@ def test_api_token_desde_admin(admin_client, client, tenant_api, usuario_panel):
     resp = admin_client.post(f'/admin/parametros/{tid}/api-token', follow_redirects=True)
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)
-    m = re.search(r'&lt;strong&gt;([A-Za-z0-9_-]{20,})&lt;/strong&gt;', html)
-    if not m:
-        m = re.search(r'<strong>([A-Za-z0-9_-]{20,})</strong>', html)
+    m = re.search(r'Token:\s*([A-Za-z0-9_-]{20,})', html)
     assert m, 'No se encontro el token en el flash del panel admin'
     token = m.group(1)
 

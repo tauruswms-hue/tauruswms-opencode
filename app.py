@@ -33,6 +33,7 @@ from modules.api import api_bp
 from modules.bootstrap import (
     check_default_secrets,
     harden_session_config,
+    no_store_login_responses,
     passwords_bd,
     register_error_handlers,
 )
@@ -124,6 +125,7 @@ limiter = Limiter(key_func=get_remote_address, storage_uri="memory://", app=app)
 limiter.limit("60 per minute")(api_bp)
 
 register_error_handlers(app, logger)
+no_store_login_responses(app, ('/login',))
 
 
 # ============================================================================
@@ -141,21 +143,37 @@ def verificar_mysql():
         return False, f"⚠️ Motor BD no disponible: {todo!s}"
 
 
+def _version_permisos():
+    """Versión global de permisos: cambia en el panel y cruza procesos."""
+    conn = _get_admin_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT valor FROM configuracion WHERE clave = %s", ('permisos_version',))
+        fila = cursor.fetchone()
+        return fila['valor'] if fila else '0'
+    finally:
+        cursor.close()
+        conn.close()
+
+
 def obtener_rutas_por_rol(rol):
     """Obtiene las rutas habilitadas para un rol específico.
 
-    roles_rutas vive en taurus_admin, no en taurus_wms.
-    El resultado se cachea por rol (TTL PERMISOS_CACHE_TTL, por defecto 30s)
-    para no abrir una conexion admin en cada request; los cambios de rutas en
-    el panel admin aplican sin re-login dentro del TTL.
+    roles_rutas vive en taurus_admin, no en taurus_wms. El resultado se cachea
+    por (rol, versión): el panel incrementa la versión al cambiar roles o rutas,
+    así el cambio aplica en el siguiente request aunque sean procesos distintos.
     """
 
     def _consultar():
         conn = _get_admin_connection()
         cursor = conn.cursor()
 
-        # Verificar si el rol tiene acceso a todas las rutas (*)
-        sentencia = "SELECT ruta FROM roles_rutas WHERE rol = %s"
+        # Un rol desactivado no otorga permisos aunque conserve filas en roles_rutas.
+        sentencia = """
+            SELECT rr.ruta FROM roles_rutas rr
+            JOIN roles r ON r.nombre = rr.rol AND r.activo
+            WHERE rr.rol = %s
+        """
         cursor.execute(sentencia, (rol,))
         rutas = cursor.fetchall()
 
@@ -171,7 +189,12 @@ def obtener_rutas_por_rol(rol):
         return [ruta['ruta'] for ruta in rutas]
 
     try:
-        return obtener_rutas_cached(rol, _consultar)
+        version = _version_permisos()
+    except Exception as e:
+        logger.error("Error al leer la versión de permisos: %s", e)
+        version = '0'
+    try:
+        return obtener_rutas_cached(rol, _consultar, version=version)
     except Exception as e:
         logger.error("Error al obtener rutas por rol: %s", e)
         return []

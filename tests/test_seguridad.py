@@ -2,6 +2,7 @@
 
 import datetime
 import logging
+import re
 
 import pytest
 
@@ -69,6 +70,55 @@ def test_cookie_de_sesion_admin_no_colisiona_con_wms(admin_client):
         'username': 'x', 'password': 'y', 'csrf_token': token,
     })
     assert resp.status_code == 200
+
+
+# --------------------------------------------------------------------------
+# Los gestores de contraseñas no deben ofrecer guardar ni autocompletar
+# --------------------------------------------------------------------------
+ATRIBUTOS_SIN_GESTOR = (
+    'autocomplete="off"',
+    'data-1p-ignore',
+    'data-bwignore="true"',
+    'data-lpignore="true"',
+    'data-form-type="other"',
+)
+
+
+def _assert_sin_gestor_de_contrasenas(html):
+    cuerpo = re.search(r'<body[^>]*>', html)
+    elementos = [
+        re.search(r'<form[^>]*>', html),
+        re.search(r'<input[^>]*name="username"[^>]*>', html),
+        re.search(r'<input[^>]*type="password"[^>]*>', html),
+    ]
+    assert cuerpo and all(elementos), 'Faltan el body, el form o los campos del login'
+    for atributo in ATRIBUTOS_SIN_GESTOR[1:]:
+        assert atributo in cuerpo.group(0), f'{atributo} falta en {cuerpo.group(0)[:80]}'
+    for elemento in elementos:
+        for atributo in ATRIBUTOS_SIN_GESTOR:
+            assert atributo in elemento.group(0), f'{atributo} falta en {elemento.group(0)[:80]}'
+
+
+def _assert_no_store(resp):
+    assert resp.headers['Cache-Control'] == 'no-store, no-cache, must-revalidate, max-age=0'
+    assert resp.headers['Pragma'] == 'no-cache'
+    assert resp.headers['Expires'] == '0'
+
+
+def test_login_wms_no_ofrece_guardar_contrasena(client):
+    _assert_sin_gestor_de_contrasenas(client.get('/login').get_data(as_text=True))
+
+
+def test_login_admin_no_ofrece_guardar_contrasena(admin_client):
+    _assert_sin_gestor_de_contrasenas(admin_client.get('/admin/login').get_data(as_text=True))
+
+
+def test_login_wms_no_queda_en_cache(client):
+    _assert_no_store(client.get('/login'))
+
+
+def test_login_admin_no_queda_en_cache(admin_client):
+    _assert_no_store(admin_client.get('/admin/login'))
 
 
 # --------------------------------------------------------------------------

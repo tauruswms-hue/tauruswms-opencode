@@ -21,10 +21,16 @@
             <li>Sus usuarios están en <code>taurus_admin.admin_usuarios</code>, separados de los usuarios del WMS
                 (<code>taurus_admin.usuarios</code>). Se gestionan con el
                 <a href="../inicio/base-de-datos/superusuario.html">ejecutable de superusuario</a>, no desde el panel.</li>
-            <li>Un <code>ADMIN</code> gestiona tenants y sus usuarios; el resto de las secciones es solo para
-                <code>SUPERADMIN</code>.</li>
+            <li>Todas las secciones son solo para <code>SUPERADMIN</code>: son datos globales de la instalación.
+                El rol <code>ADMIN</code> de <code>admin_usuarios</code> no habilita ninguna pantalla del panel.</li>
             <li>El login admite 5 intentos cada 15 minutos por dirección IP.</li>
-            <li>Usa su propia cookie de sesión, <code>taurus_admin_session</code>, independiente de la del WMS.</li>
+            <li>Usa su propia cookie de sesión, <code>taurus_admin_session</code>, independiente de la del WMS.
+                Se cierra por 15 minutos de inactividad (configurable con <code>PANEL_IDLE_TIMEOUT_SECONDS</code>)
+                y se revalida en cada pantalla: si el usuario se da de baja o cambia de rol, la sesión se cierra.</li>
+            <li>El formulario de login está marcado para que los gestores de contraseñas no ofrezcan guardar ni
+                autocompletar credenciales, y su HTML se responde sin caché. Es una mitigación
+                <strong>best-effort</strong>: un navegador o extensión que ignore esos atributos puede seguir
+                ofreciéndolo; la política de la instalación es no usar el autoguardado.</li>
         </ul>
 
         <h2>Qué puede hacer cada rol</h2>
@@ -32,8 +38,8 @@
             <table>
                 <thead><tr><th>Sección</th><th>Ruta</th><th>ADMIN</th><th>SUPERADMIN</th></tr></thead>
                 <tbody>
-                    <tr><td>Tenants</td><td><code>/admin/tenants</code></td><td>Sí</td><td>Sí</td></tr>
-                    <tr><td>Usuarios de un tenant</td><td><code>/admin/tenants/ver/&lt;id&gt;</code></td><td>Sí</td><td>Sí</td></tr>
+                    <tr><td>Tenants</td><td><code>/admin/tenants</code></td><td>No</td><td>Sí</td></tr>
+                    <tr><td>Usuarios de un tenant</td><td><code>/admin/tenants/ver/&lt;id&gt;</code></td><td>No</td><td>Sí</td></tr>
                     <tr><td>Usuarios de todos los tenants</td><td><code>/admin/usuarios</code></td><td>No</td><td>Sí</td></tr>
                     <tr><td>Roles y rutas</td><td><code>/admin/roles</code></td><td>No</td><td>Sí</td></tr>
                     <tr><td>Parámetros del tenant y token de API</td><td><code>/admin/parametros/editar/&lt;id&gt;</code></td><td>No</td><td>Sí</td></tr>
@@ -43,6 +49,8 @@
                 </tbody>
             </table>
         </div>
+        <p>Un usuario con rol <code>ADMIN</code> que inicia sesión recibe un error 403: no puede consultar ni
+        modificar estos datos. Para volver al ingreso, usar <strong>Volver al panel</strong> en la pantalla de error.</p>
 
         <h2>Tenants</h2>
         <p>Cada tenant es una empresa que opera en la instalación.</p>
@@ -66,20 +74,27 @@
             <li>El nombre de usuario es único en toda la instalación.</li>
             <li>La contraseña debe cumplir la política (mínimo 8 caracteres). Al editar, dejarla en blanco conserva
                 la actual.</li>
-            <li>El rol se elige entre los roles activos del catálogo.</li>
+            <li>El rol se elige entre los roles activos del catálogo. No se puede asignar <code>ADMIN</code> ni
+                <code>SUPERADMIN</code>: son nombres reservados (los usuarios antiguos con rol <code>ADMIN</code>
+                pueden conservarlo al editarse).</li>
+            <li>Las altas, ediciones, bajas y activaciones se validan contra el tenant indicado: un ID de usuario
+                de otro tenant no se modifica.</li>
             <li><strong>Desactivar</strong> impide el ingreso y se puede revertir. <strong>Borrar</strong> elimina el
-                usuario de la base en forma definitiva.</li>
+                usuario de la base en forma definitiva. Al desactivar un tenant, sus usuarios no pueden ingresar
+                al WMS; no se les cambia el estado uno por uno.</li>
         </ul>
 
         <h2>Roles y rutas</h2>
         <ul>
             <li>El nombre del rol se guarda en mayúsculas y es único. Al renombrarlo, se actualizan sus usuarios y
-                sus rutas.</li>
-            <li>Un rol con usuarios activos no se puede desactivar.</li>
-            <li>La pantalla de rutas muestra el catálogo agrupado por módulo. Marcar "Acceso total" guarda el
-                permiso <code>*</code> y reemplaza al resto.</li>
-            <li>Los cambios llegan al WMS sin que los usuarios vuelvan a iniciar sesión; pueden demorar hasta el
-                tiempo de caché (30 s por defecto).</li>
+                sus rutas. <code>SUPERADMIN</code> y <code>ADMIN</code> están reservados.</li>
+            <li>Un rol con usuarios activos no se puede desactivar. Si se desactiva, sus permisos dejan de aplicar
+                de inmediato.</li>
+            <li>La pantalla de rutas muestra el catálogo agrupado por módulo y permite filtrar por nombre. Marcar
+                "Acceso total" guarda el permiso <code>*</code>, deshabilita el resto y reemplaza las rutas
+                individuales.</li>
+            <li>Los cambios llegan al WMS sin que los usuarios vuelvan a iniciar sesión: el panel incrementa una
+                versión global en <code>configuracion</code> y la caché del WMS se descarta en el siguiente request.</li>
         </ul>
         <p>El modelo completo está en <a href="../arquitectura/roles-permisos.html">Roles y permisos</a>.</p>
 
@@ -99,6 +114,8 @@
                 </tbody>
             </table>
         </div>
+        <p>La clave de API IA tampoco se devuelve al navegador: el campo aparece vacío y dejarlo en blanco al
+        guardar conserva la clave actual. Los valores numéricos se validan antes de guardar.</p>
 
         <h3>Token de API</h3>
         <p>Desde la misma pantalla se genera el token del tenant para la
@@ -114,7 +131,9 @@
             un valor, incluido <code>mantenimiento</code>, no modifica el comportamiento del sistema.</p>
         </div>
         <p>El valor de las claves que contienen <code>PASSWORD</code>, <code>SECRET</code> o <code>TOKEN</code> no
-        se muestra: al editarlas el campo aparece vacío, y dejarlo en blanco conserva el valor actual.</p>
+        se muestra: al editarlas el campo aparece vacío, y dejarlo en blanco conserva el valor actual. La clave
+        interna <code>permisos_version</code> no aparece en la lista: la usa el panel para invalidar la caché de
+        permisos del WMS entre procesos.</p>
         <div class="aviso">
             <p><strong>Las conexiones a las bases no se configuran acá.</strong> Se definen en el archivo
             <code>conexiones.json</code> del servidor. Ver <a href="../inicio/base-de-datos/conexiones.html">Configuración de conexiones</a>.</p>
@@ -148,6 +167,10 @@
             <li>Solo cubre lo que se hace en el panel. Los movimientos de stock del WMS se consultan en los
                 reportes del WMS (<code>/reportes</code>).</li>
         </ul>
+
+        <p>Las altas, modificaciones y bajas se registran después de confirmar la transacción, para que no aparezcan
+        operaciones que finalmente fallaron. Los errores de base no se muestran al usuario: se escriben en el log
+        del servidor y en la auditoría como <em>Error</em>, sin incluir el mensaje crudo.</p>
 
         <h3>Cómo se lee un registro</h3>
         <div class="tabla-scroll">

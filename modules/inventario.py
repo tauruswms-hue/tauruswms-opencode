@@ -148,7 +148,8 @@ def crear():
 
 # ── Detalle / conteo ──────────────────────────────────────────────────────────
 
-@inventario_bp.route('/inventario/<int:id_inventario>')
+@inventario_bp.route('/inventario/<int:id_inventario>', endpoint='detalle_legacy')
+@inventario_bp.route('/inventario/ver/<int:id_inventario>', endpoint='detalle')
 def ver_inventario(id_inventario):
     tenant_id = get_tenant_filter()
     conn = get_db_connection()

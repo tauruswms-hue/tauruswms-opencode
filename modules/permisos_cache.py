@@ -1,15 +1,12 @@
-"""Cache de permisos por rol (FASE 2.7).
+"""Cache de permisos por rol, invalidable entre procesos (FASE 2.7).
 
-obtener_rutas_por_rol() en app.py abria una conexion admin en cada request.
-Este modulo cachea el resultado por rol con TTL (por defecto 30s,
-configurable con PERMISOS_CACHE_TTL) para no golpear la BD en cada request.
+La clave de cache incluye una "version global" guardada en
+taurus_admin.configuracion (clave ``permisos_version``). Cada cambio del panel
+en roles/roles_rutas incrementa esa version: los procesos WMS la ven en el
+siguiente request y descartan su entrada aunque no compartan memoria.
 
-Garantia de consistencia:
-  - TTL corto: los cambios de roles_rutas en el panel admin aplican sin
-    re-login dentro del TTL (mismo proceso o no).
-  - invalidar_permisos_cache(): los procesos que modifiquen roles_rutas
-    (admin.py) la llaman para limpiar de inmediato SI comparten proceso;
-    entre procesos separados el TTL es la garantia.
+La version se consulta en cada request (una query pequena al pool admin); el
+TTL sigue siendo el limite superior por si la BD no esta disponible.
 """
 
 import os
@@ -17,10 +14,12 @@ import time
 
 TTL = float(os.getenv('PERMISOS_CACHE_TTL', '30'))
 
-_cache = {}  # rol -> (timestamp, [rutas])
+VERSION_CLAVE = 'permisos_version'
+
+_cache = {}  # (rol, version) -> (timestamp, [rutas])
 
 
-def obtener_rutas_cached(rol, loader, usar_cache=True):
+def obtener_rutas_cached(rol, loader, usar_cache=True, version='0'):
     """Devuelve las rutas del rol usando la cache si esta fresca.
 
     loader() es un callable sin argumentos que consulta la BD y devuelve la
@@ -31,15 +30,40 @@ def obtener_rutas_cached(rol, loader, usar_cache=True):
         return loader()
 
     ahora = time.time()
-    entrada = _cache.get(rol)
+    clave = (rol, version)
+    entrada = _cache.get(clave)
     if entrada is not None and (ahora - entrada[0]) < TTL:
         return entrada[1]
 
     rutas = loader()
-    _cache[rol] = (ahora, rutas)
+    _cache[clave] = (ahora, rutas)
     return rutas
 
 
 def invalidar_permisos_cache():
-    """Limpia la cache completa (llamar tras modificar roles_rutas)."""
+    """Limpia la cache local (llamar tras modificar roles o roles_rutas)."""
     _cache.clear()
+
+
+def incrementar_version_permisos(conn):
+    """Incrementa la version global de permisos en la misma transaccion del panel."""
+    from modules.sql_dialect import execute_insert
+
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT valor FROM configuracion WHERE clave = %s", (VERSION_CLAVE,))
+        fila = cursor.fetchone()
+        if fila:
+            try:
+                nueva = str(int(fila['valor']) + 1)
+            except (TypeError, ValueError):
+                nueva = '1'
+            cursor.execute("UPDATE configuracion SET valor = %s WHERE clave = %s",
+                           (nueva, VERSION_CLAVE))
+        else:
+            execute_insert(cursor, """
+                INSERT INTO configuracion (clave, valor, descripcion)
+                VALUES (%s, %s, %s)
+            """, (VERSION_CLAVE, '1', 'Versión global de permisos (uso interno)'))
+    finally:
+        cursor.close()

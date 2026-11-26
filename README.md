@@ -3,6 +3,7 @@
 Sistema de gestión de almacenes (Warehouse Management System) en Flask.
 Dos apps Flask que comparten la base administrativa `taurus_admin`:
 
+
 - **`app.py`** — app principal del WMS (puerto 5000)
 - **`admin.py`** — panel de administración (puerto 5001, UI en `/admin`)
 - **`schema_app.py`** — generador de schema por GUI (puerto 5002, solo desarrollo)

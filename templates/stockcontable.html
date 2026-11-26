@@ -316,6 +316,7 @@
                     </div>
                     <div class="chk-dropdown-menu" id="menuEstado" style="min-width:190px;">
                         <label class="chk-option"><input type="checkbox" value="entrando"   class="chkEstado"> Con Stock Entrando</label>
+                        <label class="chk-option"><input type="checkbox" value="saliendo"   class="chkEstado"> Con Stock Saliendo</label>
                         <label class="chk-option"><input type="checkbox" value="disponible" class="chkEstado"> Con Stock Disponible</label>
                     </div>
                 </div>
@@ -349,14 +350,10 @@
             <tbody>
                 {% for s in stocks %}
                 {% set tiene_entrando   = s.StockEntrando   is not none and s.StockEntrando   > 0 %}
+                {% set tiene_saliendo   = s.StockSaliendo   is not none and s.StockSaliendo   > 0 %}
                 {% set tiene_disponible = s.StockDisponible is not none and s.StockDisponible > 0 %}
-                {% if tiene_entrando %}
-                <tr style="background:#fffde7;" data-entrando="1" data-disponible="0">
-                {% elif tiene_disponible %}
-                <tr style="background:#f0fdf4;" data-entrando="0" data-disponible="1">
-                {% else %}
-                <tr data-entrando="0" data-disponible="0">
-                {% endif %}
+                <tr{% if tiene_entrando %} style="background:#fffde7;"{% elif tiene_saliendo %} style="background:#fdf2f2;"{% elif tiene_disponible %} style="background:#f0fdf4;"{% endif %}
+                    data-entrando="{{ 1 if tiene_entrando else 0 }}" data-saliendo="{{ 1 if tiene_saliendo else 0 }}" data-disponible="{{ 1 if tiene_disponible else 0 }}">
                     <td style="text-align:center;">
                         <button class="btn-edit-row" title="Editar"
                             data-id="{{ s.ID }}"
@@ -401,7 +398,16 @@
                         {{ '%g' % (s.StockEntrando | float) }}
                         {% endif %}
                     </td>
-                    <td class="text-right">{{ '%g' % (s.StockSaliendo | float) }}</td>
+                    <td class="text-right">
+                        {% if tiene_saliendo %}
+                        <strong style="color:#c0392b;">
+                            <i class="fas fa-arrow-up" style="font-size:0.75rem;"></i>
+                            {{ '%g' % (s.StockSaliendo | float) }}
+                        </strong>
+                        {% else %}
+                        {{ '%g' % (s.StockSaliendo | float) }}
+                        {% endif %}
+                    </td>
                     <td>{{ s.UltimaEntrada.strftime('%d/%m/%Y %H:%M') if s.UltimaEntrada else '-' }}</td>
                     <td>{{ s.UltimaSalida.strftime('%d/%m/%Y %H:%M') if s.UltimaSalida else '-' }}</td>
                     <td class="celda-ultmov">{{ s.UltimoMovimiento.strftime('%d/%m/%Y %H:%M') if s.UltimoMovimiento else '-' }}</td>
@@ -466,23 +472,7 @@ var COL_LOTE       = 5;
 
 $(document).ready(function () {
     tabla = $('#tablaStock').DataTable({
-        language: {
-            sProcessing:   "Procesando...",
-            sLengthMenu:   "Mostrar _MENU_ registros",
-            sZeroRecords:  "No se encontraron resultados",
-            sEmptyTable:   "Ningún dato disponible",
-            sInfo:         "Mostrando _START_ a _END_ de _TOTAL_ registros",
-            sInfoEmpty:    "Mostrando 0 a 0 de 0 registros",
-            sInfoFiltered: "(filtrado de _MAX_ registros totales)",
-            sSearch:       "Buscar:",
-            sLoadingRecords: "Cargando...",
-            oPaginate: {
-                sFirst:    "Primero",
-                sLast:     "Último",
-                sNext:     "Siguiente",
-                sPrevious: "Anterior"
-            }
-        },
+        language: DataTablesEs,
         pageLength: 25,
         order: [[1, 'asc']],
         scrollX: true,
@@ -530,7 +520,7 @@ $(document).ready(function () {
         tabla.draw();
     });
     $(document).on('change', '.chkEstado', function () {
-        actualizarLabel('chkEstado', 'lblEstado', 'Todos', 2);
+        actualizarLabel('chkEstado', 'lblEstado', 'Todos');
         tabla.draw();
     });
 
@@ -596,6 +586,7 @@ $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
         if (!fila) return true;
         var ok = estados.some(function(v) {
             if (v === 'entrando')   return fila.dataset.entrando   === '1';
+            if (v === 'saliendo')   return fila.dataset.saliendo   === '1';
             if (v === 'disponible') return fila.dataset.disponible === '1';
             return false;
         });

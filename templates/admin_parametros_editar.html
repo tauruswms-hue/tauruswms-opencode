@@ -186,7 +186,7 @@
                             <div class="row">
                                 <div class="col-md-12 mb-3">
                                     <label class="form-label">API Key</label>
-                                    <textarea class="form-control" name="api_key" rows="2" style="resize:vertical;">{{ param.api_key or '' }}</textarea>
+                                    <textarea class="form-control" name="api_key" rows="2" style="resize:vertical;" placeholder="{{ 'Configurada. Dejar en blanco para conservarla.' if param.api_key_configurada else '' }}">{{ param.api_key or '' }}</textarea>
                                 </div>
                             </div>
                             <div class="row">

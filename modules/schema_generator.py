@@ -1090,7 +1090,7 @@ ROUTE_CATALOG = [
         "/stockcontable/exportar/*", "/stockcontable/plantilla/*",
     ]},
     {"grupo": "Inventario", "rutas": [
-        "/inventario", "/inventario/crear", "/inventario/*",
+        "/inventario", "/inventario/crear", "/inventario/ver/*", "/inventario/*",
     ]},
     {"grupo": "Parametros", "rutas": [
         "/parametros", "/actualizar_parametros",
@@ -1169,7 +1169,7 @@ ROUTES_CONSULTA = [
     "/omc", "/omc/ver/*", "/omc/buscar_*",
     "/despacho", "/stockcontable", "/stockcontable/exportar/*",
     "/stockcontable/plantilla/*",
-    "/inventario", "/inventario/*",
+    "/inventario", "/inventario/ver/*",
     "/parametros",
     "/reportes", "/reportes/*",
     "/sidebar-preferences",

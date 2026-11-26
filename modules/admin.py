@@ -1,4 +1,5 @@
 import base64
+import binascii
 import datetime
 import hashlib
 import json
@@ -6,9 +7,10 @@ import logging
 import os
 import re
 import secrets
+from functools import wraps
 
 from dotenv import load_dotenv
-from flask import Blueprint, flash, redirect, render_template, request, session, url_for
+from flask import Blueprint, abort, flash, redirect, render_template, request, session, url_for
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -27,7 +29,11 @@ from modules.intercambio import (
     reintentar_todo,
 )
 from modules.passwords import validar_password
-from modules.permisos_cache import invalidar_permisos_cache
+from modules.permisos_cache import (
+    VERSION_CLAVE,
+    incrementar_version_permisos,
+    invalidar_permisos_cache,
+)
 from modules.schema_generator import ROUTE_CATALOG
 from modules.sql_dialect import date as date_func
 from modules.sql_dialect import execute_insert, is_duplicate_key_error, limit_sql
@@ -41,9 +47,16 @@ load_dotenv(dotenv_path=env_path)
 
 SECRET_SALT = os.getenv('SECRET_SALT', 'taurus-wms-salt-2024')
 
+# El WMS da acceso total al rol con este nombre (app.py), así que no se puede
+# crear ni renombrar un rol a él desde el panel. ADMIN ya tiene '*' por seed.
+ROLES_RESERVADOS = ('SUPERADMIN', 'ADMIN')
+
+# Inactividad del panel: se cierra aunque la cookie siga vigente (8 h).
+PANEL_IDLE_TIMEOUT_SECONDS = int(os.getenv('PANEL_IDLE_TIMEOUT_SECONDS', '900'))
+
 
 def encode_id(tenant_id):
-    """Codifica el ID con base64 para ocultar el valor real"""
+    """Ofusca el ID con base64; NO es un control de acceso (ver superadmin_required)."""
     if tenant_id is None:
         return ''
     data = f"{int(tenant_id)}:{SECRET_SALT}"
@@ -60,7 +73,7 @@ def decode_id(encoded):
         if salt != SECRET_SALT:
             return None
         return int(tenant_id)
-    except:
+    except (ValueError, binascii.Error, UnicodeDecodeError):
         return None
 
 
@@ -122,12 +135,67 @@ def log_audit(accion, modulo, detalle=None):
         logging.error("Error al registrar auditoría: %s", e)
 
 
-def admin_required(f):
-    from functools import wraps
+def _sesion_panel_expirada():
+    ingresado = session.get('admin_login_at')
+    if not ingresado:
+        return True
+    try:
+        inactivo = (datetime.datetime.now() - datetime.datetime.fromisoformat(ingresado)).total_seconds()
+    except (TypeError, ValueError):
+        return True
+    return inactivo > PANEL_IDLE_TIMEOUT_SECONDS or inactivo < -60
+
+
+def _validar_sesion_panel():
+    """Cierra la sesión si expiró por inactividad o el usuario cambió/dejó de estar activo."""
+    if 'admin_user_id' not in session:
+        return redirect(url_for('admin.login'))
+    if _sesion_panel_expirada():
+        session.clear()
+        flash('Sesión cerrada por inactividad', 'warning')
+        return redirect(url_for('admin.login'))
+
+    conn = _get_admin_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT activo, rol FROM admin_usuarios WHERE id = %s", (session['admin_user_id'],))
+        usuario = cursor.fetchone()
+    finally:
+        cursor.close()
+        conn.close()
+    if not usuario or not usuario['activo'] or usuario['rol'] != session.get('admin_rol'):
+        session.clear()
+        flash('Su usuario del panel fue dado de baja o cambió de rol', 'warning')
+        return redirect(url_for('admin.login'))
+    return None
+
+
+def _roles_asignables(cursor):
+    """Roles habilitados y asignables desde el panel (nunca los reservados del WMS)."""
+    cursor.execute("SELECT nombre FROM roles WHERE activo")
+    return {fila['nombre'] for fila in cursor.fetchall() if fila['nombre'] not in ROLES_RESERVADOS}
+
+
+def _rutas_catalogadas():
+    return {ruta for grupo in ROUTE_CATALOG for ruta in grupo['rutas']} | {'*'}
+
+
+def _invalidar_permisos(conn):
+    """Versión global (otros procesos) + caché local (este proceso)."""
+    incrementar_version_permisos(conn)
+    invalidar_permisos_cache()
+
+
+def superadmin_required(f):
+    """Todas las secciones del panel son globales: solo SUPERADMIN puede verlas o cambiarlas."""
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'admin_user_id' not in session:
-            return redirect(url_for('admin.login'))
+        respuesta = _validar_sesion_panel()
+        if respuesta:
+            return respuesta
+        if session.get('admin_rol') != 'SUPERADMIN':
+            abort(403)
+        session['admin_login_at'] = datetime.datetime.now().isoformat()
         return f(*args, **kwargs)
     return decorated_function
 
@@ -136,8 +204,11 @@ def admin_required(f):
 @admin_limiter.limit("5 per 15 minutes", methods=['POST'])
 def login():
     if 'admin_user_id' in session:
-        return redirect(url_for('admin.tenants'))
-    
+        if _sesion_panel_expirada():
+            session.clear()
+        else:
+            return redirect(url_for('admin.tenants'))
+
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         password = request.form.get('password')
@@ -155,21 +226,23 @@ def login():
                 WHERE username = %s AND activo = 1
             """, (username,))
             usuario = cursor.fetchone()
-            
-            if usuario:
+            valido = bool(usuario and check_password_hash(usuario['password_hash'], password))
+
+            if valido:
                 cursor.execute("""
                     UPDATE admin_usuarios SET ultimo_acceso = %s WHERE id = %s
                 """, (datetime.datetime.now(), usuario['id']))
                 conn.commit()
-            
+
             cursor.close()
             conn.close()
-            
-            if usuario and check_password_hash(usuario['password_hash'], password):
+
+            if valido:
                 session['admin_user_id'] = usuario['id']
                 session['admin_username'] = usuario['username']
                 session['admin_nombre'] = usuario['nombre']
                 session['admin_rol'] = usuario['rol']
+                session['admin_login_at'] = datetime.datetime.now().isoformat()
                 session.permanent = True
                 
                 log_audit('LOGIN', 'auth', {'username': username})
@@ -179,9 +252,10 @@ def login():
                 flash('Credenciales inválidas', 'error')
                 log_audit('LOGIN_FAILED', 'auth', {'username': username})
                 
-        except Exception as e:
-            flash(f'Error de conexión: {e!s}', 'error')
-    
+        except Exception:
+            logging.exception('Error al iniciar sesión en el panel')
+            flash('No se pudo iniciar sesión. Intente nuevamente.', 'error')
+
     return render_template('admin_login.html')
 
 
@@ -194,19 +268,20 @@ def logout():
     session.pop('admin_username', None)
     session.pop('admin_nombre', None)
     session.pop('admin_rol', None)
-    
+    session.pop('admin_login_at', None)
+
     flash('Sesión admin cerrada', 'info')
     return redirect(url_for('admin.login'))
 
 
 @admin_bp.route('/')
-@admin_required
+@superadmin_required
 def index():
     return redirect(url_for('admin.tenants'))
 
 
 @admin_bp.route('/tenants')
-@admin_required
+@superadmin_required
 def tenants():
     conn = _get_admin_connection()
     try:
@@ -227,7 +302,7 @@ def tenants():
 
 
 @admin_bp.route('/tenants/ver/<encoded_id>')
-@admin_required
+@superadmin_required
 def tenants_ver(encoded_id):
     tenant_id = decode_id(encoded_id)
     if tenant_id is None:
@@ -260,7 +335,7 @@ def tenants_ver(encoded_id):
 
 
 @admin_bp.route('/tenants/guardar', methods=['POST'])
-@admin_required
+@superadmin_required
 def tenants_guardar():
     d = request.form
     tenant_id = d.get('id')
@@ -290,7 +365,8 @@ def tenants_guardar():
                 1 if d.get('activo') else 0, tenant_id
             ))
             msg = 'Tenant actualizado correctamente'
-            log_audit('UPDATE', 'tenants', {'id': tenant_id, 'nombre': nombre})
+            accion = 'UPDATE'
+            datos_auditoria = {'id': tenant_id, 'nombre': nombre}
         else:
             tenant_id = execute_insert(cursor, """
                 INSERT INTO tenants (codigo, nombre, razon_social, cuit, direccion, telefono, email)
@@ -300,9 +376,11 @@ def tenants_guardar():
                 cuit, d.get('direccion'), d.get('telefono'), d.get('email')
             ))
             msg = 'Tenant creado correctamente'
-            log_audit('CREATE', 'tenants', {'id': tenant_id, 'codigo': codigo, 'nombre': nombre})
+            accion = 'CREATE'
+            datos_auditoria = {'id': tenant_id, 'codigo': codigo, 'nombre': nombre}
 
         conn.commit()
+        log_audit(accion, 'tenants', datos_auditoria)
         flash(msg, 'success')
         cursor.close()
     except Exception as e:
@@ -310,8 +388,9 @@ def tenants_guardar():
         if is_duplicate_key_error(e):
             flash(f"Ya existe un tenant con el código '{codigo}'.", 'danger')
         else:
-            flash(f'Error: {e!s}', 'danger')
-        log_audit('ERROR', 'tenants', {'error': str(e)})
+            logging.exception('Error al guardar tenant del panel')
+            flash('No se pudo guardar el tenant. Intente nuevamente.', 'danger')
+        log_audit('ERROR', 'tenants', {'accion': 'guardar'})
     finally:
         conn.close()
     
@@ -319,7 +398,7 @@ def tenants_guardar():
 
 
 @admin_bp.route('/tenants/eliminar/<encoded_id>', methods=['POST'])
-@admin_required
+@superadmin_required
 def tenants_eliminar(encoded_id):
     tenant_id = decode_id(encoded_id)
     if tenant_id is None:
@@ -331,8 +410,8 @@ def tenants_eliminar(encoded_id):
         cursor = conn.cursor()
         cursor.execute("UPDATE tenants SET activo = FALSE WHERE id = %s", (tenant_id,))
         conn.commit()
-        flash('Tenant desactivado.', 'success')
         log_audit('DELETE', 'tenants', {'id': tenant_id})
+        flash('Tenant desactivado.', 'success')
         cursor.close()
     finally:
         conn.close()
@@ -341,7 +420,7 @@ def tenants_eliminar(encoded_id):
 
 
 @admin_bp.route('/tenants/activar/<encoded_id>', methods=['POST'])
-@admin_required
+@superadmin_required
 def tenants_activar(encoded_id):
     tenant_id = decode_id(encoded_id)
     if tenant_id is None:
@@ -353,8 +432,8 @@ def tenants_activar(encoded_id):
         cursor = conn.cursor()
         cursor.execute("UPDATE tenants SET activo = TRUE WHERE id = %s", (tenant_id,))
         conn.commit()
-        flash('Tenant activado.', 'success')
         log_audit('UPDATE', 'tenants', {'id': tenant_id, 'action': 'activar'})
+        flash('Tenant activado.', 'success')
         cursor.close()
     finally:
         conn.close()
@@ -363,46 +442,61 @@ def tenants_activar(encoded_id):
 
 
 @admin_bp.route('/usuarios/guardar', methods=['POST'])
-@admin_required
+@superadmin_required
 def usuarios_guardar():
     d = request.form
     usuario_id = d.get('id')
     tenant_id = d.get('tenant_id')
+    destino = url_for('admin.tenants_ver', encoded_id=encode_id(tenant_id))
+    rol = (d.get('rol') or '').strip()
 
     # Alta: contraseña obligatoria. Edición: solo se valida si se cambia.
     if d.get('password') or not usuario_id:
         error_password = validar_password(d.get('password'))
         if error_password:
             flash(error_password, 'danger')
-            return redirect(url_for('admin.tenants_ver', encoded_id=encode_id(tenant_id)))
+            return redirect(destino)
 
     conn = _get_admin_connection()
     try:
         cursor = conn.cursor()
+        actual = None
         if usuario_id:
+            cursor.execute("SELECT id, rol FROM usuarios WHERE id = %s AND tenant_id = %s",
+                           (usuario_id, tenant_id))
+            actual = cursor.fetchone()
+            if not actual:
+                flash('Usuario no encontrado en este tenant.', 'danger')
+                cursor.close()
+                return redirect(destino)
+
+        roles_validos = _roles_asignables(cursor)
+        # Un usuario legacy con rol ADMIN puede conservarlo al editarse; lo que
+        # se prohíbe es asignarlo (o SUPERADMIN) a un usuario nuevo.
+        conserva_actual = bool(actual and rol == actual['rol'] and rol != 'SUPERADMIN')
+        if rol not in roles_validos and not conserva_actual:
+            flash('El rol indicado no está disponible. Elija un rol activo.', 'danger')
+            cursor.close()
+            return redirect(destino)
+
+        if usuario_id:
+            params = [d.get('nombre'), d.get('email'), rol, 1 if d.get('activo') else 0]
             if d.get('password'):
-                cursor.execute("""
-                    UPDATE usuarios SET 
-                        nombre = %s, email = %s, rol = %s, activo = %s,
+                params.append(generate_password_hash(d.get('password')))
+                sentencia = """
+                    UPDATE usuarios SET nombre = %s, email = %s, rol = %s, activo = %s,
                         password_hash = %s
-                    WHERE id = %s
-                """, (
-                    d.get('nombre'), d.get('email'), d.get('rol'),
-                    1 if d.get('activo') else 0,
-                    generate_password_hash(d.get('password')),
-                    usuario_id
-                ))
+                    WHERE id = %s AND tenant_id = %s
+                """
             else:
-                cursor.execute("""
-                    UPDATE usuarios SET 
-                        nombre = %s, email = %s, rol = %s, activo = %s
-                    WHERE id = %s
-                """, (
-                    d.get('nombre'), d.get('email'), d.get('rol'),
-                    1 if d.get('activo') else 0, usuario_id
-                ))
+                sentencia = """
+                    UPDATE usuarios SET nombre = %s, email = %s, rol = %s, activo = %s
+                    WHERE id = %s AND tenant_id = %s
+                """
+            params.extend([usuario_id, tenant_id])
+            cursor.execute(sentencia, params)
             msg = 'Usuario actualizado correctamente'
-            log_audit('UPDATE', 'usuarios', {'id': usuario_id, 'username': d.get('username')})
+            accion = 'UPDATE'
         else:
             cursor.execute("""
                 INSERT INTO usuarios (username, password_hash, nombre, email, rol, tenant_id)
@@ -412,13 +506,16 @@ def usuarios_guardar():
                 generate_password_hash(d.get('password')),
                 d.get('nombre'),
                 d.get('email'),
-                d.get('rol'),
+                rol,
                 tenant_id
             ))
             msg = 'Usuario creado correctamente'
-            log_audit('CREATE', 'usuarios', {'username': d.get('username'), 'tenant_id': tenant_id})
-        
+            accion = 'CREATE'
+
         conn.commit()
+        log_audit(accion, 'usuarios', {'id': usuario_id or None,
+                                      'username': d.get('username'), 'tenant_id': tenant_id,
+                                      'rol': rol})
         flash(msg, 'success')
         cursor.close()
     except Exception as e:
@@ -426,16 +523,17 @@ def usuarios_guardar():
         if is_duplicate_key_error(e):
             flash('El nombre de usuario ya existe. Elija otro.', 'danger')
         else:
-            flash(f'Error: {e!s}', 'danger')
-        log_audit('ERROR', 'usuarios', {'error': str(e)})
+            logging.exception('Error al guardar usuario del panel')
+            flash('No se pudo guardar el usuario. Intente nuevamente.', 'danger')
+        log_audit('ERROR', 'usuarios', {'accion': 'guardar'})
     finally:
         conn.close()
-    
-    return redirect(url_for('admin.tenants_ver', encoded_id=encode_id(tenant_id)))
+
+    return redirect(destino)
 
 
 @admin_bp.route('/usuarios/eliminar/<int:usuario_id>/<encoded_tenant_id>', methods=['POST'])
-@admin_required
+@superadmin_required
 def usuarios_eliminar(usuario_id, encoded_tenant_id):
     tenant_id = decode_id(encoded_tenant_id)
     if tenant_id is None:
@@ -445,20 +543,22 @@ def usuarios_eliminar(usuario_id, encoded_tenant_id):
     conn = _get_admin_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("UPDATE usuarios SET activo = FALSE WHERE id = %s", (usuario_id,))
+        cursor.execute("UPDATE usuarios SET activo = FALSE WHERE id = %s AND tenant_id = %s",
+                       (usuario_id, tenant_id))
         conn.commit()
         filas_afectadas = cursor.rowcount
         cursor.close()
-        
+
         if filas_afectadas > 0:
+            log_audit('DELETE', 'usuarios', {'id': usuario_id, 'tenant_id': tenant_id})
             flash('Usuario desactivado.', 'success')
-            log_audit('DELETE', 'usuarios', {'id': usuario_id})
         else:
-            flash('Usuario no encontrado.', 'warning')
-    except Exception as e:
+            flash('Usuario no encontrado para este tenant.', 'warning')
+    except Exception:
         conn.rollback()
-        flash(f'Error: {e!s}', 'danger')
-        log_audit('ERROR', 'usuarios', {'error': str(e)})
+        logging.exception('Error al desactivar usuario del panel')
+        flash('No se pudo desactivar el usuario. Intente nuevamente.', 'danger')
+        log_audit('ERROR', 'usuarios', {'accion': 'eliminar'})
     finally:
         conn.close()
     
@@ -466,7 +566,7 @@ def usuarios_eliminar(usuario_id, encoded_tenant_id):
 
 
 @admin_bp.route('/usuarios/borrar/<int:usuario_id>/<encoded_tenant_id>', methods=['POST'])
-@admin_required
+@superadmin_required
 def usuarios_borrar(usuario_id, encoded_tenant_id):
     """Elimina el usuario definitivamente de la BD (solo dentro de su tenant)."""
     tenant_id = decode_id(encoded_tenant_id)
@@ -488,17 +588,18 @@ def usuarios_borrar(usuario_id, encoded_tenant_id):
         cursor.close()
 
         if filas_afectadas > 0:
-            flash('Usuario eliminado definitivamente de la base de datos.', 'success')
             log_audit('DELETE', 'usuarios', {
                 'id': usuario_id, 'username': usuario['username'] if usuario else None,
                 'tenant_id': tenant_id, 'action': 'borrado_fisico',
             })
+            flash('Usuario eliminado definitivamente de la base de datos.', 'success')
         else:
             flash('Usuario no encontrado para este tenant.', 'warning')
-    except Exception as e:
+    except Exception:
         conn.rollback()
-        flash(f'Error: {e!s}', 'danger')
-        log_audit('ERROR', 'usuarios', {'error': str(e)})
+        logging.exception('Error al borrar usuario del panel')
+        flash('No se pudo eliminar el usuario. Intente nuevamente.', 'danger')
+        log_audit('ERROR', 'usuarios', {'accion': 'borrar'})
     finally:
         conn.close()
 
@@ -506,7 +607,7 @@ def usuarios_borrar(usuario_id, encoded_tenant_id):
 
 
 @admin_bp.route('/usuarios/activar/<int:usuario_id>/<encoded_tenant_id>', methods=['POST'])
-@admin_required
+@superadmin_required
 def usuarios_activar(usuario_id, encoded_tenant_id):
     tenant_id = decode_id(encoded_tenant_id)
     if tenant_id is None:
@@ -516,20 +617,23 @@ def usuarios_activar(usuario_id, encoded_tenant_id):
     conn = _get_admin_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("UPDATE usuarios SET activo = TRUE WHERE id = %s", (usuario_id,))
+        cursor.execute("UPDATE usuarios SET activo = TRUE WHERE id = %s AND tenant_id = %s",
+                       (usuario_id, tenant_id))
         conn.commit()
         filas_afectadas = cursor.rowcount
         cursor.close()
-        
+
         if filas_afectadas > 0:
+            log_audit('UPDATE', 'usuarios', {'id': usuario_id, 'tenant_id': tenant_id,
+                                             'action': 'activar'})
             flash('Usuario activado.', 'success')
-            log_audit('UPDATE', 'usuarios', {'id': usuario_id, 'action': 'activar'})
         else:
-            flash('Usuario no encontrado.', 'warning')
-    except Exception as e:
+            flash('Usuario no encontrado para este tenant.', 'warning')
+    except Exception:
         conn.rollback()
-        flash(f'Error: {e!s}', 'danger')
-        log_audit('ERROR', 'usuarios', {'error': str(e)})
+        logging.exception('Error al activar usuario del panel')
+        flash('No se pudo activar el usuario. Intente nuevamente.', 'danger')
+        log_audit('ERROR', 'usuarios', {'accion': 'activar'})
     finally:
         conn.close()
     
@@ -537,12 +641,8 @@ def usuarios_activar(usuario_id, encoded_tenant_id):
 
 
 @admin_bp.route('/usuarios')
-@admin_required
+@superadmin_required
 def usuarios():
-    if session.get('admin_rol') != 'SUPERADMIN':
-        flash('Solo SUPERADMIN puede gestionar todos los usuarios', 'danger')
-        return redirect(url_for('admin.tenants'))
-    
     tenant_id = request.args.get('tenant_id', type=int)
     
     conn = _get_admin_connection()
@@ -578,12 +678,8 @@ def usuarios():
 
 
 @admin_bp.route('/roles')
-@admin_required
+@superadmin_required
 def roles():
-    if session.get('admin_rol') != 'SUPERADMIN':
-        flash('Solo SUPERADMIN puede gestionar roles', 'danger')
-        return redirect(url_for('admin.tenants'))
-
     conn = _get_admin_connection()
     try:
         cursor = conn.cursor()
@@ -604,12 +700,8 @@ def roles():
 
 
 @admin_bp.route('/roles/guardar', methods=['POST'])
-@admin_required
+@superadmin_required
 def roles_guardar():
-    if session.get('admin_rol') != 'SUPERADMIN':
-        flash('Solo SUPERADMIN puede gestionar roles', 'danger')
-        return redirect(url_for('admin.tenants'))
-
     d = request.form
     rol_id = d.get('id')
     nombre = (d.get('nombre') or '').strip().upper()
@@ -623,26 +715,34 @@ def roles_guardar():
     conn = _get_admin_connection()
     try:
         cursor = conn.cursor()
+        anterior = None
         if rol_id:
             cursor.execute("SELECT nombre FROM roles WHERE id = %s", (rol_id,))
             anterior = cursor.fetchone()
+        if nombre in ROLES_RESERVADOS and (not anterior or anterior['nombre'] != nombre):
+            flash(f'El rol {nombre} está reservado y no puede crearse ni asignarse desde el panel.', 'danger')
+            cursor.close()
+            return redirect(url_for('admin.roles'))
+
+        if rol_id:
             cursor.execute("""
                 UPDATE roles SET nombre = %s, descripcion = %s, activo = %s WHERE id = %s
             """, (nombre, descripcion, activo, rol_id))
             if anterior and anterior['nombre'] != nombre:
                 cursor.execute("UPDATE roles_rutas SET rol = %s WHERE rol = %s", (nombre, anterior['nombre']))
                 cursor.execute("UPDATE usuarios SET rol = %s WHERE rol = %s", (nombre, anterior['nombre']))
-            invalidar_permisos_cache()
+            _invalidar_permisos(conn)
             msg = 'Rol actualizado correctamente'
-            log_audit('UPDATE', 'roles', {'id': rol_id, 'nombre': nombre})
+            accion = 'UPDATE'
         else:
             cursor.execute("""
                 INSERT INTO roles (nombre, descripcion, activo) VALUES (%s, %s, %s)
             """, (nombre, descripcion, activo))
             msg = 'Rol creado correctamente'
-            log_audit('CREATE', 'roles', {'nombre': nombre})
+            accion = 'CREATE'
 
         conn.commit()
+        log_audit(accion, 'roles', {'id': rol_id, 'nombre': nombre})
         flash(msg, 'success')
         cursor.close()
     except Exception as e:
@@ -650,8 +750,9 @@ def roles_guardar():
         if is_duplicate_key_error(e):
             flash('Ya existe un rol con ese nombre', 'danger')
         else:
-            flash(f'Error: {e!s}', 'danger')
-        log_audit('ERROR', 'roles', {'error': str(e)})
+            logging.exception('Error al guardar rol del panel')
+            flash('No se pudo guardar el rol. Intente nuevamente.', 'danger')
+        log_audit('ERROR', 'roles', {'accion': 'guardar'})
     finally:
         conn.close()
 
@@ -659,12 +760,8 @@ def roles_guardar():
 
 
 @admin_bp.route('/roles/eliminar/<int:rol_id>', methods=['POST'])
-@admin_required
+@superadmin_required
 def roles_eliminar(rol_id):
-    if session.get('admin_rol') != 'SUPERADMIN':
-        flash('Solo SUPERADMIN puede gestionar roles', 'danger')
-        return redirect(url_for('admin.tenants'))
-
     conn = _get_admin_connection()
     try:
         cursor = conn.cursor()
@@ -682,10 +779,10 @@ def roles_eliminar(rol_id):
             return redirect(url_for('admin.roles'))
 
         cursor.execute("UPDATE roles SET activo = FALSE WHERE id = %s", (rol_id,))
+        _invalidar_permisos(conn)
         conn.commit()
-        invalidar_permisos_cache()
-        flash('Rol desactivado.', 'success')
         log_audit('DELETE', 'roles', {'id': rol_id, 'nombre': rol['nombre']})
+        flash('Rol desactivado.', 'success')
         cursor.close()
     finally:
         conn.close()
@@ -694,19 +791,16 @@ def roles_eliminar(rol_id):
 
 
 @admin_bp.route('/roles/activar/<int:rol_id>', methods=['POST'])
-@admin_required
+@superadmin_required
 def roles_activar(rol_id):
-    if session.get('admin_rol') != 'SUPERADMIN':
-        flash('Solo SUPERADMIN puede gestionar roles', 'danger')
-        return redirect(url_for('admin.tenants'))
-
     conn = _get_admin_connection()
     try:
         cursor = conn.cursor()
         cursor.execute("UPDATE roles SET activo = TRUE WHERE id = %s", (rol_id,))
+        _invalidar_permisos(conn)
         conn.commit()
-        flash('Rol activado.', 'success')
         log_audit('UPDATE', 'roles', {'id': rol_id, 'action': 'activar'})
+        flash('Rol activado.', 'success')
         cursor.close()
     finally:
         conn.close()
@@ -715,12 +809,8 @@ def roles_activar(rol_id):
 
 
 @admin_bp.route('/roles/rutas/<rol>', methods=['GET', 'POST'])
-@admin_required
+@superadmin_required
 def roles_rutas_editar(rol):
-    if session.get('admin_rol') != 'SUPERADMIN':
-        flash('Solo SUPERADMIN puede gestionar roles', 'danger')
-        return redirect(url_for('admin.tenants'))
-
     conn = _get_admin_connection()
     try:
         cursor = conn.cursor()
@@ -732,17 +822,23 @@ def roles_rutas_editar(rol):
             return redirect(url_for('admin.roles'))
 
         if request.method == 'POST':
-            nuevas = request.form.getlist('rutas')
-            cursor.execute("DELETE FROM roles_rutas WHERE rol = %s", (rol,))
+            permitidas = _rutas_catalogadas()
+            nuevas = list(dict.fromkeys(r for r in request.form.getlist('rutas') if r in permitidas))
             if '*' in nuevas:
-                cursor.execute("INSERT INTO roles_rutas (rol, ruta) VALUES (%s, %s)", (rol, '*'))
-            else:
+                nuevas = ['*']
+            try:
+                cursor.execute("DELETE FROM roles_rutas WHERE rol = %s", (rol,))
                 for ruta in nuevas:
                     cursor.execute("INSERT INTO roles_rutas (rol, ruta) VALUES (%s, %s)", (rol, ruta))
-            conn.commit()
-            invalidar_permisos_cache()
-            flash('Rutas asignadas correctamente', 'success')
-            log_audit('UPDATE', 'roles_rutas', {'rol': rol, 'rutas': nuevas})
+                _invalidar_permisos(conn)
+                conn.commit()
+                log_audit('UPDATE', 'roles_rutas', {'rol': rol, 'rutas': nuevas})
+                flash('Rutas asignadas correctamente', 'success')
+            except Exception:
+                conn.rollback()
+                logging.exception('Error al guardar las rutas del rol %s', rol)
+                flash('No se pudieron guardar las rutas. Intente nuevamente.', 'danger')
+                log_audit('ERROR', 'roles_rutas', {'rol': rol})
             cursor.close()
             return redirect(url_for('admin.roles'))
 
@@ -872,12 +968,8 @@ def _fecha_filtro(valor, rotulo):
 
 
 @admin_bp.route('/audit')
-@admin_required
+@superadmin_required
 def audit():
-    if session.get('admin_rol') != 'SUPERADMIN':
-        flash('Solo SUPERADMIN puede ver los logs', 'danger')
-        return redirect(url_for('admin.tenants'))
-
     page = max(request.args.get('page', 1, type=int), 1)
     por_pagina = 50
     offset = (page - 1) * por_pagina
@@ -971,16 +1063,12 @@ def _clave_sensible(clave):
 
 
 @admin_bp.route('/configuracion')
-@admin_required
+@superadmin_required
 def configuracion():
-    if session.get('admin_rol') != 'SUPERADMIN':
-        flash('Solo SUPERADMIN puede gestionar la configuración', 'danger')
-        return redirect(url_for('admin.tenants'))
-    
     conn = _get_admin_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM configuracion ORDER BY clave")
+        cursor.execute("SELECT * FROM configuracion WHERE clave <> %s ORDER BY clave", (VERSION_CLAVE,))
         configs = [dict(c) for c in cursor.fetchall()]
         cursor.close()
     finally:
@@ -997,12 +1085,8 @@ def configuracion():
 
 
 @admin_bp.route('/configuracion/guardar', methods=['POST'])
-@admin_required
+@superadmin_required
 def configuracion_guardar():
-    if session.get('admin_rol') != 'SUPERADMIN':
-        flash('Solo SUPERADMIN puede gestionar la configuración', 'danger')
-        return redirect(url_for('admin.tenants'))
-    
     d = request.form
     config_id = d.get('id')
     clave = d.get('clave', '').strip().upper()
@@ -1032,26 +1116,28 @@ def configuracion_guardar():
                 cursor.execute("UPDATE configuracion SET valor = %s, descripcion = %s WHERE id = %s",
                                (valor, descripcion, config_id))
             msg = 'Configuración actualizada correctamente'
-            log_audit('UPDATE', 'configuracion', {'clave': clave})
+            accion = 'UPDATE'
         else:
             cursor.execute("""
                 INSERT INTO configuracion (clave, valor, descripcion)
                 VALUES (%s, %s, %s)
             """, (clave, valor, descripcion))
             msg = 'Configuración creada correctamente'
-            log_audit('CREATE', 'configuracion', {'clave': clave})
-        
+            accion = 'CREATE'
+
         conn.commit()
+        log_audit(accion, 'configuracion', {'clave': clave})
         flash(msg, 'success')
         cursor.close()
     except Exception as e:
         conn.rollback()
         if is_duplicate_key_error(e):
             flash('La clave ya existe. Elija otra.', 'danger')
-            log_audit('ERROR', 'configuracion', {'error': 'clave duplicada'})
+            log_audit('ERROR', 'configuracion', {'motivo': 'clave duplicada'})
         else:
-            flash(f'Error: {e!s}', 'danger')
-            log_audit('ERROR', 'configuracion', {'error': str(e)})
+            logging.exception('Error al guardar configuración del panel')
+            flash('No se pudo guardar la configuración. Intente nuevamente.', 'danger')
+            log_audit('ERROR', 'configuracion', {'accion': 'guardar'})
     finally:
         conn.close()
     
@@ -1059,12 +1145,8 @@ def configuracion_guardar():
 
 
 @admin_bp.route('/configuracion/eliminar/<int:config_id>', methods=['POST'])
-@admin_required
+@superadmin_required
 def configuracion_eliminar(config_id):
-    if session.get('admin_rol') != 'SUPERADMIN':
-        flash('Solo SUPERADMIN puede gestionar la configuración', 'danger')
-        return redirect(url_for('admin.tenants'))
-    
     conn = _get_admin_connection()
     try:
         cursor = conn.cursor()
@@ -1076,14 +1158,15 @@ def configuracion_eliminar(config_id):
         cursor.close()
         
         if filas > 0:
-            flash('Configuración eliminada.', 'success')
             log_audit('DELETE', 'configuracion', {'id': config_id, 'clave': config['clave'] if config else None})
+            flash('Configuración eliminada.', 'success')
         else:
             flash('Configuración no encontrada.', 'warning')
-    except Exception as e:
+    except Exception:
         conn.rollback()
-        flash(f'Error: {e!s}', 'danger')
-        log_audit('ERROR', 'configuracion', {'error': str(e)})
+        logging.exception('Error al eliminar configuración del panel')
+        flash('No se pudo eliminar la configuración. Intente nuevamente.', 'danger')
+        log_audit('ERROR', 'configuracion', {'accion': 'eliminar'})
     finally:
         conn.close()
     
@@ -1091,12 +1174,8 @@ def configuracion_eliminar(config_id):
 
 
 @admin_bp.route('/intercambio')
-@admin_required
+@superadmin_required
 def intercambio():
-    if session.get('admin_rol') != 'SUPERADMIN':
-        flash('Solo SUPERADMIN puede monitorear el intercambio', 'danger')
-        return redirect(url_for('admin.tenants'))
-
     # Conexión de intercambio (sin la contraseña), tal como está en el archivo de conexiones
     descripciones = {'engine': 'Motor de BD', 'host': 'Servidor', 'port': 'Puerto',
                      'database': 'Base de datos', 'user': 'Usuario'}
@@ -1121,7 +1200,7 @@ def intercambio():
 
             cursor_int.execute(
                 f"SELECT * FROM {conf['tabla']} WHERE estado = 'error' "
-                f"ORDER BY id DESC LIMIT 100")
+                f"ORDER BY id DESC {limit_sql(100)}")
             for row in cursor_int.fetchall():
                 row = dict(row)
                 if m == 'transporte_rutas':
@@ -1147,7 +1226,7 @@ def intercambio():
         errores = errores[:100]
 
         cursor_int.execute(
-            "SELECT * FROM intercambio_log ORDER BY id DESC LIMIT 20")
+            f"SELECT * FROM intercambio_log ORDER BY id DESC {limit_sql(20)}")
         logs = cursor_int.fetchall()
     finally:
         conn_int.close()
@@ -1161,12 +1240,8 @@ def intercambio():
 
 
 @admin_bp.route('/intercambio/procesar', methods=['POST'])
-@admin_required
+@superadmin_required
 def intercambio_procesar():
-    if session.get('admin_rol') != 'SUPERADMIN':
-        flash('Solo SUPERADMIN puede procesar el intercambio', 'danger')
-        return redirect(url_for('admin.tenants'))
-
     try:
         resultado = procesar_intercambio(usuario=session.get('admin_username'))
         if resultado.get('aviso'):
@@ -1178,36 +1253,30 @@ def intercambio_procesar():
                   f"{resultado['errores']} con error.", 'warning')
         log_audit('PROCESS', 'intercambio',
                   {'procesados': resultado['procesados'], 'errores': resultado['errores']})
-    except Exception as e:
-        flash(f"Error al procesar el intercambio: {e!s}", 'danger')
-        log_audit('ERROR', 'intercambio', {'error': str(e)})
+    except Exception:
+        logging.exception('Error al procesar el intercambio desde el panel')
+        flash('No se pudo procesar el intercambio. Revise los logs.', 'danger')
+        log_audit('ERROR', 'intercambio', {'accion': 'procesar'})
     return redirect(url_for('admin.intercambio'))
 
 
 @admin_bp.route('/intercambio/reintentar', methods=['POST'])
-@admin_required
+@superadmin_required
 def intercambio_reintentar():
-    if session.get('admin_rol') != 'SUPERADMIN':
-        flash('Solo SUPERADMIN puede reintentar registros', 'danger')
-        return redirect(url_for('admin.tenants'))
-
     try:
         n = reintentar_todo()
         flash(f"{n} registro(s) en error devuelto(s) a pendiente.", 'info')
         log_audit('UPDATE', 'intercambio', {'reintentados': n})
-    except Exception as e:
-        flash(f"Error: {e!s}", 'danger')
-        log_audit('ERROR', 'intercambio', {'error': str(e)})
+    except Exception:
+        logging.exception('Error al reintentar el intercambio desde el panel')
+        flash('No se pudieron reintentar los registros. Revise los logs.', 'danger')
+        log_audit('ERROR', 'intercambio', {'accion': 'reintentar'})
     return redirect(url_for('admin.intercambio'))
 
 
 @admin_bp.route('/parametros/editar/<int:tenant_id>', methods=['GET', 'POST'])
-@admin_required
+@superadmin_required
 def parametros_editar(tenant_id):
-    if session.get('admin_rol') != 'SUPERADMIN':
-        flash('Solo SUPERADMIN puede gestionar parámetros', 'danger')
-        return redirect(url_for('admin.tenants'))
-    
     conn_admin = _get_admin_connection()
     
     try:
@@ -1223,12 +1292,21 @@ def parametros_editar(tenant_id):
             FROM tenants WHERE id = %s
         """, (tenant_id,))
         tenant_actual = cursor_admin.fetchone()
-        
+        if not tenant_actual:
+            flash('Tenant no encontrado', 'danger')
+            return redirect(url_for('admin.tenants'))
+
         if request.method == 'POST':
             d = request.form
             cuit = normalizar_cuit(d.get('cuit'))
             if cuit is None:
                 flash(CUIT_INVALIDO, 'danger')
+                return redirect(url_for('admin.parametros_editar', tenant_id=tenant_id))
+            try:
+                bajostock = float(d.get('bajostock') or 0)
+                dias_filtro = int(d.get('dias_filtro_fechas') or 30)
+            except (TypeError, ValueError):
+                flash('Los valores numéricos de los parámetros no son válidos.', 'danger')
                 return redirect(url_for('admin.parametros_editar', tenant_id=tenant_id))
             metodos = request.form.getlist('metodosdepicking')
             if not metodos:
@@ -1268,10 +1346,10 @@ def parametros_editar(tenant_id):
                 d.get('nombredelalmacen', ''),
                 picking_json,
                 metodo_default,
-                float(d.get('bajostock') or 0),
-                int(d.get('dias_filtro_fechas') or 30),
+                bajostock,
+                dias_filtro,
                 d.get('proveedor_api_ia', ''),
-                d.get('api_key', ''),
+                d.get('api_key') or tenant_actual['api_key'] or '',
                 d.get('modelo_api_ia', ''),
                 d.get('contexto', ''),
                 d.get('prompt', ''),
@@ -1284,43 +1362,36 @@ def parametros_editar(tenant_id):
             
             return redirect(url_for('admin.tenants'))
         
-        if tenant_actual:
-            param = {
-                'tenant_id': tenant_actual['id'],
-                'tenant_nombre': tenant_actual['nombre'],
-                'razon_social': tenant_actual.get('razon_social') or '',
-                'cuit': tenant_actual.get('cuit') or '',
-                'direccion': tenant_actual.get('direccion') or '',
-                'telefono': tenant_actual.get('telefono') or '',
-                'email': tenant_actual.get('email') or '',
-                'nombredelalmacen': tenant_actual.get('nombredelalmacen') or '',
-                'metodosdepicking': tenant_actual.get('metodosdepicking') or '"fifo"',
-                'metodo_picking_default': tenant_actual.get('metodo_picking_default') or 'libre',
-                'bajostock': tenant_actual.get('bajostock') or 0,
-                'dias_filtro_fechas': tenant_actual.get('dias_filtro_fechas') or 30,
-                'proveedor_api_ia': tenant_actual.get('proveedor_api_ia') or '',
-                'api_key': tenant_actual.get('api_key') or '',
-                'modelo_api_ia': tenant_actual.get('modelo_api_ia') or '',
-                'contexto': tenant_actual.get('contexto') or '',
-                'prompt': tenant_actual.get('prompt') or '',
-                'api_token_activo': bool(tenant_actual.get('api_token')),
-            }
-            log_audit('ACCESS', 'parametros', {'tenant_id': tenant_id})
-            return render_template('admin_parametros_editar.html', param=param, tenants=tenants_list, tenant_id=tenant_id)
-        else:
-            flash('Tenant no encontrado', 'danger')
-            return redirect(url_for('admin.tenants'))
+        param = {
+            'tenant_id': tenant_actual['id'],
+            'tenant_nombre': tenant_actual['nombre'],
+            'razon_social': tenant_actual.get('razon_social') or '',
+            'cuit': tenant_actual.get('cuit') or '',
+            'direccion': tenant_actual.get('direccion') or '',
+            'telefono': tenant_actual.get('telefono') or '',
+            'email': tenant_actual.get('email') or '',
+            'nombredelalmacen': tenant_actual.get('nombredelalmacen') or '',
+            'metodosdepicking': tenant_actual.get('metodosdepicking') or '"fifo"',
+            'metodo_picking_default': tenant_actual.get('metodo_picking_default') or 'libre',
+            'bajostock': tenant_actual.get('bajostock') or 0,
+            'dias_filtro_fechas': tenant_actual.get('dias_filtro_fechas') or 30,
+            'proveedor_api_ia': tenant_actual.get('proveedor_api_ia') or '',
+            'api_key': '',
+            'api_key_configurada': bool(tenant_actual.get('api_key')),
+            'modelo_api_ia': tenant_actual.get('modelo_api_ia') or '',
+            'contexto': tenant_actual.get('contexto') or '',
+            'prompt': tenant_actual.get('prompt') or '',
+            'api_token_activo': bool(tenant_actual.get('api_token')),
+        }
+        log_audit('ACCESS', 'parametros', {'tenant_id': tenant_id})
+        return render_template('admin_parametros_editar.html', param=param, tenants=tenants_list, tenant_id=tenant_id)
     finally:
         conn_admin.close()
 
 
 @admin_bp.route('/parametros/<int:tenant_id>/api-token', methods=['POST'])
-@admin_required
+@superadmin_required
 def api_token_generar(tenant_id):
-    if session.get('admin_rol') != 'SUPERADMIN':
-        flash('Solo SUPERADMIN puede gestionar tokens de API', 'danger')
-        return redirect(url_for('admin.tenants'))
-
     token = secrets.token_urlsafe(32)
     conn_admin = _get_admin_connection()
     try:
@@ -1329,19 +1400,23 @@ def api_token_generar(tenant_id):
             "UPDATE tenants SET api_token = %s WHERE id = %s",
             (_hash_token(token), tenant_id)
         )
+        if cursor_admin.rowcount == 0:
+            flash('Tenant no encontrado', 'danger')
+            return redirect(url_for('admin.tenants'))
         conn_admin.commit()
         log_audit('UPDATE', 'api_token', {'tenant_id': tenant_id})
-    except Exception as e:
+    except Exception:
         conn_admin.rollback()
-        flash(f"Error al generar el token: {e!s}", 'danger')
+        logging.exception('Error al generar el token API del tenant %s', tenant_id)
+        flash('No se pudo generar el token. Intente nuevamente.', 'danger')
         return redirect(url_for('admin.parametros_editar', tenant_id=tenant_id))
     finally:
         conn_admin.close()
 
     flash(
         "Token API generado. Copialo ahora: ya no se volverá a mostrar. "
-        "Usalo como `Authorization: Bearer <token>` contra /api/v1/. "
-        f"<strong>{token}</strong>",
+        "Usalo como Authorization: Bearer <token> contra /api/v1/. "
+        f"Token: {token}",
         'info'
     )
     return redirect(url_for('admin.parametros_editar', tenant_id=tenant_id))

@@ -69,6 +69,9 @@
                     </button>
                 </div>
                 <div class="card-body">
+                    <div class="mb-3">
+                        <input type="search" id="filtroRutas" class="form-control" placeholder="Filtrar rutas por nombre...">
+                    </div>
                     <div class="form-check form-switch mb-3 p-3 bg-warning-subtle rounded">
                         <input class="form-check-input" type="checkbox" value="*" id="chkAccesoTotal" name="rutas"
                                {% if '*' in asignadas %}checked{% endif %}>
@@ -129,6 +132,24 @@
                 cb.checked = estado;
             });
         }
+
+        var chkTotal = document.getElementById('chkAccesoTotal');
+        var rutasChecks = document.querySelectorAll('.ruta-check');
+        function sincronizarAccesoTotal() {
+            rutasChecks.forEach(function(cb) {
+                cb.disabled = chkTotal.checked;
+                if (chkTotal.checked) cb.checked = false;
+            });
+        }
+        chkTotal.addEventListener('change', sincronizarAccesoTotal);
+        sincronizarAccesoTotal();
+
+        document.getElementById('filtroRutas').addEventListener('input', function(event) {
+            var texto = event.target.value.toLowerCase();
+            document.querySelectorAll('.ruta-caja').forEach(function(caja) {
+                caja.parentElement.style.display = caja.textContent.toLowerCase().includes(texto) ? '' : 'none';
+            });
+        });
     </script>
 </body>
 </html>

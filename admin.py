@@ -11,6 +11,7 @@ from modules.admin import admin_bp, admin_limiter
 from modules.bootstrap import (
     check_default_secrets,
     harden_session_config,
+    no_store_login_responses,
     passwords_bd,
     register_error_handlers,
 )
@@ -49,6 +50,7 @@ check_default_secrets(APP_ENV, [
 harden_session_config(app, APP_ENV)
 
 register_error_handlers(app, logger, template='admin_error.html')
+no_store_login_responses(app, ('/admin/login',))
 
 
 @app.route('/')

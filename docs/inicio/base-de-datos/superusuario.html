@@ -101,8 +101,10 @@
                 </tbody>
             </table>
         </div>
-        <p>Toda escritura pide confirmación (S/N) y se guarda en el momento. Si la base falla, se deshace la
-        operación, se informa el error y el menú sigue disponible.</p>
+        <p>Toda escritura (opciones 1 a 3 y 5) pide antes el usuario y la contraseña de un
+        <code>SUPERADMIN</code> activo, pide confirmación (S/N) y queda registrada en
+        <code>audit_logs</code> a nombre de quien autorizó. La opción 4 solo consulta. Si la base falla, se deshace
+        la operación, se informa el error y el menú sigue disponible.</p>
 
         <h2 id="limpiar-auditoria">Limpiar la auditoría</h2>
         <p>La opción 5 borra de <code>audit_logs</code> los registros de la
@@ -124,8 +126,10 @@
 
         <h2>Validaciones</h2>
         <ul>
-            <li>Rol: solo <code>SUPERADMIN</code> o <code>ADMIN</code>.</li>
-            <li>No permite dar de baja ni degradar al último <code>SUPERADMIN</code> activo.</li>
+            <li>Rol: solo <code>SUPERADMIN</code> o <code>ADMIN</code>. El panel solo admite
+                <code>SUPERADMIN</code>; un <code>ADMIN</code> no tiene pantallas habilitadas.</li>
+            <li>No permite dar de baja ni degradar al último <code>SUPERADMIN</code> activo (quedaría el panel sin
+                usuarios con acceso).</li>
             <li>Contraseña: mínimo 8 caracteres, se ingresa dos veces y no se muestra en pantalla.</li>
             <li>Email opcional, con formato validado.</li>
         </ul>

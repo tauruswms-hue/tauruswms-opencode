@@ -54,6 +54,26 @@ def harden_session_config(app, app_env):
     app.config['PERMANENT_SESSION_LIFETIME'] = datetime.timedelta(hours=8)
 
 
+def no_store_login_responses(app, login_paths):
+    """Evita que el navegador guarde en caché las respuestas de login.
+
+    Complementa los atributos anti-autofill del HTML: aunque un gestor ignore
+    esos atributos, el HTML con el formulario no queda en la caché ni en el
+    historial del navegador.
+    """
+    from flask import request
+
+    rutas = frozenset(login_paths)
+
+    @app.after_request
+    def _sin_cache(respuesta):
+        if request.path in rutas:
+            respuesta.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+            respuesta.headers['Pragma'] = 'no-cache'
+            respuesta.headers['Expires'] = '0'
+        return respuesta
+
+
 def register_error_handlers(app, logger, template='error.html'):
     """Registra handlers globales de error con una plantilla por app."""
     app_name = app.name or ''

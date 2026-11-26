@@ -26,7 +26,10 @@
                 </tbody>
             </table>
         </div>
-        <p>La asignación se hace desde el panel admin y vale para todos los tenants.</p>
+        <p>La asignación se hace desde el panel admin y vale para todos los tenants. Los nombres
+        <code>SUPERADMIN</code> y <code>ADMIN</code> están reservados: no se pueden crear ni renombrar roles con
+        ellos. Dar de baja un rol (<code>roles.activo = 0</code>) revoca sus permisos de inmediato; el panel
+        tampoco permite desactivarlo si todavía tiene usuarios activos.</p>
 
         <h2>Verificación en cada request</h2>
         <ol>
@@ -36,23 +39,33 @@
                 lo que un cambio hecho en el panel se aplica sin volver a iniciar sesión.</li>
             <li>Si la ruta pedida está en el catálogo y el rol no la tiene, se bloquea.</li>
         </ol>
-        <p>La consulta a <code>taurus_admin</code> se cachea por rol (<code>modules/permisos_cache.py</code>,
-        <code>PERMISOS_CACHE_TTL</code>, 30 s por defecto). El panel admin invalida la caché de su proceso al
-        modificar roles o rutas.</p>
+        <p>La consulta a <code>taurus_admin</code> se cachea por par (rol, versión) en
+        <code>modules/permisos_cache.py</code> (<code>PERMISOS_CACHE_TTL</code>, 30 s por defecto). Al cambiar
+        roles o rutas, el panel incrementa <code>configuracion.permisos_version</code> en la misma transacción:
+        los procesos WMS ven el cambio en el siguiente request aunque no compartan memoria. La clave interna
+        <code>permisos_version</code> no se muestra en la pantalla de configuración.</p>
 
         <h2>Casos especiales</h2>
         <div class="tabla-scroll">
             <table>
                 <thead><tr><th>Caso</th><th>Comportamiento</th></tr></thead>
                 <tbody>
-                    <tr><td>Rol <code>SUPERADMIN</code></td><td>Sin verificación de rutas.</td></tr>
-                    <tr><td>Permiso <code>*</code> ("Acceso total")</td><td>Sin verificación de rutas.</td></tr>
+                    <tr><td>Rol <code>SUPERADMIN</code></td><td>Sin verificación de rutas. No se puede asignar a usuarios WMS desde el panel.</td></tr>
+                    <tr><td>Permiso <code>*</code> ("Acceso total")</td><td>Sin verificación de rutas; al marcarlo, la UI deshabilita el resto.</td></tr>
+                    <tr><td>Rol <code>CONSULTA</code> e inventarios</td><td>Puede listar y ver el detalle por
+                        <code>/inventario/ver/*</code>; no tiene <code>/inventario/*</code> (crear, contar, anular, cerrar).</td></tr>
                     <tr><td>Rutas fuera del catálogo</td><td>Solo exigen login: <code>/</code>, <code>/logout</code>,
                         <code>/estado</code>, <code>/api/xlsx_sheetnames</code>.</td></tr>
                     <tr><td><code>/login</code></td><td>Pública.</td></tr>
                 </tbody>
             </table>
         </div>
+
+        <p>Tanto <code>/login</code> como <code>/admin/login</code> llevan atributos anti-autofill
+        (<code>autocomplete="off"</code>, <code>data-1p-ignore</code>, <code>data-lpignore</code>,
+        <code>data-bwignore</code> y <code>data-form-type="other"</code>) y responden con
+        <code>Cache-Control: no-store</code>. Buscan evitar que los gestores de contraseñas guarden o
+        autocompleten credenciales; no es una garantía absoluta.</p>
 
         <h2>En las plantillas</h2>
         <p>El helper <code>tiene_permiso_ruta</code> está disponible en Jinja para mostrar u ocultar elementos

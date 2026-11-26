@@ -255,7 +255,7 @@ def es_ultimo_superadmin(cursor, usuario):
     if usuario['rol'] != 'SUPERADMIN' or not usuario['activo']:
         return False
     cursor.execute(
-        "SELECT COUNT(*) AS total FROM admin_usuarios WHERE rol = 'SUPERADMIN' AND activo = TRUE AND id <> %s",
+        "SELECT COUNT(*) AS total FROM admin_usuarios WHERE rol = 'SUPERADMIN' AND activo = 1 AND id <> %s",
         (usuario['id'],)
     )
     return cursor.fetchone()['total'] == 0
@@ -269,6 +269,9 @@ def _hash(password):
 
 def crear_o_actualizar(conn, cursor):
     mostrar_encabezado("Crear / Actualizar usuario")
+    autoriza = validar_superadmin(cursor)
+    if autoriza is None:
+        return
 
     username = pedir_input("  Username: ")
     if username is None:
@@ -276,12 +279,12 @@ def crear_o_actualizar(conn, cursor):
 
     usuario = buscar_usuario(cursor, username)
     if usuario:
-        _actualizar(conn, cursor, usuario)
+        _actualizar(conn, cursor, usuario, autoriza)
     else:
-        _crear(conn, cursor, username)
+        _crear(conn, cursor, username, autoriza)
 
 
-def _actualizar(conn, cursor, usuario):
+def _actualizar(conn, cursor, usuario, autoriza):
     username = usuario['username']
     mostrar_usuario(usuario)
     if not usuario['activo']:
@@ -321,11 +324,12 @@ def _actualizar(conn, cursor, usuario):
             "UPDATE admin_usuarios SET nombre = %s, email = %s, rol = %s WHERE id = %s",
             (nombre, email, rol, usuario['id'])
         )
+    registrar_auditoria_usuario(cursor, autoriza, 'UPDATE', username, {'rol': rol})
     conn.commit()
     exito(f"Usuario '{username}' actualizado exitosamente")
 
 
-def _crear(conn, cursor, username):
+def _crear(conn, cursor, username, autoriza):
     info(f"El usuario '{username}' no existe. Se creará uno nuevo.\n")
 
     password = pedir_password_nueva(obligatoria=True)
@@ -350,6 +354,7 @@ def _crear(conn, cursor, username):
         "INSERT INTO admin_usuarios (username, password_hash, nombre, email, rol) VALUES (%s, %s, %s, %s, %s)",
         (username, _hash(password), nombre, email, rol)
     )
+    registrar_auditoria_usuario(cursor, autoriza, 'CREATE', username, {'rol': rol})
     conn.commit()
     exito(f"Usuario '{username}' creado exitosamente")
 
@@ -357,6 +362,9 @@ def _crear(conn, cursor, username):
 def cambiar_estado(conn, cursor, activar):
     accion = "Activar" if activar else "Dar de baja"
     mostrar_encabezado(f"{accion} usuario")
+    autoriza = validar_superadmin(cursor)
+    if autoriza is None:
+        return
 
     username = pedir_input(f"  Username a {'activar' if activar else 'dar de baja'}: ")
     if username is None:
@@ -382,6 +390,7 @@ def cambiar_estado(conn, cursor, activar):
         return
 
     cursor.execute("UPDATE admin_usuarios SET activo = %s WHERE id = %s", (activar, usuario['id']))
+    registrar_auditoria_usuario(cursor, autoriza, 'UPDATE', username, {'activo': bool(activar)})
     conn.commit()
     exito(f"Usuario '{username}' {'activado' if activar else 'dado de baja'} exitosamente")
 
@@ -467,7 +476,7 @@ def validar_superadmin(cursor):
     password = _leer_password("  Contraseña: ")
     cursor.execute(
         "SELECT id, username, nombre, password_hash FROM admin_usuarios "
-        "WHERE username = %s AND rol = 'SUPERADMIN' AND activo = TRUE",
+        "WHERE username = %s AND rol = 'SUPERADMIN' AND activo = 1",
         (username,)
     )
     usuario = cursor.fetchone()
@@ -475,6 +484,18 @@ def validar_superadmin(cursor):
         error("Credenciales inválidas o el usuario no es un SUPERADMIN activo.")
         return None
     return usuario
+
+
+def registrar_auditoria_usuario(cursor, autoriza, accion, username, detalle):
+    """Deja constancia de quién autorizó el cambio (sin guards contraseñas)."""
+    cursor.execute(
+        "INSERT INTO audit_logs (usuario_id, usuario_nombre, accion, modulo, detalle, user_agent) "
+        "VALUES (%s, %s, %s, 'usuarios', %s, %s)",
+        (autoriza['id'], autoriza['nombre'], accion,
+         json.dumps({**detalle, 'username': username,
+                     'autorizado_por': autoriza['username'], 'origen': ORIGEN_AUDITORIA}),
+         ORIGEN_AUDITORIA)
+    )
 
 
 def limpiar_auditoria(conn, cursor):

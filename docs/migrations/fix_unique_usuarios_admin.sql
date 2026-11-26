@@ -10,17 +10,28 @@
 -- Cada índice se crea solo si la columna no tiene ya uno UNIQUE (idempotente,
 -- y seguro en instalaciones nuevas que ya traen el UNIQUE inline).
 
--- 1) admin_usuarios: conservar el registro más antiguo de cada username
---    (el que usa el login) y reasignarle el historial de auditoría.
+-- 1) admin_usuarios: conservar el registro activo y, entre ellos, el SUPERADMIN
+--    (no solo el más antiguo: borrar el SUPERADMIN puede dejar el panel sin acceso).
+--    Se reasigna el historial de auditoría antes de borrar los duplicados.
 UPDATE audit_logs a
 JOIN admin_usuarios dup ON dup.id = a.usuario_id
-JOIN (SELECT username, MIN(id) AS id FROM admin_usuarios GROUP BY username) keep_u
-  ON keep_u.username = dup.username AND keep_u.id <> dup.id
+JOIN (
+    SELECT username,
+           SUBSTRING_INDEX(GROUP_CONCAT(id ORDER BY activo DESC,
+                                                  rol = 'SUPERADMIN' DESC,
+                                                  id ASC), ',', 1) AS id
+    FROM admin_usuarios GROUP BY username
+) keep_u ON keep_u.username = dup.username AND keep_u.id <> dup.id
 SET a.usuario_id = keep_u.id;
 
 DELETE dup FROM admin_usuarios dup
-JOIN (SELECT username, MIN(id) AS id FROM admin_usuarios GROUP BY username) keep_u
-  ON keep_u.username = dup.username AND keep_u.id <> dup.id;
+JOIN (
+    SELECT username,
+           SUBSTRING_INDEX(GROUP_CONCAT(id ORDER BY activo DESC,
+                                                  rol = 'SUPERADMIN' DESC,
+                                                  id ASC), ',', 1) AS id
+    FROM admin_usuarios GROUP BY username
+) keep_u ON keep_u.username = dup.username AND keep_u.id <> dup.id;
 
 SET @sql := IF((SELECT COUNT(*) FROM information_schema.statistics
                 WHERE table_schema = DATABASE() AND table_name = 'admin_usuarios'
