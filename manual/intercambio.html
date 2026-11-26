@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Datos de otros sistemas — Manual de usuario Taurus WMS</title>
+    <link rel="stylesheet" href="assets/docs.css">
+</head>
+<body data-root="" data-page="intercambio.html">
+<div class="layout">
+    <nav id="sidebar"></nav>
+    <main class="content">
+        <p class="migas">Control y consultas</p>
+        <h1>Datos de otros sistemas</h1>
+        <p class="bajada">Cómo aplicar en el depósito los datos que llegan desde el sistema de gestión de la empresa.</p>
+
+        <h2>Qué hace esta pantalla</h2>
+        <p>El sistema de gestión envía altas, cambios y bajas de rutas, transportes, clientes, materiales y pedidos. Esos datos llegan pendientes de aplicar. Esta pantalla permite procesarlos, revisar los que dieron error y volver a intentarlos.</p>
+
+        <h2>Procesar lo pendiente</h2>
+        <ol>
+            <li>Entrá a <strong>Intercambio con sistemas externos</strong>.</li>
+            <li>Revisá el contador de <strong>Pendientes</strong>.</li>
+            <li>Apretá <strong>Procesar Pendientes</strong>.</li>
+            <li>Leé el resultado: el registro cuántos datos se aplicaron y cuántos dieron error.</li>
+        </ol>
+        <p>Los datos se aplican en un orden determinado: primero rutas y transportes, después clientes y materiales, y por último pedidos. No hace falta cambiar ese orden manualmente.</p>
+
+        <h2>Revisar errores</h2>
+        <p>Apretá el filtro <strong>Errores</strong> para ver los registros que no se pudieron aplicar. Cada fila muestra:</p>
+        <ul>
+            <li>El tipo de dato y una referencia para identificarlo.</li>
+            <li>La acción que se intentó: alta, modificación o baja.</li>
+            <li>El estado y la cantidad de intentos.</li>
+            <li>Un mensaje con el motivo del error.</li>
+        </ul>
+        <div class="aviso">
+            <p>El mensaje de error es la pista más importante. Si dice que un código no existe o está repetido, revisá ese dato en el sistema de gestión antes de reintentar. Si dice que el CUIT no es válido, corregilo con el formato <strong>99-99999999-9</strong>.</p>
+        </div>
+
+        <h2>Reintentar</h2>
+        <ul>
+            <li><strong>Reintentar Errores:</strong> vuelve a procesar todos los registros con error.</li>
+            <li>El botón de la fila repite uno solo. Es útil cuando corregiste ese dato puntual.</li>
+        </ul>
+        <p>Si un error se repite después de corregirlo, informalo al administrador con el número de registro y el mensaje exacto.</p>
+
+        <h2>Historial</h2>
+        <p>Abajo de la pantalla hay un historial de ejecuciones con fecha, resultado, cantidad de registros procesados y errores. Sirve para confirmar si un dato ya se aplicó antes de volver a procesarlo.</p>
+
+        <h2>Cuidados</h2>
+        <ul>
+            <li>No repitas «Procesar Pendientes» varias veces seguidas: esperá el resultado de cada ejecución.</li>
+            <li>Una baja de material o cliente no borra la historia: deja de ofrecerse en los formularios nuevos.</li>
+            <li>Un pedido que ya se está preparando no se borra automáticamente aunque llegue una baja desde el otro sistema.</li>
+        </ul>
+
+        <div id="pager"></div>
+    </main>
+</div>
+<script src="assets/docs.js"></script>
+</body>
+</html>

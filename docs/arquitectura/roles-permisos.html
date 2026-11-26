@@ -73,11 +73,25 @@
 <pre><code>{% if tiene_permiso_ruta('/pedidos/nuevo') %}
     ...
 {% endif %}</code></pre>
+        <p>El menú lateral aplica el mismo helper desde el modelo <code>modules/navegacion.py</code>: un
+        <em>context processor</em> entrega a las plantillas los destinos ya filtrados por rol, con la sección
+        activa expandida. Las preferencias del usuario (secciones, riel y favoritos) se guardan en
+        <code>usuarios.sidebar_preferences</code> a través de <code>/sidebar-preferences</code>.</p>
+        <p>El buscador del menú admite sinónimos del negocio definidos en <code>palabras_clave</code> (por
+        ejemplo, «existencias» encuentra Stock). Se abre con la tecla <code>/</code>, se recorre con las
+        flechas y Enter abre el primer resultado; Escape limpia la búsqueda. Los favoritos se fijan con la
+        estrella de cada opción y el riel de iconos muestra el destino al pasar el mouse o al enfocarlo.</p>
+        <p>El enlace «Manual de usuario» abre <code>/manual</code>, que sirve las páginas de
+        <code>manual/</code> con la sesión de la app. Esa carpeta contiene sólo la guía operativa para el
+        usuario final; la documentación interna queda en <code>docs/</code> y no se expone por esa ruta.
+        La ruta no está en <code>ROUTE_CATALOG</code>: cualquier usuario autenticado puede leer el manual,
+        fijarlo como favorito y encontrarlo con la búsqueda del menú.</p>
 
         <h2>Al agregar un módulo o una ruta</h2>
         <div class="aviso atencion">
             <p>Agregar la ruta a <code>ROUTE_CATALOG</code>. Una ruta que no está en el catálogo queda accesible
-            para cualquier usuario con sesión.</p>
+            para cualquier usuario con sesión. Si el módulo debe aparecer en el menú, agregarlo también a
+            <code>NAVEGACION</code> en <code>modules/navegacion.py</code>.</p>
         </div>
 
         <div id="pager"></div>

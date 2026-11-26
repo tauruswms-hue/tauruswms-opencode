@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Pedidos — Manual de usuario Taurus WMS</title>
+    <link rel="stylesheet" href="assets/docs.css">
+</head>
+<body data-root="" data-page="pedidos.html">
+<div class="layout">
+    <nav id="sidebar"></nav>
+    <main class="content">
+        <p class="migas">Operación diaria</p>
+        <h1>Pedidos</h1>
+        <p class="bajada">Cargar lo que pide un cliente, verificar que haya stock y dejar el pedido listo para la preparación.</p>
+
+        <h2>Estados de un pedido</h2>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Estado</th><th>Qué significa</th></tr></thead>
+                <tbody>
+                    <tr><td>Pendiente</td><td>Cargado, sin preparar. Es el único estado en que se puede editar o anular.</td></tr>
+                    <tr><td>Trabajo</td><td>En preparación, con la lista de picking generada.</td></tr>
+                    <tr><td>Trabajo OMC</td><td>En preparación, con un movimiento hacia el muelle de salida.</td></tr>
+                    <tr><td>Preparado</td><td>Listo para despachar.</td></tr>
+                    <tr><td>Despachado</td><td>Salió del depósito.</td></tr>
+                    <tr><td>Anulado</td><td>Cancelado.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Cargar un pedido</h2>
+        <ol>
+            <li>Entrá a <strong>Pedidos</strong> y apretá <strong>Nuevo pedido</strong>.</li>
+            <li>Completá la cabecera: <strong>cliente</strong>, <strong>clase de pedido</strong>, <strong>fecha</strong>, <strong>ruta</strong>, <strong>transporte</strong>, <strong>dirección de entrega</strong> y observaciones. La ruta y el transporte se proponen según el cliente.</li>
+            <li>Agregá los ítems: <strong>material</strong>, <strong>cantidad</strong> y <strong>tipo de stock</strong>.</li>
+            <li>Si hace falta, indicá los <strong>contenedores</strong> que deben ir al muelle. Esta opción es opcional y sólo se carga al dar de alta el pedido.</li>
+            <li>Apretá <strong>Guardar</strong>.</li>
+        </ol>
+        <p>Si indicaste contenedores y cada uno cumple las condiciones, se crea automáticamente un movimiento hacia el muelle del transporte y el pedido queda en <strong>Trabajo OMC</strong>. Los contenedores que no cumplen se informan con un aviso y quedan fuera; el pedido se guarda igual.</p>
+
+        <h2>Verificar stock</h2>
+        <p>Desde la consola, seleccioná los pedidos que querés analizar y apretá <strong>Verificar stock</strong>. El informe agrupa los materiales pedidos y muestra:</p>
+        <ul>
+            <li>Cantidad pedida y stock disponible.</li>
+            <li>Stock entrando, todavía no disponible.</li>
+            <li>Diferencia: lo que falta para completar el pedido.</li>
+        </ul>
+        <p>Las líneas con faltante aparecen primero y detallan qué pedidos las incluyen. Esta consulta no modifica nada.</p>
+
+        <h2>Preparar</h2>
+        <ol>
+            <li>Seleccioná los pedidos Pendientes y apretá <strong>Preparar</strong>.</li>
+            <li>Revisá el resumen de pedidos, clientes, materiales, unidades y ubicaciones con stock.</li>
+            <li>Elegí el modo de preparación que usa tu depósito: <strong>directa</strong>, <strong>cliente</strong> o <strong>dospasos</strong>.</li>
+            <li>Descargá la lista de picking y seguí las indicaciones de la <a href="preparacion.html">guía de preparación</a>.</li>
+        </ol>
+        <div class="aviso">
+            <p><strong>Preparar no mueve stock por sí solo.</strong> Genera la lista de picking y cambia el pedido a <strong>Trabajo</strong>. El stock se mueve cuando se confirma el <a href="movimientos.html">movimiento</a> correspondiente.</p>
+        </div>
+
+        <h2>Otras acciones de la consola</h2>
+        <ul>
+            <li><strong>Cambiar ruta o transporte:</strong> actualiza todos los pedidos seleccionados a la vez.</li>
+            <li><strong>Anular:</strong> sólo se puede usar con pedidos Pendientes. El pedido no se borra: queda en estado Anulado.</li>
+            <li><strong>Editar:</strong> disponible sólo mientras el pedido está Pendiente. Al guardar, los ítems se reemplazan por los nuevos.</li>
+        </ul>
+
+        <h2>Importar pedidos</h2>
+        <p>Desde la consola se puede descargar una plantilla en Excel o CSV e importarla. Las filas con el mismo valor en la columna agrupador forman un pedido; sin ese valor, cada fila es un pedido distinto.</p>
+        <p>Los pedidos importados quedan Pendientes y sin ruta ni transporte: completá esos datos antes de prepararlos. El resultado de la importación informa cuántos se crearon y los errores por fila.</p>
+
+        <div id="pager"></div>
+    </main>
+</div>
+<script src="assets/docs.js"></script>
+</body>
+</html>

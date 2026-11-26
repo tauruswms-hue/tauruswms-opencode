@@ -21,7 +21,7 @@
     {% set cont_stock = stock_origen | selectattr('contenedor_id', 'equalto', cont.id_contenedor) | list %}
     {% if cont_stock %}
     <table class="movil-table">
-        <thead><tr><th>Código</th><th>Material</th><th>Disp.</th><th>Lote</th></tr></thead>
+        <thead><tr><th scope="col">Código</th><th scope="col">Material</th><th scope="col">Disp.</th><th scope="col">Lote</th></tr></thead>
         <tbody>
         {% for s in cont_stock %}
         <tr>

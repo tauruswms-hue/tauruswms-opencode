@@ -1,0 +1,74 @@
+{% macro enlace(item, permite_favorito) -%}
+<div class="sidebar-item-row" data-ruta="{{ item.ruta }}" data-buscar="{{ item.buscar }}">
+    <a href="{{ url_for(item.endpoint) }}" class="sidebar-link{% if item.activo %} active{% endif %}"
+       {% if item.activo %}aria-current="page"{% endif %}
+       data-tooltip="{{ item.etiqueta }}" aria-label="{{ item.etiqueta }}">
+        <i class="{{ item.icono }}" aria-hidden="true"></i>
+        <span class="link-text">{{ item.etiqueta }}</span>
+    </a>
+    {% if permite_favorito %}
+    <button type="button" class="fav-btn" data-favorito="{{ item.ruta }}"
+            aria-pressed="{{ 'true' if item.favorito else 'false' }}"
+            aria-label="{{ 'Quitar ' ~ item.etiqueta ~ ' de favoritos' if item.favorito else 'Fijar ' ~ item.etiqueta ~ ' en favoritos' }}"
+            title="{{ 'Quitar de favoritos' if item.favorito else 'Fijar en favoritos' }}">
+        <i class="{{ 'fas fa-star' if item.favorito else 'far fa-star' }}" aria-hidden="true"></i>
+    </button>
+    {% endif %}
+</div>
+{%- endmacro %}
+
+<nav class="sidebar" id="sidebar-principal" aria-label="Navegación principal"
+     data-preferencias-url="{{ url_for('guardar_sidebar_preferences') }}"
+     data-preferencias='{{ session.get("sidebar_collapsed", {})|tojson }}'>
+    <div class="sidebar-header">
+        <a href="{{ url_for('index') }}" class="sidebar-brand" data-tooltip="Inicio" aria-label="Taurus WMS, ir al inicio">
+            <img src="{{ url_for('static', filename='logo/Taurussuite.jpg') }}" alt="">
+            <span>Taurus WMS</span>
+        </a>
+        <button type="button" class="sidebar-mode-btn" aria-label="Contraer menú a iconos"
+                data-tooltip="Contraer menú a iconos">
+            <i class="fas fa-angle-double-left" aria-hidden="true"></i>
+        </button>
+    </div>
+
+    <div class="sidebar-search">
+        <i class="fas fa-search" aria-hidden="true"></i>
+        <input type="search" id="sidebar-buscar" placeholder="Buscar en el menú…"
+               aria-label="Buscar en el menú" aria-keyshortcuts="/"
+               aria-describedby="sidebar-buscar-ayuda" autocomplete="off">
+        <kbd class="search-hint" aria-hidden="true">/</kbd>
+        <p id="sidebar-buscar-ayuda" class="visually-hidden">Escribí para filtrar, usá las flechas para recorrer los resultados y Enter para abrirlos. Escape limpia la búsqueda.</p>
+    </div>
+    <p class="sidebar-resultados" id="sidebar-resultados" role="status" aria-live="polite" hidden></p>
+
+    <div class="sidebar-nav">
+        {% for seccion in nav.secciones %}
+        <div class="sidebar-section" data-seccion="{{ seccion.clave }}" data-etiqueta="{{ seccion.etiqueta }}">
+            {% if seccion.directo %}
+                {{ enlace(seccion['items'][0], false) }}
+            {% else %}
+            <button type="button" class="sidebar-toggle" data-section="{{ seccion.clave }}"
+                    aria-expanded="{{ 'true' if seccion.expandida else 'false' }}"
+                    aria-controls="section-{{ seccion.clave }}">
+                <i class="{{ seccion.icono }}" aria-hidden="true"></i>
+                <span class="link-text">{{ seccion.etiqueta }}</span>
+                <span class="section-count" aria-hidden="true">{{ seccion.total }}</span>
+                <i class="fas fa-chevron-down toggle-icon" aria-hidden="true"></i>
+            </button>
+            <div class="sidebar-submenu" id="section-{{ seccion.clave }}"
+                 {% if not seccion.expandida %}hidden{% endif %}>
+                {% if seccion.clave == 'favoritos' and not seccion['items'] %}
+                <p class="favoritos-vacio">Fija accesos con la estrella de cada opción.</p>
+                {% endif %}
+                {% for item in seccion['items'] %}
+                    {{ enlace(item, true) }}
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+        <p class="sidebar-no-resultados" hidden>No se encontraron opciones en el menú.</p>
+    </div>
+
+    <p class="sidebar-estado" id="sidebar-estado" role="status" aria-live="polite" hidden></p>
+</nav>

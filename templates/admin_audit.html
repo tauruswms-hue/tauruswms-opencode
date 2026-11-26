@@ -120,15 +120,15 @@
                         <h6 class="mt-3">Columnas</h6>
                         <table class="table table-sm mb-0">
                             <tbody>
-                                <tr><th class="text-nowrap">Fecha y hora</th><td>Momento exacto, según el reloj del servidor.</td></tr>
-                                <tr><th>Usuario</th><td>Usuario del panel que hizo la acción. Un guion (-) significa que no había
+                                <tr><th scope="row" class="text-nowrap">Fecha y hora</th><td>Momento exacto, según el reloj del servidor.</td></tr>
+                                <tr><th scope="row">Usuario</th><td>Usuario del panel que hizo la acción. Un guion (-) significa que no había
                                     nadie identificado, como en un ingreso fallido.</td></tr>
-                                <tr><th>Acción</th><td>Qué se hizo. El color indica el tipo (ver abajo).</td></tr>
-                                <tr><th>Sección</th><td>Parte del panel donde ocurrió.</td></tr>
-                                <tr><th>Detalle</th><td>Sobre qué registro se actuó: el tenant, usuario, rol o clave afectado.
+                                <tr><th scope="row">Acción</th><td>Qué se hizo. El color indica el tipo (ver abajo).</td></tr>
+                                <tr><th scope="row">Sección</th><td>Parte del panel donde ocurrió.</td></tr>
+                                <tr><th scope="row">Detalle</th><td>Sobre qué registro se actuó: el tenant, usuario, rol o clave afectado.
                                     Dice <em>qué</em> registro cambió, no los valores anteriores y nuevos. Si aparece
                                     "ID 15" es porque ese registro ya no existe y no se puede mostrar su nombre.</td></tr>
-                                <tr><th class="text-nowrap">Equipo (IP)</th><td>Dirección de red del equipo desde el que se hizo.
+                                <tr><th scope="row" class="text-nowrap">Equipo (IP)</th><td>Dirección de red del equipo desde el que se hizo.
                                     <code>127.0.0.1</code> es el propio servidor. Al pasar el mouse se ve el navegador usado.</td></tr>
                             </tbody>
                         </table>
@@ -152,7 +152,7 @@
                         <table class="table table-sm mb-0">
                             <tbody>
                                 {% for codigo, texto in modulos.items() %}
-                                <tr><th class="text-nowrap">{{ texto }}</th><td>{{ ayuda_modulos[codigo] }}</td></tr>
+                                <tr><th scope="row" class="text-nowrap">{{ texto }}</th><td>{{ ayuda_modulos[codigo] }}</td></tr>
                                 {% endfor %}
                             </tbody>
                         </table>
@@ -224,12 +224,12 @@
                     <table class="table table-sm table-hover align-middle">
                         <thead>
                             <tr>
-                                <th>Fecha y hora</th>
-                                <th>Usuario</th>
-                                <th>Acción</th>
-                                <th>Sección</th>
-                                <th>Detalle</th>
-                                <th>Equipo (IP)</th>
+                                <th scope="col">Fecha y hora</th>
+                                <th scope="col">Usuario</th>
+                                <th scope="col">Acción</th>
+                                <th scope="col">Sección</th>
+                                <th scope="col">Detalle</th>
+                                <th scope="col">Equipo (IP)</th>
                             </tr>
                         </thead>
                         <tbody>

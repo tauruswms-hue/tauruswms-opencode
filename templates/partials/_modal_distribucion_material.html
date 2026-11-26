@@ -15,26 +15,26 @@
                 <table id="distTabla" class="dist-tabla" style="display:none;">
                     <thead>
                         <tr>
-                            <th>Ubicación</th>
-                            <th>Zona</th>
-                            <th>Contenedor</th>
-                            <th>Lote</th>
-                            <th>Tipo de stock</th>
-                            <th>Vencimiento</th>
-                            <th class="num" title="Existencia física en la posición">Total</th>
-                            <th class="num" title="Lo que se puede usar para nuevos pedidos">Disponible</th>
-                            <th class="num" title="En camino hacia esta posición">Entrando</th>
-                            <th class="num" title="Comprometido para salir de esta posición">Saliendo</th>
+                            <th scope="col">Ubicación</th>
+                            <th scope="col">Zona</th>
+                            <th scope="col">Contenedor</th>
+                            <th scope="col">Lote</th>
+                            <th scope="col">Tipo de stock</th>
+                            <th scope="col">Vencimiento</th>
+                            <th scope="col" class="num" title="Existencia física en la posición">Total</th>
+                            <th scope="col" class="num" title="Lo que se puede usar para nuevos pedidos">Disponible</th>
+                            <th scope="col" class="num" title="En camino hacia esta posición">Entrando</th>
+                            <th scope="col" class="num" title="Comprometido para salir de esta posición">Saliendo</th>
                         </tr>
                     </thead>
                     <tbody id="distCuerpo"></tbody>
                     <tfoot>
                         <tr>
-                            <th colspan="6" style="text-align:right;">Totales</th>
-                            <th class="num" id="distTotTotal"></th>
-                            <th class="num" id="distTotDisponible"></th>
-                            <th class="num" id="distTotEntrando"></th>
-                            <th class="num" id="distTotSaliendo"></th>
+                            <th scope="col" colspan="6" style="text-align:right;">Totales</th>
+                            <th scope="col" class="num" id="distTotTotal"></th>
+                            <th scope="col" class="num" id="distTotDisponible"></th>
+                            <th scope="col" class="num" id="distTotEntrando"></th>
+                            <th scope="col" class="num" id="distTotSaliendo"></th>
                         </tr>
                     </tfoot>
                 </table>

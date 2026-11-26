@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Preparación (picking) — Manual de usuario Taurus WMS</title>
+    <link rel="stylesheet" href="assets/docs.css">
+</head>
+<body data-root="" data-page="preparacion.html">
+<div class="layout">
+    <nav id="sidebar"></nav>
+    <main class="content">
+        <p class="migas">Operación diaria</p>
+        <h1>Preparación (picking)</h1>
+        <p class="bajada">Cómo usar la lista de picking para juntar los materiales de los pedidos y llevarlos al muelle de salida.</p>
+
+        <h2>La lista de picking</h2>
+        <p>Al <a href="pedidos.html">preparar</a> uno o más pedidos, el sistema genera una lista para descargar. Incluye:</p>
+        <ul>
+            <li>Fecha, modo de preparación, usuario y la lista de pedidos incluidos.</li>
+            <li>La cabecera y los materiales de cada pedido.</li>
+            <li>Las ubicaciones de picking con stock, <strong>en el orden de recorrido</strong> que conviene seguir.</li>
+            <li>Para cada ubicación: contenedor, lote, tipo de stock, vencimiento y cantidad disponible.</li>
+        </ul>
+        <p>Descargá la lista antes de salir al depósito. Si tu equipo no tiene impresora, podés consultarla también desde la <a href="movil.html">terminal móvil</a>.</p>
+
+        <h2>Cómo trabajar la lista</h2>
+        <ol>
+            <li>Empezá por la primera ubicación del recorrido y no saltes de un lugar a otro sin nombrar lo que tomaste.</li>
+            <li>Para cada material, tomá la cantidad indicada del contenedor y lote que figura en la lista.</li>
+            <li> Si el vencimiento o el lote no coinciden con lo indicado, no lo reemplaces por otro: anotá la novedad y avisá al encargado.</li>
+            <li>Agrupá lo preparado por pedido o por cliente, según el modo de preparación elegido.</li>
+            <li>Cuando termines, llevá la mercadería al muelle del transporte indicado en el pedido.</li>
+        </ol>
+
+        <h2>Modos de preparación</h2>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Modo</th><th>Cómo se arma la lista</th></tr></thead>
+                <tbody>
+                    <tr><td>Directa</td><td>Se recorren las ubicaciones una sola vez y se juntan todos los pedidos seleccionados.</td></tr>
+                    <tr><td>Cliente</td><td>La mercadería se separa por cliente mientras se recorre el depósito.</td></tr>
+                    <tr><td>Dospasos</td><td>Primero se junta la mercadería y después se distribuye por pedido o cliente.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Cuando hay contenedores</h2>
+        <p>Si al cargar el pedido se indicaron contenedores, el sistema generó un <a href="movimientos.html">movimiento</a> al muelle. En ese caso:</p>
+        <ol>
+            <li>Confirmá el movimiento desde su detalle; se pide permiso de supervisor y contraseña.</li>
+            <li>Al confirmar, la mercadería pasa a estar disponible en el muelle y el pedido queda <strong>Preparado</strong>.</li>
+            <li>Recién ahí podés continuar con el <a href="despacho.html">despacho</a>.</li>
+        </ol>
+        <div class="aviso atencion">
+            <p>Si el movimiento queda Pendiente, el pedido sigue en <strong>Trabajo OMC</strong> y no aparece en Despacho. Confirmalo o anulalo antes de cerrar el turno.</p>
+        </div>
+
+        <h2>Si falta mercadería</h2>
+        <p>Volvé a ejecutar la <strong>Verificación de stock</strong> de la consola de pedidos. Si el faltante persiste, no cambies el material ni el tipo de stock por tu cuenta: informalo al encargado para que decida si se espera la recepción pendiente o se ajusta el pedido.</p>
+
+        <div id="pager"></div>
+    </main>
+</div>
+<script src="assets/docs.js"></script>
+</body>
+</html>

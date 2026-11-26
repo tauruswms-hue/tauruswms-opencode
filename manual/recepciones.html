@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Recepciones — Manual de usuario Taurus WMS</title>
+    <link rel="stylesheet" href="assets/docs.css">
+</head>
+<body data-root="" data-page="recepciones.html">
+<div class="layout">
+    <nav id="sidebar"></nav>
+    <main class="content">
+        <p class="migas">Operación diaria</p>
+        <h1>Recepciones</h1>
+        <p class="bajada">Registrar la mercadería que llega de un proveedor y dejarla disponible en su ubicación de destino.</p>
+
+        <h2>Cuándo se usa</h2>
+        <p>Siempre que entre mercadería al depósito. La recepción agrupa los materiales de un proveedor en un contenedor y determina dónde se va a guardar.</p>
+
+        <h2>Crear una recepción</h2>
+        <ol>
+            <li>Entrá a <strong>Recepciones</strong> y apretá <strong>Nueva recepción</strong>.</li>
+            <li>Elegí el <strong>proveedor</strong> entre los activos.</li>
+            <li>Elegí la <strong>ubicación de recepción</strong>: el lugar donde se descarga la mercadería. El sistema recuerda la última usada.</li>
+            <li>Si ya sabés dónde va a quedar, indicá la <strong>ubicación de destino</strong>. También podés agregar observaciones.</li>
+            <li>Apretá <strong>Guardar</strong>. El sistema asigna el número de recepción y el contenedor.</li>
+        </ol>
+        <p>La recepción queda <strong>Abierta</strong>: todavía no afecta al stock. Mientras esté Abierta podés agregar, corregir o quitar ítems.</p>
+
+        <h2>Cargar los ítems</h2>
+        <ul>
+            <li>En el detalle de la recepción, buscá el material por nombre, código, código de barras o referencia del proveedor. Con lector, la búsqueda debe coincidir exactamente.</li>
+            <li>Sólo se ofrecen materiales activos vinculados al proveedor elegido. Si no aparece uno que esperás, revisá el proveedor o avisá al administrador.</li>
+            <li>Completá <strong>lote</strong> (si lo dejás vacío se usa <em>UNICO</em>), <strong>vencimiento</strong>, <strong>cantidad esperada</strong>, <strong>cantidad recibida</strong> y <strong>tipo de stock</strong>.</li>
+            <li>Apretá <strong>Agregar</strong> para cada material. Podés corregir o eliminar ítems mientras la recepción siga Abierta.</li>
+        </ul>
+        <div class="aviso">
+            <p>La cantidad que realmente ingresa es la <strong>recibida</strong>. Los ítems con cantidad recibida en cero se descartan al cerrar: no generan stock.</p>
+        </div>
+
+        <h2>Cerrar la recepción</h2>
+        <p>Apretá <strong>Cerrar Recepción</strong> cuando terminaste de cargar. El cierre pide confirmación y requiere:</p>
+        <ul>
+            <li>Que la recepción esté Abierta.</li>
+            <li>Que se haya indicado una ubicación de destino.</li>
+            <li>Al menos un ítem con cantidad recibida mayor a cero.</li>
+        </ul>
+        <p>Al cerrar, la mercadería queda en tránsito hacia el destino y se genera un <a href="movimientos.html">movimiento pendiente</a>. La recepción pasa a <strong>Cerrada</strong>.</p>
+
+        <h2>Dejar el stock disponible</h2>
+        <p>Lo habitual es ir al movimiento generado y <strong>confirmarlo</strong> desde su detalle. La recepción pasa entonces a <strong>Confirmada</strong> y la mercadería queda disponible en el destino.</p>
+        <p>En algunas recepciones aparece además el botón <strong>Confirmar Entrada al Stock</strong>. Ese botón deja el stock disponible directamente desde la recepción, sin pasar por el movimiento. Usá uno de los dos caminos, no ambos.</p>
+
+        <h2>Anular</h2>
+        <p>Si la recepción se cargó por error y todavía está Abierta, apretá <strong>Anular</strong>. Queda como <strong>Anulada</strong> y no produce ningún movimiento de stock.</p>
+
+        <h2>Importar recepciones</h2>
+        <p>Desde el listado podés descargar una plantilla en Excel o CSV e importarla. Las filas con el mismo valor en la columna agrupador forman una sola recepción; sin ese valor, cada fila es una recepción distinta.</p>
+        <p>La cabecera —proveedor y ubicaciones— se toma de la primera fila de cada grupo. Las recepciones importadas quedan Abiertas y con la cantidad recibida en cero: cargá lo recibido antes de cerrarlas.</p>
+
+        <div id="pager"></div>
+    </main>
+</div>
+<script src="assets/docs.js"></script>
+</body>
+</html>

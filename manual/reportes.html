@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Reportes — Manual de usuario Taurus WMS</title>
+    <link rel="stylesheet" href="assets/docs.css">
+</head>
+<body data-root="" data-page="reportes.html">
+<div class="layout">
+    <nav id="sidebar"></nav>
+    <main class="content">
+        <p class="migas">Control y consultas</p>
+        <h1>Reportes</h1>
+        <p class="bajada">Consultas de stock, valorización, movimientos, recepciones y pedidos, con opción de descargarlas.</p>
+
+        <h2>Lo que muestra la pantalla</h2>
+        <p>Arriba hay indicadores rápidos: stock disponible, pedidos despachados y recepciones abiertas. Abajo, las pestañas organizan los informes:</p>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Pestaña</th><th>Para qué sirve</th></tr></thead>
+                <tbody>
+                    <tr><td>Stock actual</td><td>Ver cantidades por material, ubicación, contenedor, lote y tipo de stock.</td></tr>
+                    <tr><td>Stock valorizado</td><td>Ver el valor de ese stock según los precios cargados en los materiales.</td></tr>
+                    <tr><td>Auditoría de movimientos</td><td>Seguir cada entrada, salida y cambio de stock, con fecha y usuario.</td></tr>
+                    <tr><td>Recepciones</td><td>Revisar las recepciones y su estado.</td></tr>
+                    <tr><td>Pedidos</td><td>Revisar los pedidos, su estado y su avance.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Filtrar</h2>
+        <ol>
+            <li>Apretá la pestaña del informe que necesitás.</li>
+            <li>Completá los filtros que aparecen: fechas, material, cliente, ubicación o estado, según el informe.</li>
+            <li>Apretá <strong>Filtrar</strong>.</li>
+            <li>Las grillas permiten ordenar por columna y buscar dentro de los resultados.</li>
+        </ol>
+        <p>Si un informe tarda en cargar, esperá el resultado antes de cambiar de pestaña o de apretar el filtro otra vez.</p>
+
+        <h2>Descargar</h2>
+        <p>Cada informe tiene botones de exportación en Excel o CSV. La descarga respeta los filtros aplicados, así que podés guardar exactamente el listado que estás viendo.</p>
+        <p>Para auditar una diferencia de stock, conviene descargar el <strong>stock actual</strong> y la <strong>auditoría de movimientos</strong> del mismo período y compararlos.</p>
+
+        <h2>Dónde buscar un movimiento</h2>
+        <p>En la auditoría, cada registro indica cuándo se hizo, qué material y contenedor se movió, desde dónde y hacia dónde, y qué operación lo originó. Es el lugar para responder preguntas como «¿por qué falta stock?» o «¿quién confirmó este movimiento?».</p>
+
+        <div id="pager"></div>
+    </main>
+</div>
+<script src="assets/docs.js"></script>
+</body>
+</html>

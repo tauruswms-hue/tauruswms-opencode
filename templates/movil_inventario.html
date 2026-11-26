@@ -46,7 +46,7 @@ function buscar() {
                 html += '<div class="movil-empty">Sin stock registrado para este material.</div>';
             } else {
                 html += '<div class="movil-card"><table class="movil-table"><thead><tr>' +
-                    '<th>Ubicación</th><th>Contenedor</th><th>Disp.</th><th>Total</th><th>Lote</th></tr></thead><tbody>';
+                    '<th scope="col">Ubicación</th><th scope="col">Contenedor</th><th scope="col">Disp.</th><th scope="col">Total</th><th scope="col">Lote</th></tr></thead><tbody>';
                 data.posiciones.forEach(function(p) {
                     html += '<tr><td>' + p.ubicacion_codigo + '</td><td>' + p.IDContenedor + '</td>' +
                             '<td>' + p.StockDisponible + '</td><td>' + p.StockTotal + '</td><td>' + p.Lote + '</td></tr>';

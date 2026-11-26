@@ -106,9 +106,9 @@ Objetivo: mitigar los riesgos de exposicion que hoy impiden vender.
            hidden csrf_token; se eliminaron las funciones JS eliminar*/activar*
            que hacian window.location). Ya existian forms POST en el resto.
            Verificado: GET a esas rutas -> 405; POST sin token -> 400; POST
-           con token -> 302. Nota: tenants_gestionar.html es una plantilla
-           huerfana (ninguna ruta la renderiza) y referencia un endpoint
-           inexistente; se deja como codigo muerto (ver Fase 4.2).
+           con token -> 302. Nota: la plantilla huerfana tenants_gestionar.html
+           (referenciaba endpoints inexistentes) se retiro en la limpieza
+           de estructura; los tenants se gestionan desde el panel admin.
 
   [x] 1.3  Rate limiting en login
            app.py (login) + modules/admin.py (login). Flask-Limiter por

@@ -1,0 +1,26 @@
+{# Notificaciones accesibles y consistentes para todo el WMS.
+   Uso: {% from 'partials/_flashes.html' import flashes with context %}
+         {{ flashes(get_flashed_messages(with_categories=true)) }}
+   'danger' y 'error' se normalizan a una sola categoría visual. #}
+{% macro flashes(messages, estilo='toast') -%}
+{% if messages %}
+<div class="flash-messages {% if estilo == 'inline' %}flash-messages-inline{% endif %}"
+     aria-live="polite" aria-label="Notificaciones">
+    {% for category, message in messages %}
+        {% set cat = 'error' if category in ('danger', 'error') else category %}
+        {% set icono = 'circle-check' if cat == 'success' else
+                       'circle-exclamation' if cat == 'error' else
+                       'triangle-exclamation' if cat == 'warning' else 'circle-info' %}
+        <div class="flash flash-{{ cat }}" data-flash="{{ cat }}"
+             {% if cat in ('error', 'warning') %}role="alert"{% else %}role="status"{% endif %}>
+            <i class="fas fa-{{ icono }}" aria-hidden="true"></i>
+            <span class="flash-texto">{{ message }}</span>
+            <button type="button" class="flash-cerrar" data-flash-cerrar
+                    aria-label="Cerrar mensaje" title="Cerrar mensaje">
+                <i class="fas fa-times" aria-hidden="true"></i>
+            </button>
+        </div>
+    {% endfor %}
+</div>
+{% endif %}
+{%- endmacro %}

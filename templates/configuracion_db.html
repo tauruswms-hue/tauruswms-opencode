@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from 'partials/_flashes.html' import flashes with context %}
 
 {% block title %}Configuración de Base de Datos{% endblock %}
 
@@ -15,7 +16,7 @@
                 <i class="fas fa-tachometer-alt"></i>
                 Panel de Control
             </a>
-            <a href="{{ url_for('parametros') }}" class="params-nav-link">
+            <a href="{{ url_for('parametros.parametros') }}" class="params-nav-link">
                 <i class="fas fa-sliders-h"></i>
                 Configuración general
             </a>
@@ -30,21 +31,15 @@
     <main class="params-content">
         <header class="params-header">
             <h1><i class="fas fa-database"></i> Configuración de Base de Datos</h1>
-            <p>Visualiza la configuración actual de la conexión a la base de datos MySQL.</p>
+            <p>Visualiza la configuración actual de la conexión a la base de datos y permite probarla.</p>
         </header>
 
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="flash flash-{{ category }}">{{ message }}</div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
+        {{ flashes(get_flashed_messages(with_categories=true), 'inline') }}
 
         <div class="params-form">
             <!-- Sección: Parámetros de Conexión -->
             <section class="params-section">
-                <h3><i class="fas fa-plug"></i> Parámetros de Conexión MySQL</h3>
+                <h3><i class="fas fa-plug"></i> Parámetros de Conexión</h3>
                 <div class="params-grid">
                     <div class="params-field view-only">
                         <label for="db_host">
@@ -94,7 +89,7 @@
                     <button type="button" id="test-db-connection" class="btn btn-test">
                         <i class="fas fa-play"></i> Probar Conexión Actual
                     </button>
-                    <div id="db-test-result" class="db-test-result">
+                    <div id="db-test-result" class="db-test-result" role="status" aria-live="polite">
                         <!-- Resultado de la prueba aparecerá aquí -->
                     </div>
                 </div>

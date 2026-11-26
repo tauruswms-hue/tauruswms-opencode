@@ -254,18 +254,18 @@
         <table id="tablaLineas" class="display cell-border hover stripe" style="width:100%">
             <thead>
                 <tr>
-                    <th>Ubicación</th>
-                    <th>Material</th>
-                    <th>Contenedor</th>
-                    <th>Lote</th>
-                    <th>Tipo Stock</th>
-                    <th class="text-right">Stock Sistema</th>
-                    <th class="text-right">Stock Contado</th>
-                    <th class="text-right">Diferencia</th>
-                    <th>Fecha Conteo</th>
-                    <th>Usuario</th>
+                    <th scope="col">Ubicación</th>
+                    <th scope="col">Material</th>
+                    <th scope="col">Contenedor</th>
+                    <th scope="col">Lote</th>
+                    <th scope="col">Tipo Stock</th>
+                    <th scope="col" class="text-right">Stock Sistema</th>
+                    <th scope="col" class="text-right">Stock Contado</th>
+                    <th scope="col" class="text-right">Diferencia</th>
+                    <th scope="col">Fecha Conteo</th>
+                    <th scope="col">Usuario</th>
                     {% if inventario.estado == 'Abierto' %}
-                    <th class="no-sort text-center">Acción</th>
+                    <th scope="col" class="no-sort text-center">Acción</th>
                     {% endif %}
                 </tr>
             </thead>

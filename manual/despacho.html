@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Despacho — Manual de usuario Taurus WMS</title>
+    <link rel="stylesheet" href="assets/docs.css">
+</head>
+<body data-root="" data-page="despacho.html">
+<div class="layout">
+    <nav id="sidebar"></nav>
+    <main class="content">
+        <p class="migas">Operación diaria</p>
+        <h1>Despacho</h1>
+        <p class="bajada">Registrar la salida del depósito de los pedidos que ya están preparados en el muelle.</p>
+
+        <h2>Qué podés ver</h2>
+        <p>La pantalla lista los pedidos en estado <strong>Preparado</strong>, del más antiguo al más reciente, con cliente, ruta, transporte y clase de pedido. Si un pedido no aparece, revisá su estado en <a href="pedidos.html">Pedidos</a>: probablemente todavía esté en Trabajo o su movimiento siga pendiente.</p>
+
+        <h2>Despachar un pedido</h2>
+        <ol>
+            <li>Confirmá que la mercadería está cargada en el transporte indicado.</li>
+            <li>En la fila del pedido, apretá <strong>Despachar</strong>.</li>
+            <li>El pedido pasa a <strong>Despachado</strong> y se guarda la fecha de salida.</li>
+        </ol>
+        <p>Si otro compañero despachó el pedido mientras tanto, el sistema avisa y no lo modifica dos veces.</p>
+
+        <h2>Despachar varios pedidos</h2>
+        <p>Seleccioná las filas correspondientes y apretá <strong>Despachar seleccionados</strong>. El sistema informa cuántos pedidos se despacharon. Si alguno dejó de estar Preparado, se omite y se informa.</p>
+
+        <h2>Cuidados</h2>
+        <ul>
+            <li>No despaches un pedido cuyo <a href="movimientos.html">movimiento</a> al muelle todavía esté pendiente.</li>
+            <li>El despacho no vuelve a descontar stock: la mercadería ya se movió al preparar y confirmar. Por eso no repitas la operación si el sistema muestra un error de estado.</li>
+            <li>Si la mercadería volvió al depósito después del despacho, avisá al encargado: no cambies el estado del pedido por tu cuenta.</li>
+        </ul>
+
+        <div id="pager"></div>
+    </main>
+</div>
+<script src="assets/docs.js"></script>
+</body>
+</html>

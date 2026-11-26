@@ -12,6 +12,12 @@
     --dark-color: #2d3748;
     --gray-color: #718096;
     --border-color: #e2e8f0;
+    /* Capas: una sola escala para que ningún componente se tape a otro. */
+    --z-sidebar: 2000;
+    --z-backdrop: 1900;
+    --z-modal: 3000;
+    --z-session: 2500;
+    --z-toast: 4000;
 }
 
 /* ============================================================================
@@ -215,11 +221,45 @@ body {
     border-color: #c3e6cb;
 }
 
-.flash-error {
+.flash-error,
+.flash-danger {
     background: linear-gradient(135deg, #fed7d7 0%, #f8d7da 100%);
     color: #742a2a;
     border-left: 4px solid var(--danger-color);
     border-color: #f5c6cb;
+}
+
+/* Cierre accesible: target táctil cómodo y foco visible. */
+.flash-cerrar {
+    flex: 0 0 auto;
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    opacity: 0.75;
+}
+
+.flash-cerrar:hover,
+.flash-cerrar:focus-visible {
+    opacity: 1;
+    background: rgba(0, 0, 0, 0.08);
+}
+
+.flash-texto { flex: 1 1 auto; }
+
+/* Variante integrada en el contenido (login, configuración, errores). */
+.flash-messages.flash-messages-inline {
+    position: static;
+    max-width: none;
+    margin: 14px 0 0;
+    padding: 0;
 }
 
 .flash-info {
@@ -985,9 +1025,7 @@ body {
     flex-shrink: 0;
 }
 
-body {
-    overflow: hidden;
-}
+/* El scroll lo gestiona el documento (o .main-content), nunca un overflow global. */
 
 .login-box {
     background: white;
@@ -2275,13 +2313,32 @@ body {
     }
 }
 
-/* Ocultar scrollbars de forma global (opcional) */
-.container {
-    overflow-y: auto !important;
-    scrollbar-width: none; /* Firefox */
-    -ms-overflow-style: none; /* IE/Edge */
+/* ============================================================================
+   COMPONENTES COMPARTIDOS DE INTERACCIÓN
+   ============================================================================ */
+
+/* Todas las capas de diálogo usan la misma escala, aunque una plantilla
+   arrastre un z-index inline heredado. */
+.modal-overlay {
+    z-index: var(--z-modal) !important;
 }
 
-.container::-webkit-scrollbar {
-    display: none; /* Chrome/Safari/Opera */
+/* Foco visible también en pantallas que no cargan el <style> de base.html. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+    outline: 3px solid #f6ad55;
+    outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
 }

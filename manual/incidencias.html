@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Resolución de incidencias — Manual de usuario Taurus WMS</title>
+    <link rel="stylesheet" href="assets/docs.css">
+</head>
+<body data-root="" data-page="incidencias.html">
+<div class="layout">
+    <nav id="sidebar"></nav>
+    <main class="content">
+        <p class="migas">Ayuda</p>
+        <h1>Resolución de incidencias</h1>
+        <p class="bajada">Qué revisar antes de pedir ayuda y qué información conviene informar.</p>
+
+        <h2>Antes de empezar</h2>
+        <ol>
+            <li>Leé el mensaje que muestra la pantalla: suele indicar el campo o la condición que falta.</li>
+            <li>Si el aviso se cerró, volvé a la pantalla y repetí la consulta; los avisos de error no se ocultan solos.</li>
+            <li>Refrescá la página una vez. Si la operación ya había terminado, el sistema la muestra en su estado actual.</li>
+            <li>No repitas una confirmación sin revisar antes si ya quedó registrada.</li>
+        </ol>
+
+        <h2>Problemas frecuentes</h2>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Síntoma</th><th>Causa habitual</th><th>Qué hacer</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td>No aparece una opción en el menú.</td>
+                        <td>Tu perfil no tiene habilitada esa pantalla.</td>
+                        <td>Pedila al administrador. No hace falta volver a iniciar sesión.</td>
+                    </tr>
+                    <tr>
+                        <td>No aparece un material al cargar una recepción.</td>
+                        <td>Está inactivo o no está asociado al proveedor elegido.</td>
+                        <td>Confirmá el proveedor de la recepción y avisá al administrador si sigue sin aparecer.</td>
+                    </tr>
+                    <tr>
+                        <td>No puedo cerrar la recepción.</td>
+                        <td>Falta la ubicación de destino o todos los ítems tienen cantidad recibida en cero.</td>
+                        <td>Completá el destino y cargá la cantidad realmente recibida.</td>
+                    </tr>
+                    <tr>
+                        <td>El stock figura como entrando o saliendo.</td>
+                        <td>Hay un movimiento pendiente de confirmar.</td>
+                        <td>Revisá <a href="movimientos.html">Movimientos</a> y confirmalo o anulalo según corresponda.</td>
+                    </tr>
+                    <tr>
+                        <td>No puedo confirmar un movimiento.</td>
+                        <td>Se necesita permiso de supervisor y la contraseña debe volver a escribirse.</td>
+                        <td>Pedí a un supervisor que haga la confirmación con su usuario.</td>
+                    </tr>
+                    <tr>
+                        <td>Un pedido no aparece en Despacho.</td>
+                        <td>Todavía está en Trabajo o tiene un movimiento pendiente.</td>
+                        <td>Revisá el pedido y el movimiento antes de intentar despacharlo.</td>
+                    </tr>
+                    <tr>
+                        <td>La verificación de stock marca faltantes.</td>
+                        <td>Falta recepción de mercadería o hay stock entrando todavía no disponible.</td>
+                        <td>Revisá el informe, esperá la recepción o consultá al encargado antes de modificar el pedido.</td>
+                    </tr>
+                    <tr>
+                        <td>Un dato de otro sistema quedó en error.</td>
+                        <td>Código repetido, dato inexistente o CUIT con formato incorrecto.</td>
+                        <td>Leé el mensaje, corregí el dato en el sistema de gestión y usá <a href="intercambio.html">Reintentar</a>.</td>
+                    </tr>
+                    <tr>
+                        <td>Olvidé mi contraseña o el usuario no ingresa.</td>
+                        <td>El usuario está inactivo o la clave necesita ser restablecida.</td>
+                        <td>Pedí una nueva contraseña al administrador del sistema.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Qué informar cuando pidas ayuda</h2>
+        <ul>
+            <li>El nombre de la pantalla y la operación que intentabas hacer.</li>
+            <li>El número del documento, si es una recepción, movimiento o pedido.</li>
+            <li>El mensaje exacto que apareció en pantalla.</li>
+            <li>La hora aproximada y si ya habías intentado la operación antes.</li>
+        </ul>
+        <p>Con esos datos se puede encontrar el registro y saber si la operación se completó parcialmente.</p>
+
+        <div id="pager"></div>
+    </main>
+</div>
+<script src="assets/docs.js"></script>
+</body>
+</html>

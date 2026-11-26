@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Cómo circula la mercadería — Manual de usuario Taurus WMS</title>
+    <link rel="stylesheet" href="assets/docs.css">
+</head>
+<body data-root="" data-page="flujo.html">
+<div class="layout">
+    <nav id="sidebar"></nav>
+    <main class="content">
+        <p class="migas">Primeros pasos</p>
+        <h1>Cómo circula la mercadería</h1>
+        <p class="bajada">El recorrido completo de la mercadería dentro del depósito y el significado de los estados que aparecen en las pantallas.</p>
+
+        <h2>El circuito en cinco pasos</h2>
+        <ol>
+            <li><strong>Recepción:</strong> se anota lo que llega de un proveedor, en una ubicación de recepción y dentro de un contenedor.</li>
+            <li><strong>Movimiento:</strong> al cerrar la recepción se genera un traslado hacia la ubicación de destino. Al confirmarlo, la mercadería queda disponible para usar.</li>
+            <li><strong>Pedido:</strong> se carga lo que pide un cliente, con ruta, transporte y materiales.</li>
+            <li><strong>Preparación:</strong> se imprime o descarga la lista de picking y se lleva la mercadería al muelle de salida.</li>
+            <li><strong>Despacho:</strong> se marca el pedido como despachado cuando sale del depósito.</li>
+        </ol>
+        <p>Las mismas operaciones se pueden hacer desde la <a href="movil.html">terminal móvil</a> con lector de códigos.</p>
+
+        <h2>Qué significa el stock en cada momento</h2>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Nombre que ves en pantalla</th><th>Qué quiere decir</th></tr></thead>
+                <tbody>
+                    <tr><td>Total</td><td>Lo que está físicamente en esa posición.</td></tr>
+                    <tr><td>Disponible</td><td>Lo que se puede usar, mover o preparar.</td></tr>
+                    <tr><td>Entrando</td><td>Lo que viene hacia esa posición, pendiente de confirmar.</td></tr>
+                    <tr><td>Saliendo</td><td>Lo que está reservado para salir, pendiente de confirmar.</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="aviso">
+            <p>Mientras un traslado está pendiente, la mercadería figura como <em>saliendo</em> del origen y <em>entrando</em> al destino: no está disponible en ninguno de los dos lugares. Recién cuando se confirma el movimiento pasa a estar disponible donde corresponde.</p>
+        </div>
+
+        <h2>Contenedores</h2>
+        <ul>
+            <li>Cada recepción genera su propio contenedor; en las pantallas aparece con un número que empieza con <strong>RC</strong>.</li>
+            <li>Un contenedor se mueve entero: no se traslada una parte del mismo en un movimiento.</li>
+            <li>Un contenedor con un movimiento pendiente no puede usarse en otro hasta confirmar o anular el primero.</li>
+            <li>Si dos recepciones distintas deben quedar juntas, se puede indicar un contenedor de destino al crear el movimiento.</li>
+        </ul>
+
+        <h2>Estados que se repiten</h2>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Estado</th><th>Recepción</th><th>Pedido</th></tr></thead>
+                <tbody>
+                    <tr><td>Abierta / Pendiente</td><td>Se están cargando los ítems.</td><td>Está cargado, sin preparar.</td></tr>
+                    <tr><td>Cerrada / Trabajo</td><td>Ya se cerró; el stock está en camino al destino.</td><td>Se generó la lista de picking.</td></tr>
+                    <tr><td>Confirmada / Preparado</td><td>El stock ya está disponible en el destino.</td><td>Está listo para despachar.</td></tr>
+                    <tr><td>Despachado</td><td>—</td><td>Salió del depósito.</td></tr>
+                    <tr><td>Anulada / Anulado</td><td>Se canceló sin afectar el stock.</td><td>Se canceló.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Tipos de stock</h2>
+        <p>Cada cantidad puede tener un tipo: <strong>Libre Venta</strong> (el habitual), <strong>Calidad</strong>, <strong>Bloqueado</strong> o <strong>Mal Estado</strong>. Los pedidos piden un tipo por cada material; si el tipo elegido no tiene stock suficiente, la consulta de stock lo muestra como faltante.</p>
+
+        <h2>Números de los trabajos</h2>
+        <p>Cada documento recibe un número automático que sirve para buscarlo y citarlo:</p>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Documento</th><th>Ejemplo</th></tr></thead>
+                <tbody>
+                    <tr><td>Recepción</td><td>REC-2026-00042</td></tr>
+                    <tr><td>Movimiento</td><td>OMC-2026-00018</td></tr>
+                    <tr><td>Pedido</td><td>PED-2026-00137</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p>La numeración se reinicia cada año, así que indicá siempre el año cuando informes un número.</p>
+
+        <div id="pager"></div>
+    </main>
+</div>
+<script src="assets/docs.js"></script>
+</body>
+</html>

@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Movimientos (OMC) — Manual de usuario Taurus WMS</title>
+    <link rel="stylesheet" href="assets/docs.css">
+</head>
+<body data-root="" data-page="movimientos.html">
+<div class="layout">
+    <nav id="sidebar"></nav>
+    <main class="content">
+        <p class="migas">Operación diaria</p>
+        <h1>Movimientos (OMC)</h1>
+        <p class="bajada">Orden de movimiento de contenedores: la herramienta para trasladar mercadería de una ubicación a otra.</p>
+
+        <h2>Qué es una OMC</h2>
+        <p>Una OMC mueve uno o más contenedores completos hacia una ubicación de destino. Se genera automáticamente al <a href="recepciones.html">cerrar una recepción</a> o al cargar un <a href="pedidos.html">pedido con contenedores</a>, y también podés crearla manualmente.</p>
+
+        <h2>Estados</h2>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Estado</th><th>Qué significa</th><th>Qué podés hacer</th></tr></thead>
+                <tbody>
+                    <tr><td>Pendiente</td><td>La mercadería está en camino: figura como saliendo del origen y entrando al destino.</td><td>Confirmar, modificar el destino o anular.</td></tr>
+                    <tr><td>Confirmada</td><td>El traslado terminó; la mercadería está disponible en el destino.</td><td>Sólo consultar.</td></tr>
+                    <tr><td>Anulada</td><td>El traslado se canceló; la mercadería volvió a estar disponible en el origen.</td><td>Sólo consultar.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Crear un movimiento manual</h2>
+        <ol>
+            <li>Entrá a <strong>Movimientos</strong> y apretá <strong>Nueva</strong>.</li>
+            <li>Elegí la <strong>ubicación de destino</strong>.</li>
+            <li>Agregá los contenedores con su ubicación de origen. Si querés unir todo en un solo contenedor de destino, indicá también ese contenedor.</li>
+            <li>Revisá el resumen y guardá.</li>
+        </ol>
+        <p>Si un contenedor no cumple las condiciones, el sistema lo informa y lo deja fuera del movimiento. Las causas habituales son:</p>
+        <ul>
+            <li>No tiene stock disponible en la ubicación de origen que elegiste.</li>
+            <li>Tiene stock entrando o saliendo de otra operación.</li>
+            <li>Ya tiene otro movimiento pendiente.</li>
+            <li>El origen y el destino son la misma ubicación y no se indicó un contenedor de destino.</li>
+            <li>El contenedor se cargó dos veces en la misma lista.</li>
+        </ul>
+
+        <h2>Confirmar</h2>
+        <div class="aviso atencion">
+            <p>Confirmar un movimiento necesita permiso de supervisor y volver a escribir la contraseña. La confirmación no se puede deshacer: por eso conviene revisar el destino antes de apretar el botón.</p>
+        </div>
+        <p>Al confirmar:</p>
+        <ul>
+            <li>La mercadería deja de figurar en el origen y pasa a estar disponible en el destino.</li>
+            <li>Si el movimiento viene de una recepción, esa recepción queda <strong>Confirmada</strong>.</li>
+            <li>Si viene de un pedido, se suma lo confirmado a la cantidad preparada. Cuando todas las OMC del pedido están confirmadas, el pedido pasa a <strong>Preparado</strong>.</li>
+        </ul>
+
+        <h2>Modificar el destino</h2>
+        <p>Mientras la OMC está Pendiente podés cambiar la ubicación de destino y las observaciones. Los contenedores y sus ubicaciones de origen no se pueden cambiar: para eso hay que anular y crear un movimiento nuevo.</p>
+
+        <h2>Anular</h2>
+        <p>Anular deja sin efecto el traslado: la mercadería vuelve a estar disponible en el origen y deja de figurar en el destino. Tené en cuenta que:</p>
+        <ul>
+            <li>Si la OMC viene de un pedido, el pedido pasa a <strong>Anulado</strong>, salvo que ya haya sido despachado.</li>
+            <li>Si viene de una recepción, la recepción sigue <strong>Cerrada</strong> y la mercadería queda disponible en la ubicación de recepción.</li>
+        </ul>
+
+        <div id="pager"></div>
+    </main>
+</div>
+<script src="assets/docs.js"></script>
+</body>
+</html>

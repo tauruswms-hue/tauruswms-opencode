@@ -59,13 +59,12 @@
     </script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome/css/all.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/sidebar.css') }}">
     {% if session.user_id and session.login_timestamp %}
     <meta name="session-expires" content="{{ (session.login_timestamp + 28800)|int }}">
     {% endif %}
     <style>
         :root {
-            --sidebar-width: 260px;
-            --sidebar-collapsed-width: 60px;
             --navbar-height: 56px;
         }
 
@@ -77,141 +76,11 @@
             overflow-y: auto;
         }
 
-        /* Sidebar */
-        .sidebar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: var(--sidebar-width);
-            height: 100vh;
-            background: linear-gradient(180deg, #1a365d 0%, #2c5282 100%);
-            color: white;
-            overflow-y: auto;
-            overflow-x: hidden;
-            transition: width 0.3s ease;
-            z-index: 1000;
-            box-shadow: 2px 0 10px rgba(0,0,0,0.2);
-        }
-
-        .sidebar::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        .sidebar::-webkit-scrollbar-track {
-            background: rgba(255,255,255,0.1);
-        }
-
-        .sidebar::-webkit-scrollbar-thumb {
-            background: rgba(255,255,255,0.3);
-            border-radius: 3px;
-        }
-
-        .sidebar-header {
-            padding: 15px 20px;
-            background: rgba(0,0,0,0.2);
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .sidebar-header img {
-            height: 32px;
-            width: auto;
-        }
-
-        .sidebar-header span {
-            font-size: 1.1rem;
-            font-weight: 600;
-            white-space: nowrap;
-        }
-
-        .sidebar-nav {
-            padding: 10px 0;
-        }
-
-        .sidebar-section {
-            margin-bottom: 5px;
-        }
-
-        .sidebar-title {
-            padding: 8px 20px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            color: rgba(255,255,255,0.5);
-            letter-spacing: 1px;
-        }
-
-        .sidebar-item {
-            position: relative;
-        }
-
-        .sidebar-link {
-            display: flex;
-            align-items: center;
-            padding: 10px 20px;
-            color: rgba(255,255,255,0.85);
-            text-decoration: none;
-            transition: all 0.2s ease;
-            cursor: pointer;
-            gap: 12px;
-        }
-
-        .sidebar-link:hover {
-            background: rgba(255,255,255,0.1);
-            color: white;
-        }
-
-        .sidebar-link.active {
-            background: rgba(255,255,255,0.15);
-            color: white;
-            border-left: 3px solid #63b3ed;
-        }
-
-        .sidebar-link i {
-            width: 20px;
-            text-align: center;
-            font-size: 1rem;
-        }
-
-        .sidebar-link .link-text {
-            flex: 1;
-            white-space: nowrap;
-        }
-
-        .sidebar-link .submenu-icon {
-            font-size: 0.7rem;
-            transition: transform 0.2s ease;
-        }
-
-        .sidebar-link.expanded .submenu-icon {
-            transform: rotate(180deg);
-        }
-
-        .sidebar-submenu {
-            display: none;
-            background: rgba(0,0,0,0.15);
-        }
-
-        .sidebar-submenu.show {
-            display: block;
-        }
-
-        .sidebar-submenu .sidebar-link {
-            padding-left: 52px;
-            font-size: 0.9rem;
-        }
-
-        .sidebar-submenu .sidebar-link:hover {
-            padding-left: 55px;
-        }
-
         /* Navbar superior */
         .navbar {
             position: fixed;
             top: 0;
-            left: var(--sidebar-width);
+            left: var(--nav-offset);
             right: 0;
             height: var(--navbar-height);
             background: white;
@@ -226,7 +95,16 @@
 
         .navbar-menu {
             display: flex;
+            align-items: center;
             gap: 5px;
+        }
+
+        .navbar-brand-movil {
+            display: none;
+            color: #2d3748;
+            font-size: 0.9rem;
+            font-weight: 600;
+            white-space: nowrap;
         }
 
         .navbar-link {
@@ -294,12 +172,11 @@
 
         /* Main content */
         .main-content {
-            margin-left: var(--sidebar-width);
+            margin-left: var(--nav-offset);
             margin-top: var(--navbar-height);
             padding: 20px;
-            height: calc(100vh - var(--navbar-height));
+            min-height: calc(100dvh - var(--navbar-height));
             background: #f7fafc;
-            overflow-y: auto;
             box-sizing: border-box;
         }
 
@@ -314,8 +191,8 @@
             position: fixed;
             bottom: 24px;
             right: 24px;
-            z-index: 2000;
-            max-width: 360px;
+            z-index: var(--z-toast, 4000);
+            max-width: min(360px, calc(100vw - 32px));
             display: flex;
             flex-direction: column;
             gap: 8px;
@@ -325,47 +202,9 @@
         #session-warning {
             bottom: 20px;
             right: 20px;
+            z-index: var(--z-session, 3200);
         }
 
-        /* Responsive */
-        @media (max-width: 1024px) {
-            .sidebar {
-                width: var(--sidebar-collapsed-width);
-            }
-            .sidebar-header span,
-            .sidebar-link .link-text,
-            .sidebar-submenu {
-                display: none;
-            }
-            .navbar {
-                left: var(--sidebar-collapsed-width);
-            }
-            .main-content {
-                margin-left: var(--sidebar-collapsed-width);
-            }
-            .navbar-link span {
-                display: none;
-            }
-        }
-
-        /* Sidebar toggle */
-        .sidebar-toggle {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-        .sidebar-toggle .toggle-icon {
-            font-size: 0.75rem;
-            transition: transform 0.2s;
-            margin-left: auto;
-        }
-        .sidebar-submenu {
-            padding-left: 15px;
-        }
-        .sidebar-submenu .sidebar-link {
-            padding: 8px 15px;
-            font-size: 0.9rem;
-        }
         .skip-link {
             position: absolute;
             left: -9999px;
@@ -392,213 +231,15 @@
         @media (max-width: 768px) {
             .navbar-menu { gap: 6px; }
             .navbar-link .link-text { display: none; }
-            .sidebar { width: var(--sidebar-width); }
-            .main-content { margin-left: 0; }
+            .navbar-brand-movil { display: inline; }
         }
     </style>
 </head>
 <body>
     <a class="skip-link" href="#contenido-principal">Saltar al contenido</a>
     {% if session.user_id %}
-    <!-- Sidebar -->
-    <nav class="sidebar">
-        <div class="sidebar-header">
-            <img src="{{ url_for('static', filename='logo/Taurussuite.jpg') }}" alt="Taurus">
-            <span>Taurus WMS</span>
-        </div>
-
-        <div class="sidebar-nav">
-            <!-- Inicio -->
-            <div class="sidebar-section">
-                <a href="{{ url_for('index') }}" class="sidebar-link">
-                    <i class="fas fa-home"></i>
-                    <span class="link-text">Inicio</span>
-                </a>
-            </div>
-
-            <!-- Acceso Rápido -->
-            <div class="sidebar-section">
-                <div class="sidebar-item">
-                    <a href="#" class="sidebar-link sidebar-toggle" data-section="rapido">
-                        <i class="fas fa-bolt"></i>
-                        <span class="link-text">Acceso Rápido</span>
-                        <i class="fas fa-chevron-down toggle-icon" data-section="rapido"></i>
-                    </a>
-                    <div class="sidebar-submenu" id="section-rapido" style="display: none;">
-                        <a href="{{ url_for('pedidos.listar') }}" class="sidebar-link">
-                            <i class="fas fa-shopping-cart"></i>
-                            <span class="link-text">Pedidos</span>
-                        </a>
-                        <a href="{{ url_for('recepciones.listar') }}" class="sidebar-link">
-                            <i class="fas fa-sign-in-alt"></i>
-                            <span class="link-text">Recepciones</span>
-                        </a>
-                        <a href="{{ url_for('stockcontable.listar') }}" class="sidebar-link">
-                            <i class="fas fa-clipboard-check"></i>
-                            <span class="link-text">Stock</span>
-                        </a>
-                        <a href="{{ url_for('movil.hub') }}" class="sidebar-link">
-                            <i class="fas fa-mobile-alt"></i>
-                            <span class="link-text">Móvil</span>
-                        </a>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Maestros -->
-            <div class="sidebar-section">
-                <div class="sidebar-item">
-                    <a href="#" class="sidebar-link sidebar-toggle" data-section="maestros">
-                        <i class="fas fa-database"></i>
-                        <span class="link-text">Maestros</span>
-                        <i class="fas fa-chevron-down toggle-icon" data-section="maestros"></i>
-                    </a>
-                    <div class="sidebar-submenu" id="section-maestros" style="display: none;">
-                        <a href="{{ url_for('materiales.listar') }}" class="sidebar-link">
-                            <i class="fas fa-boxes"></i>
-                            <span class="link-text">Materiales</span>
-                        </a>
-                        <a href="{{ url_for('categorias.listar') }}" class="sidebar-link">
-                            <i class="fas fa-tags"></i>
-                            <span class="link-text">Categorías</span>
-                        </a>
-                        <a href="{{ url_for('unidades.unidades') }}" class="sidebar-link">
-                            <i class="fas fa-ruler-combined"></i>
-                            <span class="link-text">Unidades de Medida</span>
-                        </a>
-                        <a href="{{ url_for('proveedores.listar') }}" class="sidebar-link">
-                            <i class="fas fa-truck"></i>
-                            <span class="link-text">Proveedores</span>
-                        </a>
-                        <a href="{{ url_for('clientes.listar') }}" class="sidebar-link">
-                            <i class="fas fa-users"></i>
-                            <span class="link-text">Clientes</span>
-                        </a>
-                        <a href="{{ url_for('transportes.listar') }}" class="sidebar-link">
-                            <i class="fas fa-shipping-fast"></i>
-                            <span class="link-text">Transportes</span>
-                        </a>
-                        <a href="{{ url_for('rutas.listar') }}" class="sidebar-link">
-                            <i class="fas fa-route"></i>
-                            <span class="link-text">Rutas</span>
-                        </a>
-                        <a href="{{ url_for('clases_pedido.listar') }}" class="sidebar-link">
-                            <i class="fas fa-layer-group"></i>
-                            <span class="link-text">Clases de Pedido</span>
-                        </a>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Almacén -->
-            <div class="sidebar-section">
-                <div class="sidebar-item">
-                    <a href="#" class="sidebar-link sidebar-toggle" data-section="almacen">
-                        <i class="fas fa-warehouse"></i>
-                        <span class="link-text">Almacén</span>
-                        <i class="fas fa-chevron-down toggle-icon" data-section="almacen"></i>
-                    </a>
-                    <div class="sidebar-submenu" id="section-almacen" style="display: none;">
-                        <a href="{{ url_for('ubicaciones.listar') }}" class="sidebar-link">
-                            <i class="fas fa-warehouse"></i>
-                            <span class="link-text">Ubicaciones</span>
-                        </a>
-                        <a href="{{ url_for('zonas.listar') }}" class="sidebar-link">
-                            <i class="fas fa-map-marked-alt"></i>
-                            <span class="link-text">Zonas</span>
-                        </a>
-                        <a href="{{ url_for('tipoubicacion.listar') }}" class="sidebar-link">
-                            <i class="fas fa-project-diagram"></i>
-                            <span class="link-text">Tipos de Ubicación</span>
-                        </a>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Operaciones -->
-            <div class="sidebar-section">
-                <div class="sidebar-item">
-                    <a href="#" class="sidebar-link sidebar-toggle" data-section="operaciones">
-                        <i class="fas fa-cogs"></i>
-                        <span class="link-text">Operaciones</span>
-                        <i class="fas fa-chevron-down toggle-icon" data-section="operaciones"></i>
-                    </a>
-                    <div class="sidebar-submenu" id="section-operaciones" style="display: none;">
-                        <a href="{{ url_for('recepciones.listar') }}" class="sidebar-link">
-                            <i class="fas fa-sign-in-alt"></i>
-                            <span class="link-text">Recepciones</span>
-                        </a>
-                        <a href="{{ url_for('pedidos.listar') }}" class="sidebar-link">
-                            <i class="fas fa-shopping-cart"></i>
-                            <span class="link-text">Pedidos</span>
-                        </a>
-                        <a href="{{ url_for('despacho.listar') }}" class="sidebar-link">
-                            <i class="fas fa-truck-loading"></i>
-                            <span class="link-text">Despacho</span>
-                        </a>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Consultas -->
-            <div class="sidebar-section">
-                <div class="sidebar-item">
-                    <a href="#" class="sidebar-link sidebar-toggle" data-section="consultas">
-                        <i class="fas fa-search"></i>
-                        <span class="link-text">Consultas</span>
-                        <i class="fas fa-chevron-down toggle-icon" data-section="consultas"></i>
-                    </a>
-                    <div class="sidebar-submenu" id="section-consultas" style="display: none;">
-                        <a href="{{ url_for('stockcontable.listar') }}" class="sidebar-link">
-                            <i class="fas fa-clipboard-check"></i>
-                            <span class="link-text">Stock</span>
-                        </a>
-                        <a href="{{ url_for('inventario.listar') }}" class="sidebar-link">
-                            <i class="fas fa-clipboard-list"></i>
-                            <span class="link-text">Inventario</span>
-                        </a>
-                        <a href="{{ url_for('omc.listar') }}" class="sidebar-link">
-                            <i class="fas fa-exchange-alt"></i>
-                            <span class="link-text">Movimientos (OMC)</span>
-                        </a>
-                        {% if tiene_permiso_ruta('/reportes') %}
-                        <a href="{{ url_for('reportes.listar') }}" class="sidebar-link">
-                            <i class="fas fa-chart-bar"></i>
-                            <span class="link-text">Reportes</span>
-                        </a>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-
-            <!-- Sistema -->
-            <div class="sidebar-section">
-                <div class="sidebar-item">
-                    <a href="#" class="sidebar-link sidebar-toggle" data-section="sistema">
-                        <i class="fas fa-cog"></i>
-                        <span class="link-text">Sistema</span>
-                        <i class="fas fa-chevron-down toggle-icon" data-section="sistema"></i>
-                    </a>
-                    <div class="sidebar-submenu" id="section-sistema" style="display: none;">
-                        {% if tiene_permiso_ruta('/intercambio') %}
-                        <a href="{{ url_for('intercambio.listar') }}" class="sidebar-link">
-                            <i class="fas fa-exchange-alt"></i>
-                            <span class="link-text">Intercambio</span>
-                        </a>
-                        {% endif %}
-                        <a href="{{ url_for('parametros.parametros') }}" class="sidebar-link">
-                            <i class="fas fa-sliders-h"></i>
-                            <span class="link-text">Parámetros</span>
-                        </a>
-                        <a href="{{ url_for('estado') }}" class="sidebar-link">
-                            <i class="fas fa-info-circle"></i>
-                            <span class="link-text">Info del Sistema</span>
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </nav>
+    {% include 'partials/sidebar.html' %}
+    <div class="sidebar-backdrop" id="sidebar-backdrop" hidden></div>
     {% endif %}
 
     <!-- Navbar -->
@@ -614,6 +255,11 @@
 
         {% if session.user_id %}
         <div class="navbar-menu">
+            <button type="button" id="btn-menu-movil" class="btn-menu-movil"
+                    aria-label="Abrir menú" aria-controls="sidebar-principal" aria-expanded="false">
+                <i class="fas fa-bars" aria-hidden="true"></i>
+            </button>
+            <span class="navbar-brand-movil">Taurus WMS</span>
         </div>
         <div class="navbar-user">
             <div class="user-info">
@@ -631,38 +277,15 @@
         {% block content %}{% endblock %}
     </main>
 
-    <!-- Mensajes flash -->
+    <!-- Mensajes flash: errors persistentes, hasta cierre explícito (ver _flashes.html) -->
     {% block flash_messages %}
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-        <div class="flash-messages">
-            {% for category, message in messages %}
-            <div class="flash flash-{{ category }}">
-                <span style="flex:1;">{{ message }}</span>
-                <button onclick="this.closest('.flash').remove()" style="background:none; border:none; cursor:pointer; font-size:1rem; line-height:1; opacity:0.6; padding:0 0 0 8px; color:inherit;" title="Cerrar">&times;</button>
-            </div>
-            {% endfor %}
-        </div>
-        <script>
-        (function() {
-            var flashes = document.querySelectorAll('.flash-messages .flash');
-            flashes.forEach(function(el) {
-                setTimeout(function() {
-                    el.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
-                    el.style.opacity = '0';
-                    el.style.transform = 'translateX(30px)';
-                    setTimeout(function() { el.remove(); }, 420);
-                }, 4000);
-            });
-        })();
-        </script>
-        {% endif %}
-    {% endwith %}
+        {% from 'partials/_flashes.html' import flashes with context %}
+        {{ flashes(get_flashed_messages(with_categories=true)) }}
     {% endblock %}
 
     <!-- Aviso de expiración de sesión -->
     {% if session.user_id %}
-    <div id="session-warning" style="display:none; position:fixed; bottom:20px; right:20px; background:#1a365d; color:white; padding:14px 20px; border-radius:10px; box-shadow:0 4px 20px rgba(0,0,0,0.3); z-index:9999; font-size:0.9rem; max-width:300px;">
+    <div id="session-warning" role="status" aria-live="polite" style="display:none; position:fixed; bottom:20px; right:20px; background:#1a365d; color:white; padding:14px 20px; border-radius:10px; box-shadow:0 4px 20px rgba(0,0,0,0.3); font-size:0.9rem; max-width:300px;">
         <i class="fas fa-clock" style="color:#f6ad55; margin-right:8px;"></i>
         <strong>Sesión por expirar</strong><br>
         <span id="session-countdown"></span> minutos restantes.
@@ -672,62 +295,9 @@
 
     <script src="{{ url_for('static', filename='js/data_tables.js') }}"></script>
     <script src="{{ url_for('static', filename='js/cuit.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/ui.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/sidebar.js') }}"></script>
     <script>
-    var collapsed = {{ session.get('sidebar_collapsed', '{}')|tojson }};
-
-    $(document).ready(function() {
-        // Restaurar estado de las secciones desde la sesion
-        // true = expandido, false o no existe = colapsado
-        Object.keys(collapsed).forEach(function(section) {
-            var $submenu = $('#section-' + section);
-            var $toggle = $('.sidebar-toggle[data-section="' + section + '"]');
-            if ($submenu.length && $toggle.length) {
-                if (collapsed[section] === true) {
-                    // true = expandido (visible)
-                    $submenu.show();
-                    $toggle.find('.toggle-icon').removeClass('fa-chevron-right').addClass('fa-chevron-down');
-                } else {
-                    // false o no existe = colapsado (oculto)
-                    $submenu.hide();
-                    $toggle.find('.toggle-icon').removeClass('fa-chevron-down').addClass('fa-chevron-right');
-                }
-            }
-        });
-
-        // Toggle sections
-        $('.sidebar-toggle').on('click', function(e) {
-            e.preventDefault();
-            var section = $(this).data('section');
-            var $submenu = $('#section-' + section);
-            var $icon = $(this).find('.toggle-icon');
-
-            if ($submenu.is(':visible')) {
-                $submenu.hide();
-                $icon.removeClass('fa-chevron-down').addClass('fa-chevron-right');
-                collapsed[section] = false;  // false = colapsado
-            } else {
-                $submenu.show();
-                $icon.removeClass('fa-chevron-right').addClass('fa-chevron-down');
-                collapsed[section] = true;  // true = expandido
-            }
-
-            // Guardar preferencias (solo la seccion que cambio)
-            fetch('/sidebar-preferences', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ section: section, value: collapsed[section] })
-            });
-        });
-
-        // Highlight active link (sin sobreescribir estado de sesion)
-        var path = window.location.pathname;
-        $('.sidebar-link, .navbar-link').each(function() {
-            if ($(this).attr('href') === path) {
-                $(this).addClass('active');
-            }
-        });
-    });
-
     // Aviso de expiración de sesión
     (function() {
         var meta = document.querySelector('meta[name="session-expires"]');

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Terminal móvil — Manual de usuario Taurus WMS</title>
+    <link rel="stylesheet" href="assets/docs.css">
+</head>
+<body data-root="" data-page="movil.html">
+<div class="layout">
+    <nav id="sidebar"></nav>
+    <main class="content">
+        <p class="migas">Operación diaria</p>
+        <h1>Terminal móvil</h1>
+        <p class="bajada">Pantallas adaptadas a un dispositivo de mano con lector de códigos para trabajar dentro del depósito.</p>
+
+        <h2>Inicio</h2>
+        <p>La pantalla de inicio muestra cuántas recepciones están Abiertas y cuántos movimientos están Pendientes. Desde ahí se accede a las tres operaciones disponibles: recepción, picking y consulta de inventario.</p>
+
+        <h2>Recibir mercadería</h2>
+        <ol>
+            <li>Apretá <strong>Recepción</strong>. Se muestran las últimas recepciones y la opción de crear una nueva.</li>
+            <li>Indicá proveedor y ubicación de recepción.</li>
+            <li>Escaneá cada material, o buscalo por código o por parte del nombre. Con lector, el código debe coincidir exactamente.</li>
+            <li>Cargá la cantidad recibida, el lote, el vencimiento y el tipo de stock.</li>
+            <li>Al cerrar, indicá la ubicación de destino. Se genera el movimiento hacia ese lugar, igual que en la versión de escritorio.</li>
+        </ol>
+        <p>Para más detalle sobre las reglas de carga, mirá <a href="recepciones.html">Recepciones</a>.</p>
+
+        <h2>Confirmar movimientos</h2>
+        <ol>
+            <li>Apretá <strong>Picking</strong>. Se listan los movimientos Pendientes recientes, con su destino y sus contenedores.</li>
+            <li>Abrí el movimiento y revisá contenedor, ubicación de origen y stock a trasladar.</li>
+            <li>Apretá <strong>Confirmar</strong>. Se pide permiso de supervisor y volver a escribir la contraseña.</li>
+        </ol>
+        <p>La confirmación tiene el mismo efecto que en el escritorio: el stock queda disponible en el destino y, si corresponde, la recepción o el pedido cambian de estado.</p>
+
+        <h2>Consultar stock</h2>
+        <p>Apretá <strong>Inventario</strong> para buscar un material por código de barras, por código exacto o por parte del nombre. La pantalla muestra cada posición con stock:</p>
+        <ul>
+            <li>Ubicación y contenedor.</li>
+            <li>Lote, tipo de stock y vencimiento.</li>
+            <li>Cantidades total, disponible, entrando y saliendo.</li>
+        </ul>
+        <p>Si hay varias coincidencias, se muestra primero la que coincide por código. Esta consulta no modifica nada.</p>
+
+        <h2>Recomendaciones con el lector</h2>
+        <ul>
+            <li>Mantené la distancia y el ángulo que indica el fabricante del lector; un código mal leído no carga el material.</li>
+            <li>Después de escanear, mirá el nombre del material en pantalla antes de confirmar la cantidad.</li>
+            <li>Si perdés cobertura, esperá a que la pantalla confirme el guardado antes de repetir el escaneo.</li>
+        </ul>
+
+        <div id="pager"></div>
+    </main>
+</div>
+<script src="assets/docs.js"></script>
+</body>
+</html>

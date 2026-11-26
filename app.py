@@ -9,11 +9,13 @@ from pathlib import Path
 from dotenv import load_dotenv
 from flask import (
     Flask,
+    abort,
     flash,
     jsonify,
     redirect,
     render_template,
     request,
+    send_from_directory,
     session,
     url_for,
 )
@@ -58,6 +60,14 @@ from modules.intercambio import intercambio_bp
 from modules.inventario import inventario_bp
 from modules.materiales import materiales_bp
 from modules.movil import movil_bp
+from modules.navegacion import (
+    MAX_FAVORITOS,
+    MODOS,
+    RUTAS_VALIDAS,
+    SECCIONES_CLAVES,
+    construir_navegacion,
+    normalizar_preferencias,
+)
 from modules.omc import omc_bp
 from modules.parametros import parametros_bp
 from modules.pedidos import pedidos_bp
@@ -274,6 +284,26 @@ def tiene_permiso_ruta(path_objetivo):
 
 
 app.jinja_env.globals['tiene_permiso_ruta'] = tiene_permiso_ruta
+
+
+@app.context_processor
+def inyectar_navegacion():
+    """Entrega a las plantillas el menú ya filtrado para el rol actual."""
+
+    if 'user_id' not in session:
+        return {'nav': construir_navegacion(lambda _ruta: False, request.path, {})}
+
+    def puede_mostrarse(ruta):
+        # Las rutas fuera de ROUTE_CATALOG sólo exigen login (caso de '/' y '/estado').
+        return not _ruta_en_catalogo(ruta) or tiene_permiso_ruta(ruta)
+
+    return {
+        'nav': construir_navegacion(
+            puede_mostrarse,
+            request.path,
+            session.get('sidebar_collapsed', {}),
+        )
+    }
 
 
 def verificar_permiso_decorator(f):
@@ -605,36 +635,53 @@ def api_xlsx_sheetnames():
 
 @app.route('/sidebar-preferences', methods=['POST'])
 def guardar_sidebar_preferences():
-    """Guarda las preferencias de sidebar del usuario"""
+    """Guarda secciones, ancho del menú y favoritos del usuario."""
     if 'user_id' not in session:
         return jsonify({'error': 'No autenticado'}), 401
-    
+
     try:
-        data = request.get_json()
-        section = data.get('section')
-        value = data.get('value')
-        
-        collapsed = session.get('sidebar_collapsed', {})
-        if isinstance(collapsed, str):
-            collapsed = json.loads(collapsed)
-        
-        if section is not None:
-            collapsed[section] = value
-        
+        datos = request.get_json(silent=True) or {}
+        preferencias = normalizar_preferencias(session.get('sidebar_collapsed', {}))
+
+        seccion = datos.get('section')
+        if seccion in SECCIONES_CLAVES and seccion != 'favoritos':
+            preferencias[seccion] = bool(datos.get('value'))
+
+        if datos.get('modo') in MODOS:
+            preferencias['_modo'] = datos['modo']
+
+        ruta = datos.get('favorito')
+        if ruta in RUTAS_VALIDAS and (
+            not _ruta_en_catalogo(ruta) or tiene_permiso_ruta(ruta)
+        ):
+            favoritos = preferencias['_favoritos']
+            if datos.get('value') and ruta not in favoritos:
+                favoritos.append(ruta)
+            elif not datos.get('value') and ruta in favoritos:
+                favoritos.remove(ruta)
+            preferencias['_favoritos'] = favoritos[:MAX_FAVORITOS]
+
+        preferencias = normalizar_preferencias(preferencias)
+
         conn = _get_admin_connection()
         try:
             with conn.cursor() as cursor:
                 cursor.execute(
                     "UPDATE usuarios SET sidebar_preferences = %s WHERE id = %s",
-                    (json.dumps(collapsed), session['user_id'])
+                    (json.dumps(preferencias), session['user_id'])
                 )
             conn.commit()
-            session['sidebar_collapsed'] = collapsed
+            session['sidebar_collapsed'] = preferencias
         finally:
             conn.close()
-        
-        return jsonify({'success': True, 'collapsed': collapsed})
+
+        return jsonify({
+            'success': True,
+            'preferencias': preferencias,
+            'collapsed': preferencias,  # compatibilidad con clientes anteriores
+        })
     except Exception as e:
+        logger.error("Error al guardar preferencias del sidebar: %s", e)
         return jsonify({'error': str(e)}), 500
 
 
@@ -656,6 +703,29 @@ def estado():
     }
 
     return render_template('estado.html', info=info)
+
+
+# ============================================================================
+# MANUAL DE USUARIO (guía operativa en manual/, servida por la app)
+# ============================================================================
+MANUAL_DIR = Path(__file__).resolve().parent / 'manual'
+MANUAL_EXTENSIONES = frozenset({'.html', '.css', '.js', '.jpg', '.png', '.gif', '.svg', '.ico', '.webp'})
+
+
+@app.route('/manual')
+@verificar_permiso_decorator
+def manual():
+    """Punto de entrada del manual online, enlazado desde el menú lateral."""
+    return redirect(url_for('manual_archivo', archivo='index.html'))
+
+
+@app.route('/manual/<path:archivo>')
+@verificar_permiso_decorator
+def manual_archivo(archivo):
+    """Sirve sólo los archivos que forman parte del manual (nunca scripts ni .docx)."""
+    if Path(archivo).suffix.lower() not in MANUAL_EXTENSIONES:
+        abort(404)
+    return send_from_directory(MANUAL_DIR, archivo)
 
 
 # ============================================================================

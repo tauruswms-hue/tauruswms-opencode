@@ -17,10 +17,12 @@ jobs:
       - run: pip install ruff
       - run: ruff check .
       - name: Schemas generados al día
-        # Si falla: correr `python modules/schema_generator.py --all` y commitear el resultado.
+        # Si falla: correr `python modules/schema_generator.py --all` y regenerar
+        # también los combined de schemas/ (ver AGENTS.md) antes de commitear.
         run: |
           python modules/schema_generator.py --all
-          git diff --exit-code -- schema_*.sql docs/migrations/create_*.sql
+          python -c "from modules.schema_generator import generate_schema; [generate_schema(e, f'schemas/schema_{e}_admin_wms.sql') for e in ('mysql','postgresql','sqlite','sqlserver')]"
+          git diff --exit-code -- schema_*.sql docs/migrations/create_*.sql schemas/schema_*_admin_wms.sql
 
   test:
     name: Tests (pytest)

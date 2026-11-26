@@ -274,15 +274,15 @@
             <table id="tablaDetalle" style="width:100%; border-collapse:collapse; font-size:0.9rem;">
                 <thead>
                     <tr style="background:#f8f9fa; border-bottom:2px solid #dee2e6;">
-                        <th style="padding:10px; text-align:left;">Material</th>
-                        <th style="padding:10px; text-align:left;">Lote</th>
-                        <th style="padding:10px; text-align:left;">Tipo Stock</th>
-                        <th style="padding:10px; text-align:right;">Esperada</th>
-                        <th style="padding:10px; text-align:right;">Recibida</th>
-                        <th style="padding:10px; text-align:center;">Vencimiento</th>
-                        <th style="padding:10px; text-align:left;">Observ.</th>
+                        <th scope="col" style="padding:10px; text-align:left;">Material</th>
+                        <th scope="col" style="padding:10px; text-align:left;">Lote</th>
+                        <th scope="col" style="padding:10px; text-align:left;">Tipo Stock</th>
+                        <th scope="col" style="padding:10px; text-align:right;">Esperada</th>
+                        <th scope="col" style="padding:10px; text-align:right;">Recibida</th>
+                        <th scope="col" style="padding:10px; text-align:center;">Vencimiento</th>
+                        <th scope="col" style="padding:10px; text-align:left;">Observ.</th>
                         {% if recepcion.estado == 'Abierta' %}
-                        <th style="padding:10px; text-align:center;">Acciones</th>
+                        <th scope="col" style="padding:10px; text-align:center;">Acciones</th>
                         {% endif %}
                     </tr>
                 </thead>

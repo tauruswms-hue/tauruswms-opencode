@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Datos de base — Manual de usuario Taurus WMS</title>
+    <link rel="stylesheet" href="assets/docs.css">
+</head>
+<body data-root="" data-page="maestros.html">
+<div class="layout">
+    <nav id="sidebar"></nav>
+    <main class="content">
+        <p class="migas">Primeros pasos</p>
+        <h1>Datos de base</h1>
+        <p class="bajada">Los datos que se cargan una vez y después se usan en todas las operaciones: materiales, proveedores, clientes, ubicaciones, rutas y transportes.</p>
+
+        <h2>Qué se administra acá</h2>
+        <ul>
+            <li><strong>Materiales:</strong> lo que se recibe, almacena y despacha. Pueden tener código de barras, lote, vencimiento y presentaciones.</li>
+            <li><strong>Proveedores:</strong> quién entrega la mercadería. Algunos materiales quedan asociados a un proveedor.</li>
+            <li><strong>Clientes:</strong> quién pide los pedidos. Suele tener una ruta y un transporte habituales.</li>
+            <li><strong>Ubicaciones, zonas y tipos de ubicación:</strong> dónde está la mercadería. Hay ubicaciones para recibir, para almacenar y muelles de salida.</li>
+            <li><strong>Rutas y transportes:</strong> cómo se entregan los pedidos. Un transporte puede tener uno o más muelles asignados.</li>
+            <li><strong>Clases de pedido, categorías y unidades:</strong> clasificaciones que se usan al cargar materiales y pedidos.</li>
+        </ul>
+
+        <h2>Cargar un dato nuevo</h2>
+        <ol>
+            <li>Entrá a la pantalla correspondiente desde el menú lateral.</li>
+            <li>Apretá <strong>Nuevo</strong> y completá los campos marcados como obligatorios.</li>
+            <li>Revisá el código: es la forma en que el dato aparecerá en las otras pantallas y en las plantillas.</li>
+            <li>Apretá <strong>Guardar</strong>. Si hay un error, el sistema indica qué campo revisar.</li>
+        </ol>
+
+        <h2>Buscar, editar y dar de baja</h2>
+        <ul>
+            <li>Usá el filtro o la búsqueda de la grilla para encontrar el registro. Podés ordenar las columnas apretando sobre el encabezado.</li>
+            <li><strong>Editar</strong> permite corregir los datos. Si el registro ya se usó en operaciones, cambiá con cuidado los códigos: podrías perder la relación con trabajos anteriores.</li>
+            <li><strong>Dar de baja</strong> no borra la historia: el dato deja de ofrecerse en los formularios nuevos, pero sigue visible en las operaciones ya hechas.</li>
+        </ul>
+        <div class="aviso atencion">
+            <p>No des de baja un material mientras tenga stock, ni una ubicación que todavía contenga mercadería. Primero vaciala o mové el stock con un <a href="movimientos.html">movimiento</a>.</p>
+        </div>
+
+        <h2>Importar desde una plantilla</h2>
+        <p>Cuando hay muchos datos para cargar, las pantallas ofrecen descargar una plantilla en Excel o CSV.</p>
+        <ol>
+            <li>Apretá <strong>Descargar plantilla</strong> y completá las filas siguiendo las columnas de ejemplo.</li>
+            <li>Apretá <strong>Importar</strong> y elegí el archivo.</li>
+            <li>Leé el resultado: informa cuántas filas se crearon y detalla los errores por fila.</li>
+            <li>Coregí sólo las filas con error y volvé a importarlas. No hace falta repetir las que ya se crearon.</li>
+        </ol>
+        <p>Si el formulario pide un CUIT, escribilo con el formato <strong>99-99999999-9</strong> o los 11 números sin guiones; el sistema lo deja con guiones. Un CUIT con otro formato impide guardar el registro.</p>
+
+        <h2>Exportar</h2>
+        <p>El botón <strong>Exportar</strong> descarga el listado filtrado. Es útil para revisar los datos con el área administrativa o para preparar una importación posterior.</p>
+
+        <h2>Si falta una opción</h2>
+        <p>Algunas altas —por ejemplo crear una zona, definir un muelle o habilitar un tipo de ubicación para recibir— las hace el administrador del sistema. Si el formulario no te ofrece el dato que necesitás, consultalo antes de cargar la operación.</p>
+
+        <div id="pager"></div>
+    </main>
+</div>
+<script src="assets/docs.js"></script>
+</body>
+</html>

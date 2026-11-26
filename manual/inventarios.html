@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Inventarios — Manual de usuario Taurus WMS</title>
+    <link rel="stylesheet" href="assets/docs.css">
+</head>
+<body data-root="" data-page="inventarios.html">
+<div class="layout">
+    <nav id="sidebar"></nav>
+    <main class="content">
+        <p class="migas">Control y consultas</p>
+        <h1>Inventarios</h1>
+        <p class="bajada">Contar físicamente el stock y registrar las diferencias encontradas.</p>
+
+        <h2>Cuándo se usa</h2>
+        <p>Cuando se quiere comparar lo que dice el sistema con lo que realmente hay en el depósito: conteos parciales por zona, por material o un inventario general.</p>
+
+        <h2>Crear un inventario</h2>
+        <ol>
+            <li>Entrá a <strong>Inventarios</strong> y apretá <strong>Nuevo Inventario</strong>.</li>
+            <li>Agregá una descripción que identifique el conteo, por ejemplo «Conteo zona A – marzo».</li>
+            <li>Elegí el alcance: por <strong>ubicaciones</strong> o por <strong>material</strong>, según lo que vayas a contar.</li>
+            <li>Seleccioná las ubicaciones o los materiales incluidos y guardá.</li>
+        </ol>
+        <p>El inventario queda <strong>Abierto</strong> y el sistema genera una línea por cada posición con stock dentro del alcance elegido.</p>
+
+        <h2>Contar</h2>
+        <ol>
+            <li>En el listado, apretá <strong>Contar</strong> en el inventario correspondiente.</li>
+            <li>Para cada línea, compará el <strong>stock del sistema</strong> con lo que contaste y escribí la cantidad real.</li>
+            <li>Guardá cada línea. La pantalla calcula la <strong>diferencia</strong>: positiva si hay más de lo registrado, negativa si falta.</li>
+            <li>Podés filtrar las líneas pendientes, las contadas y las que tienen diferencia.</li>
+        </ol>
+        <p>El progreso del inventario muestra cuántas líneas se contaron de cuántas y cuántas presentan diferencias.</p>
+
+        <h2>Cerrar o anular</h2>
+        <ul>
+            <li><strong>Cerrar Inventario</strong> deja el conteo como registro definitivo: ya no se puede modificar. Se usa cuando terminaste de revisar todas las diferencias.</li>
+            <li><strong>Anular</strong> descarta el inventario Abierto. Las cantidades contadas hasta ese momento no se aplican.</li>
+        </ul>
+        <div class="aviso atencion">
+            <p>Cerrar un inventario <strong>no corrige el stock automáticamente</strong>. Las diferencias quedan registradas para que el encargado analice la causa y decida cómo regularizarla. No cambies el stock contado por tu cuenta sin esa indicación.</p>
+        </div>
+
+        <h2>Cómo leer las diferencias</h2>
+        <div class="tabla-scroll">
+            <table>
+                <thead><tr><th>Resultado</th><th>Qué revisar</th></tr></thead>
+                <tbody>
+                    <tr><td>Sin diferencia</td><td>El conteo coincide con el sistema.</td></tr>
+                    <tr><td>Diferencia positiva</td><td>Puede faltar una recepción confirmada o haberse contado dos veces la misma posición.</td></tr>
+                    <tr><td>Diferencia negativa</td><td>Puede haber un movimiento sin confirmar, una salida no registrada o mercadería en mal estado.</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p>Cruzá el resultado con la <a href="reportes.html">auditoría de movimientos</a> antes de informar la diferencia.</p>
+
+        <div id="pager"></div>
+    </main>
+</div>
+<script src="assets/docs.js"></script>
+</body>
+</html>
