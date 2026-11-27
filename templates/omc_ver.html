@@ -20,12 +20,12 @@
             {% if omc.recepcion_numero %}
             <div style="color:#666; font-size:0.9rem; margin-top:4px;">
                 Generada desde recepción:
-                <a href="{{ url_for('recepciones.ver', id_recepcion=omc.id_recepcion) }}" style="color:#3498db;">{{ omc.recepcion_numero }}</a>
+                <a href="{{ url_for('recepciones.ver', id_recepcion=omc.id_recepcion, desde='omc') }}" style="color:#3498db;">{{ omc.recepcion_numero }}</a>
             </div>
             {% elif omc.pedido_numero %}
             <div style="color:#666; font-size:0.9rem; margin-top:4px;">
                 <i class="fas fa-file-invoice" style="color:#8e44ad;"></i> Generada desde pedido:
-                <a href="{{ url_for('pedidos.ver_detalle', id_pedido=omc.id_pedido) }}" style="color:#8e44ad; font-weight:bold;">{{ omc.pedido_numero }}</a>
+                <a href="{{ url_for('pedidos.ver_detalle', id_pedido=omc.id_pedido, desde='omc') }}" style="color:#8e44ad; font-weight:bold;">{{ omc.pedido_numero }}</a>
             </div>
             {% endif %}
         </div>

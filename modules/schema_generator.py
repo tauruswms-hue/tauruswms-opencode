@@ -1065,7 +1065,7 @@ ROUTE_CATALOG = [
     ]},
     {"grupo": "Pedidos", "rutas": [
         "/pedidos", "/pedidos/nuevo", "/pedidos/ver/*", "/pedidos/editar/*",
-        "/pedidos/guardar", "/pedidos/eliminar/*", "/pedidos/importar",
+        "/pedidos/guardar", "/pedidos/eliminar/*", "/pedidos/eliminar_masivo", "/pedidos/importar",
         "/pedidos/plantilla/*", "/pedidos/picking_json",
         "/pedidos/verificar_stock_masivo", "/pedidos/preparar_masivo",
         "/pedidos/resumen_preparar", "/pedidos/cambiar_ruta_transporte",
@@ -1138,7 +1138,7 @@ ROUTES_OPERADOR = [
     "/rutas", "/rutas/guardar", "/rutas/eliminar/*",
     "/rutas/importar", "/rutas/exportar/*", "/rutas/plantilla/*",
     "/pedidos", "/pedidos/nuevo", "/pedidos/ver/*", "/pedidos/editar/*",
-    "/pedidos/guardar", "/pedidos/eliminar/*", "/pedidos/importar",
+    "/pedidos/guardar", "/pedidos/eliminar/*", "/pedidos/eliminar_masivo", "/pedidos/importar",
     "/pedidos/plantilla/*", "/pedidos/picking_json",
     "/pedidos/preparar_masivo", "/pedidos/resumen_preparar",
     "/pedidos/cambiar_ruta_transporte", "/pedidos/filtros/*", "/pedidos/contenedor_stock",

@@ -126,6 +126,77 @@ def _cantidad(valor):
     return n
 
 
+def _logistica_predeterminada_cliente(cursor, id_cliente, tenant_id):
+    """Ruta y transporte activos configurados en el cliente, o (None, None).
+
+    Se usa al crear pedidos (formulario o importación) para no depender de que
+    la pantalla haya preseleccionado los combos. Los valores inactivos no se
+    aplican: quedan como si el cliente no los tuviera.
+    """
+    cursor.execute("""
+        SELECT r.id_ruta, t.id_transporte
+        FROM clientes c
+        LEFT JOIN rutas r ON r.id_ruta = c.id_ruta AND r.activo = 1
+            AND (%s IS NULL OR r.tenant_id = %s)
+        LEFT JOIN transportes t ON t.id_transporte = c.id_transporte_predeterminado AND t.activo = 1
+            AND (%s IS NULL OR t.tenant_id = %s)
+        WHERE c.id_cliente = %s AND (%s IS NULL OR c.tenant_id = %s)
+    """, (tenant_id, tenant_id, tenant_id, tenant_id, id_cliente, tenant_id, tenant_id))
+    fila = cursor.fetchone()
+    return (fila['id_ruta'], fila['id_transporte']) if fila else (None, None)
+
+
+def completar_logistica_pendientes(cursor, id_cliente, tenant_id):
+    """Rellena ruta/transporte de los pedidos Pendientes del cliente que los tenían vacíos.
+
+    Se llama al guardar el maestro de clientes: si cuando se creó el pedido el
+    cliente no tenía esos datos, el pedido quedó sin ellos. Ahora que los tiene,
+    se completa sólo lo que faltaba; una elección hecha en el pedido no se pisa
+    y los pedidos que ya salieron de Pendiente no se tocan. Devuelve cuántos
+    pedidos se modificaron.
+    """
+    id_ruta, id_transporte = _logistica_predeterminada_cliente(cursor, id_cliente, tenant_id)
+    if not id_ruta and not id_transporte:
+        return 0
+    cursor.execute("""
+        UPDATE pedidos_cabecera
+        SET id_ruta = COALESCE(id_ruta, %s),
+            id_transporte = COALESCE(id_transporte, %s)
+        WHERE id_cliente = %s AND estado = 'Pendiente'
+          AND (id_ruta IS NULL OR id_transporte IS NULL)
+          AND (%s IS NULL OR tenant_id = %s)
+    """, (id_ruta, id_transporte, id_cliente, tenant_id, tenant_id))
+    return max(cursor.rowcount, 0)
+
+
+def detalle_completar_logistica(cantidad):
+    """Frase (o '') para informar cuántos pedidos pendientes se completaron."""
+    if not cantidad:
+        return ''
+    uno = cantidad == 1
+    return (f". Se complet{'ó' if uno else 'aron'} la ruta/transporte de "
+            f"{cantidad} pedido{'' if uno else 's'} pendiente{'' if uno else 's'}")
+
+
+def _clase_importada(cursor, referencia, tenant_id):
+    """Id de la clase indicada por nombre (o por ID); None si no se indicó."""
+    ref = str(referencia or '').strip()
+    if not ref:
+        return None
+    cursor.execute("SELECT id_clase, nombre, activo FROM clases_pedido WHERE nombre = %s AND (%s IS NULL OR tenant_id = %s)",
+                   (ref, tenant_id, tenant_id))
+    fila = cursor.fetchone()
+    if not fila and ref.isdigit():
+        cursor.execute("SELECT id_clase, nombre, activo FROM clases_pedido WHERE id_clase = %s AND (%s IS NULL OR tenant_id = %s)",
+                       (int(ref), tenant_id, tenant_id))
+        fila = cursor.fetchone()
+    if not fila:
+        raise DatoInvalido(f'Clase de pedido "{ref}" no encontrada')
+    if not fila['activo']:
+        raise DatoInvalido(f'Clase de pedido "{fila["nombre"]}" está inactiva')
+    return fila['id_clase']
+
+
 def _renglon(cursor, id_material, cantidad, tipo_stock, tenant_id, renglones, ya_en_el_pedido=()):
     """Verifica un renglón y lo agrega a `renglones`: material activo de la empresa, cantidad y tipo de stock.
 
@@ -155,11 +226,13 @@ def _renglon(cursor, id_material, cantidad, tipo_stock, tenant_id, renglones, ya
 @pedidos_bp.route('/pedidos')
 def listar():
     tenant_id = get_tenant_filter()
+    cliente_codigo = (request.args.get('cliente') or '').strip() or None
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
             sql = """
-                SELECT p.*, c.razonsocial as cliente_nombre, r.nombre_ruta, t.razonsocial as transporte_nombre,
+                SELECT p.*, c.razonsocial as cliente_nombre, c.codigo as cliente_codigo,
+                       r.nombre_ruta, t.razonsocial as transporte_nombre,
                        cp.nombre as clase_nombre
                 FROM pedidos_cabecera p
                 JOIN clientes c ON p.id_cliente = c.id_cliente
@@ -167,9 +240,10 @@ def listar():
                 LEFT JOIN transportes t ON p.id_transporte = t.id_transporte
                 LEFT JOIN clases_pedido cp ON p.id_clase = cp.id_clase
                 WHERE (%s IS NULL OR p.tenant_id = %s)
+                  AND (%s IS NULL OR c.codigo = %s)
                 ORDER BY p.id_pedido DESC
             """
-            cursor.execute(sql, (tenant_id, tenant_id))
+            cursor.execute(sql, (tenant_id, tenant_id, cliente_codigo, cliente_codigo))
             pedidos = cursor.fetchall()
             cursor.execute("SELECT id_ruta, nombre_ruta FROM rutas WHERE (%s IS NULL OR tenant_id = %s) ORDER BY nombre_ruta", (tenant_id, tenant_id))
             rutas = cursor.fetchall()
@@ -189,7 +263,8 @@ def listar():
 
         return render_template('pedidos.html', pedidos=pedidos, dias_filtro=dias_filtro,
                                rutas=rutas, transportes=transportes,
-                               transporte_rutas=transporte_rutas)
+                               transporte_rutas=transporte_rutas,
+                               cliente_filtro=cliente_codigo)
     finally:
         conn.close()
 
@@ -346,12 +421,16 @@ def guardar():
             # --- Validaciones (cualquier DatoInvalido corta sin guardar nada) ---
             id_cliente = _referencia(cursor, 'clientes', 'id_cliente', 'razonsocial', d.get('id_cliente'), tenant_id,
                                      'Cliente', actual=previo.get('id_cliente'), obligatorio=True)
+            ruta_cliente, transporte_cliente = (
+                _logistica_predeterminada_cliente(cursor, id_cliente, tenant_id) if not id_pedido else (None, None)
+            )
             fecha_pedido = _fecha(d.get('fecha_pedido'))
             id_clase = _referencia(cursor, 'clases_pedido', 'id_clase', 'nombre', d.get('id_clase'), tenant_id,
                                    'Clase de pedido', actual=previo.get('id_clase'))
-            id_ruta = _referencia(cursor, 'rutas', 'id_ruta', 'nombre_ruta', d.get('id_ruta'), tenant_id,
+            id_ruta = _referencia(cursor, 'rutas', 'id_ruta', 'nombre_ruta', d.get('id_ruta') or ruta_cliente, tenant_id,
                                   'Ruta', actual=previo.get('id_ruta'))
-            id_transporte = _referencia(cursor, 'transportes', 'id_transporte', 'razonsocial', d.get('id_transporte'),
+            id_transporte = _referencia(cursor, 'transportes', 'id_transporte', 'razonsocial',
+                                        d.get('id_transporte') or transporte_cliente,
                                         tenant_id, 'Transporte', actual=previo.get('id_transporte'))
             direccion = (d.get('direccion_entrega') or '').strip() or None
             if direccion and len(direccion) > DIRECCION_MAX:
@@ -555,24 +634,29 @@ def guardar():
     return redirect(url_for('pedidos.listar'))
 
 
+def _pedido_anulable(cursor, pedido):
+    """Pendiente, o Trabajo sin una OMC pendiente/confirmada (misma regla que el alta individual)."""
+    if pedido['estado'] == 'Pendiente':
+        return True
+    if pedido['estado'] == 'Trabajo':
+        cursor.execute("SELECT COUNT(*) AS n FROM omc WHERE id_pedido = %s AND estado IN ('Pendiente', 'Confirmada')",
+                       (pedido['id_pedido'],))
+        return cursor.fetchone()['n'] == 0
+    return False
+
+
 @pedidos_bp.route('/pedidos/eliminar/<int:id_pedido>', methods=['POST'])
 def eliminar(id_pedido):
     tenant_id = get_tenant_filter()
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            cursor.execute("SELECT nro_pedido, estado FROM pedidos_cabecera WHERE id_pedido = %s AND (%s IS NULL OR tenant_id = %s)", (id_pedido, tenant_id, tenant_id))
+            cursor.execute("SELECT id_pedido, nro_pedido, estado FROM pedidos_cabecera WHERE id_pedido = %s AND (%s IS NULL OR tenant_id = %s)", (id_pedido, tenant_id, tenant_id))
             p = cursor.fetchone()
             if not p:
                 flash("El pedido no existe.", "warning")
                 return redirect(url_for('pedidos.listar'))
-            # Se anula un pedido Pendiente, o uno en Trabajo que todavía no tiene una OMC en curso o confirmada
-            anulable = p['estado'] == 'Pendiente'
-            if p['estado'] == 'Trabajo':
-                cursor.execute("SELECT COUNT(*) AS n FROM omc WHERE id_pedido = %s AND estado IN ('Pendiente', 'Confirmada')",
-                               (id_pedido,))
-                anulable = cursor.fetchone()['n'] == 0
-            if anulable:
+            if _pedido_anulable(cursor, p):
                 cursor.execute("UPDATE pedidos_cabecera SET estado = 'Anulado' WHERE id_pedido = %s", (id_pedido,))
                 conn.commit()
                 flash(f"Pedido {p['nro_pedido']} anulado.", "success")
@@ -586,6 +670,64 @@ def eliminar(id_pedido):
     finally:
         conn.close()
     return redirect(url_for('pedidos.listar'))
+
+
+@pedidos_bp.route('/pedidos/eliminar_masivo', methods=['POST'])
+def eliminar_masivo():
+    """Anula varios pedidos marcados en la consola, con el mismo criterio que el individual."""
+    ids = _ids((request.get_json(silent=True) or {}).get('ids'))
+    if not ids:
+        return jsonify({"status": "error", "message": "No hay pedidos seleccionados"}), 400
+
+    tenant_id = get_tenant_filter()
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            ph = in_clause_sql(ids)
+            cursor.execute(f"""
+                SELECT id_pedido, nro_pedido, estado
+                FROM pedidos_cabecera
+                WHERE id_pedido IN ({ph}) AND (%s IS NULL OR tenant_id = %s)
+                ORDER BY nro_pedido
+            """, (*ids, tenant_id, tenant_id))
+            pedidos = cursor.fetchall()
+
+            anulados, omitidos = [], []
+            for p in pedidos:
+                if not _pedido_anulable(cursor, p):
+                    if p['estado'] == 'Trabajo':
+                        razon = 'tiene una OMC pendiente o confirmada'
+                    else:
+                        razon = f"está en estado {p['estado']}"
+                    omitidos.append({'id_pedido': p['id_pedido'], 'nro_pedido': p['nro_pedido'], 'razon': razon})
+                    continue
+                cursor.execute("UPDATE pedidos_cabecera SET estado = 'Anulado' WHERE id_pedido = %s", (p['id_pedido'],))
+                anulados.append({'id_pedido': p['id_pedido'], 'nro_pedido': p['nro_pedido']})
+        conn.commit()
+
+        encontrados = {p['id_pedido'] for p in pedidos}
+        no_encontrados = len(ids) - len(encontrados)
+        cantidad = len(anulados)
+        if cantidad:
+            verbo = 'anuló' if cantidad == 1 else 'anularon'
+            sustantivo = 'pedido' if cantidad == 1 else 'pedidos'
+            mensaje = f"Se {verbo} {cantidad} {sustantivo}."
+        else:
+            mensaje = 'No se anuló ningún pedido.'
+        if omitidos or no_encontrados:
+            mensaje += f" No se pudo anular {len(omitidos) + no_encontrados}."
+        return jsonify({
+            "status": "success",
+            "message": mensaje,
+            "anulados": anulados,
+            "omitidos": omitidos,
+            "no_encontrados": no_encontrados,
+        })
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"status": "error", "message": f"No se pudieron anular los pedidos: {e!s}"}), 500
+    finally:
+        conn.close()
 
 
 # --- ACCIONES MASIVAS (CONSOLA) ---
@@ -1241,11 +1383,11 @@ def picking_json():
 # IMPORTAR PEDIDOS
 # ============================================================================
 _CAMPOS_IMPORT_PED = [
-    'agrupador', 'cliente_codigo', 'fecha_pedido', 'observaciones',
+    'agrupador', 'cliente_codigo', 'clase_nombre', 'fecha_pedido', 'observaciones',
     'material_codigo', 'cantidad', 'tipo_stock'
 ]
 _EJEMPLO_IMPORT_PED = [
-    'IMPORT-2024-001', 'CLI001', '2024-01-15', 'Importación masiva',
+    'IMPORT-2024-001', 'CLI001', 'Venta', '2024-01-15', 'Importación masiva',
     'MAT001', '50', 'Libre Venta'
 ]
 
@@ -1275,6 +1417,7 @@ def importar():
             # Cada grupo es un pedido: se verifica entero antes de guardar nada, y se guarda todo o nada
             fila_cabecera, primera = filas[0]
             cliente_cod   = str(primera.get('cliente_codigo', '') or '').strip()
+            clase_ref     = str(primera.get('clase_nombre', '') or '').strip()
             observaciones = str(primera.get('observaciones', '') or '').strip() or None
             errores_grupo, id_pedido = [], None
             try:
@@ -1288,6 +1431,8 @@ def importar():
                         raise DatoInvalido(f'Cliente "{cliente_cod}" no encontrado')
                     id_cliente = _referencia(cursor, 'clientes', 'id_cliente', 'razonsocial', cliente['id_cliente'],
                                              tenant_id, 'Cliente', obligatorio=True)
+                    id_clase = _clase_importada(cursor, clase_ref, tenant_id)
+                    id_ruta, id_transporte = _logistica_predeterminada_cliente(cursor, id_cliente, tenant_id)
 
                     renglones = []
                     for fila_num, row in filas:
@@ -1311,9 +1456,11 @@ def importar():
 
                     id_pedido = execute_insert(cursor, """
                         INSERT INTO pedidos_cabecera
-                            (nro_pedido, id_cliente, fecha_pedido, observaciones, estado, tenant_id)
-                        VALUES (%s, %s, %s, %s, 'Pendiente', %s)
-                    """, (_numero_siguiente(cursor, tenant_id, anio), id_cliente, fecha_pedido, observaciones, tenant_id))
+                            (nro_pedido, id_cliente, id_clase, fecha_pedido, id_ruta, id_transporte,
+                             observaciones, estado, tenant_id)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, 'Pendiente', %s)
+                    """, (_numero_siguiente(cursor, tenant_id, anio), id_cliente, id_clase, fecha_pedido,
+                          id_ruta, id_transporte, observaciones, tenant_id))
                     for r in renglones:
                         cursor.execute(
                             "INSERT INTO pedidos_detalle (id_pedido, id_material, cantidad, tipo_stock, tenant_id) VALUES (%s, %s, %s, %s, %s)",

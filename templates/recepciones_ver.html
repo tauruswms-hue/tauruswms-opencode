@@ -62,8 +62,9 @@
             </button>
             {% endif %}
             {% endif %}
-            <a href="{{ url_for('recepciones.listar') }}"
-               style="background:#95a5a6; color:white; padding:10px 15px; border-radius:4px; text-decoration:none;">
+            {% include 'partials/_volver.html' %}
+            <a href="{{ url_for('recepciones.listar') }}" class="btn btn-secondary btn-sm"
+               style="text-decoration:none;">
                 <i class="fas fa-arrow-left"></i> Volver
             </a>
         </div>

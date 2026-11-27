@@ -15,6 +15,7 @@ from modules.db_config import (
     get_intercambio_connection,
 )
 from modules.intercambio import (
+    procesar_intercambio_clientes,
     procesar_intercambio_materiales,
     procesar_intercambio_rutas,
 )
@@ -224,6 +225,66 @@ def test_material_falta_codigo_queda_error(conexiones, tenant_id):
 
 
 @requires_db
+def test_cliente_modificacion_completa_pedidos_pendientes(conexiones, tenant_id):
+    """Al completar ruta/transporte del maestro por intercambio se rellenan los pedidos Pendientes."""
+    conn_int, conn_wms, conn_admin = conexiones
+    sufijo = uuid.uuid4().hex[:8]
+    codigo, nombre_ruta = 'TEST-INT-' + sufijo, 'Ruta ' + sufijo
+    codigo_transporte, nro_pedido = 'TRANS-' + sufijo, 'PED-' + sufijo
+
+    cur_admin = conn_admin.cursor()
+    cur_admin.execute("SELECT codigo FROM tenants WHERE id = %s", (tenant_id,))
+    tenant_codigo = cur_admin.fetchone()['codigo']
+    cur_admin.close()
+
+    cur = conn_wms.cursor()
+    cur.execute("INSERT INTO rutas (nombre_ruta, tenant_id, activo) VALUES (%s, %s, 1)", (nombre_ruta, tenant_id))
+    cur.execute("INSERT INTO transportes (codigo, razonsocial, tenant_id, activo) VALUES (%s, %s, %s, 1)",
+                (codigo_transporte, 'Transporte test', tenant_id))
+    cur.execute("""INSERT INTO clientes (codigo, razonsocial, tenant_id)
+                   VALUES (%s, %s, %s)""", (codigo, 'Cliente test', tenant_id))
+    cur.execute("SELECT id_cliente FROM clientes WHERE codigo = %s AND tenant_id = %s", (codigo, tenant_id))
+    cliente_id = cur.fetchone()['id_cliente']
+    cur.execute("""INSERT INTO pedidos_cabecera (nro_pedido, id_cliente, fecha_pedido, estado, tenant_id)
+                   VALUES (%s, %s, CURRENT_DATE, 'Pendiente', %s)""", (nro_pedido, cliente_id, tenant_id))
+    conn_wms.commit()
+
+    try:
+        cur = conn_int.cursor()
+        cur.execute("""INSERT INTO intercambio_clientes
+                       (tenant_codigo, codigo, razonsocial, ruta_nombre, transporte_codigo, accion, estado)
+                       VALUES (%s, %s, 'Cliente test', %s, %s, 'modificacion', 'pendiente')""",
+                    (tenant_codigo, codigo, nombre_ruta, codigo_transporte))
+        conn_int.commit()
+        cur.close()
+
+        res = procesar_intercambio_clientes(
+            tenant_id=tenant_id, conn_int=conn_int, conn_wms=conn_wms, conn_admin=conn_admin)
+        assert res['procesados'] == 1 and res['errores'] == 0, res['errores_detalle']
+
+        cur = conn_wms.cursor()
+        cur.execute("SELECT id_ruta, id_transporte FROM pedidos_cabecera WHERE nro_pedido = %s", (nro_pedido,))
+        pedido = cur.fetchone()
+        cur.execute("SELECT id_ruta FROM rutas WHERE nombre_ruta = %s AND tenant_id = %s", (nombre_ruta, tenant_id))
+        id_ruta = cur.fetchone()['id_ruta']
+        cur.execute("SELECT id_transporte FROM transportes WHERE codigo = %s AND tenant_id = %s",
+                    (codigo_transporte, tenant_id))
+        id_transporte = cur.fetchone()['id_transporte']
+        assert (pedido['id_ruta'], pedido['id_transporte']) == (id_ruta, id_transporte)
+    finally:
+        cur = conn_wms.cursor()
+        cur.execute("DELETE FROM pedidos_cabecera WHERE nro_pedido = %s", (nro_pedido,))
+        cur.execute("DELETE FROM clientes WHERE codigo = %s AND tenant_id = %s", (codigo, tenant_id))
+        cur.execute("DELETE FROM transportes WHERE codigo = %s AND tenant_id = %s", (codigo_transporte, tenant_id))
+        cur.execute("DELETE FROM rutas WHERE nombre_ruta = %s AND tenant_id = %s", (nombre_ruta, tenant_id))
+        conn_wms.commit()
+        cur.close()
+        cur = conn_int.cursor()
+        _limpiar(conn_int, cur, ['intercambio_clientes'], tenant_codigo, codigo)
+        conn_int.commit()
+        cur.close()
+
+
 def test_rutas_upsert(conexiones, tenant_id):
     """Alta de ruta via intercambio crea/actualiza wms.rutas."""
     conn_int, conn_wms, conn_admin = conexiones

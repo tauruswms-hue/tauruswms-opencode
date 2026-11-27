@@ -114,10 +114,10 @@
                     <td>{{ o.destino_codigo }} — {{ o.destino_nombre }}</td>
                     <td>
                         {% if o.recepcion_numero %}
-                        <a href="{{ url_for('recepciones.ver', id_recepcion=o.id_recepcion) }}"
+                        <a href="{{ url_for('recepciones.ver', id_recepcion=o.id_recepcion, desde='omc') }}"
                            style="color:#3498db; font-size:0.85rem;">{{ o.recepcion_numero }}</a>
                         {% elif o.pedido_numero %}
-                        <a href="{{ url_for('pedidos.ver_detalle', id_pedido=o.id_pedido) }}"
+                        <a href="{{ url_for('pedidos.ver_detalle', id_pedido=o.id_pedido, desde='omc') }}"
                            style="color:#8e44ad; font-size:0.85rem;"><i class="fas fa-file-invoice" style="font-size:0.75rem;"></i> {{ o.pedido_numero }}</a>
                         {% else %}—{% endif %}
                     </td>

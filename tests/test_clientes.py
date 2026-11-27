@@ -2,6 +2,7 @@
 
 import io
 import uuid
+from pathlib import Path
 
 import pytest
 
@@ -13,6 +14,54 @@ EJEMPLO = 'Cliente de Ejemplo S.A.'   # razón social de la fila de ejemplo de l
 
 def _codigo():
     return PREFIJO + uuid.uuid4().hex[:8].upper()
+
+
+def test_la_grilla_filtra_por_el_cliente_viniendo_desde_pedidos():
+    """El enlace de la consola de pedidos pasa ?cliente=<código> y la grilla lo aplica."""
+    js = (Path(__file__).resolve().parents[1] / 'static' / 'js' / 'clientes.js').read_text(encoding='utf-8')
+    assert "URLSearchParams(window.location.search).get('cliente')" in js
+    assert 'tabla.column(0).search' in js
+
+
+@requires_db
+def test_la_grilla_ofrece_volver_a_pedidos_cuando_se_llega_desde_alla(logged_client, wms):
+    html = logged_client.get('/clientes?cliente=CLI-1&desde=pedidos').get_data(as_text=True)
+    assert 'Volver a Pedidos' in html and 'href="/pedidos?cliente=CLI-1"' in html
+    assert 'Volver a Pedidos' not in logged_client.get('/clientes').get_data(as_text=True)
+    # Un origen arbitrario no se convierte en enlace de transacción
+    assert 'btn-volver-transaccion' not in logged_client.get('/clientes?desde=https://ejemplo.com').get_data(as_text=True)
+
+
+@requires_db
+def test_el_retorno_se_oculta_si_el_rol_no_tiene_permiso(logged_client, wms):
+    with logged_client.session_transaction() as sesion:
+        sesion['rol'] = 'ROL-SIN-PEDIDOS'
+        sesion['rutas_permitidas'] = ['/clientes']
+    html = logged_client.get('/clientes?desde=pedidos').get_data(as_text=True)
+    assert 'btn-volver-transaccion' not in html
+    # El destino con filtro tampoco se filtra por el query string al validar permisos.
+    assert 'Volver a Pedidos' not in html
+
+
+@requires_db
+def test_las_acciones_de_clientes_conservan_el_origen(logged_client, wms):
+    html = logged_client.get('/clientes?desde=pedidos').get_data(as_text=True)
+    for accion in ('/clientes/exportar/csv', '/clientes/exportar/xlsx',
+                   '/clientes/exportar/json', '/clientes/importar'):
+        assert f'{accion}?desde=pedidos' in html, accion
+    assert 'name="desde" value="pedidos"' in html
+
+
+@requires_db
+def test_guardar_cliente_desde_pedidos_conserva_el_retorno(logged_client, wms):
+    codigo = _codigo()
+    respuesta = logged_client.post('/clientes/guardar', data={
+        'codigo': codigo, 'razonsocial': 'Cliente con retorno', 'desde': 'pedidos'})
+    assert respuesta.status_code == 302
+    ubicacion = respuesta.headers['Location']
+    assert 'desde=pedidos' in ubicacion and f'cliente={codigo}' in ubicacion
+    html = logged_client.get(ubicacion).get_data(as_text=True)
+    assert 'Volver a Pedidos' in html
 
 
 @pytest.fixture
@@ -361,6 +410,63 @@ def test_ruta_y_transporte_tienen_que_ser_de_la_empresa(logged_client, wms, logi
     # Una ruta de otra empresa no se puede asignar: antes quedaba guardada
     assert _guardar(logged_client, codigo=otro, id_ruta=logistica['ruta_ajena']) == ['Ruta de entrega: no existe.']
     assert _cliente(wms, otro) is None
+
+
+@requires_db
+def test_completar_logistica_en_pedidos_pendientes(logged_client, wms, logistica, usuario_wms):
+    """Al completar el maestro se rellena lo que faltaba, sin tocar lo ya elegido ni otros estados."""
+    codigo = _codigo()
+    _guardar(logged_client, codigo=codigo)
+    cid = _cliente(wms, codigo)['id_cliente']
+    cur = wms.cursor()
+    # Otra ruta de la empresa: la que eligió el pedido no se debe pisar
+    cur.execute("INSERT INTO rutas (nombre_ruta, tenant_id, activo) VALUES (%s, %s, 1)",
+                (PREFIJO + 'Ruta del pedido', usuario_wms['tenant_id']))
+    cur.execute("SELECT id_ruta FROM rutas WHERE nombre_ruta = %s", (PREFIJO + 'Ruta del pedido',))
+    ruta_pedido = cur.fetchone()['id_ruta']
+    numeros = [_codigo() for _ in range(4)]
+    for nro, estado, id_ruta in zip(numeros,
+                                    ('Pendiente', 'Pendiente', 'Trabajo', 'Despachado'),
+                                    (None, ruta_pedido, None, None), strict=True):
+        cur.execute("""INSERT INTO pedidos_cabecera
+                       (nro_pedido, id_cliente, fecha_pedido, estado, id_ruta, tenant_id)
+                       VALUES (%s, %s, CURRENT_DATE, %s, %s, %s)""",
+                    (nro, cid, estado, id_ruta, usuario_wms['tenant_id']))
+    wms.commit()
+
+    assert _guardar(logged_client, id_cliente=cid, codigo=codigo,
+                    id_ruta=logistica['ruta'],
+                    id_transporte_predeterminado=logistica['transporte']) == [
+        'Cliente guardado correctamente. Se completaron la ruta/transporte de 2 pedidos pendientes']
+
+    cur.execute("""SELECT nro_pedido, id_ruta, id_transporte FROM pedidos_cabecera
+                   WHERE nro_pedido IN (%s, %s, %s, %s)""", tuple(numeros))
+    filas = {f['nro_pedido']: f for f in cur.fetchall()}
+    assert (filas[numeros[0]]['id_ruta'], filas[numeros[0]]['id_transporte']) == (
+        logistica['ruta'], logistica['transporte'])
+    assert (filas[numeros[1]]['id_ruta'], filas[numeros[1]]['id_transporte']) == (
+        ruta_pedido, logistica['transporte'])
+    for nro in numeros[2:]:
+        assert (filas[nro]['id_ruta'], filas[nro]['id_transporte']) == (None, None)
+
+
+@requires_db
+def test_importar_cliente_completa_pedidos_pendientes(logged_client, wms, logistica, usuario_wms):
+    codigo, nro = _codigo(), _codigo()
+    _guardar(logged_client, codigo=codigo)
+    cid = _cliente(wms, codigo)['id_cliente']
+    cur = wms.cursor()
+    cur.execute("""INSERT INTO pedidos_cabecera (nro_pedido, id_cliente, fecha_pedido, estado, tenant_id)
+                   VALUES (%s, %s, CURRENT_DATE, 'Pendiente', %s)""", (nro, cid, usuario_wms['tenant_id']))
+    wms.commit()
+
+    resultado = _importar(logged_client,
+                          'codigo,razonsocial,id_ruta,id_transporte_predeterminado\n'
+                          f'{codigo},Sin cambios,{logistica["ruta_nombre"]},{logistica["transporte_codigo"]}\n')
+    assert resultado['actualizados'] == 1 and resultado['pedidos_completados'] == 1
+    cur.execute("SELECT id_ruta, id_transporte FROM pedidos_cabecera WHERE nro_pedido = %s", (nro,))
+    fila = cur.fetchone()
+    assert (fila['id_ruta'], fila['id_transporte']) == (logistica['ruta'], logistica['transporte'])
 
 
 @requires_db

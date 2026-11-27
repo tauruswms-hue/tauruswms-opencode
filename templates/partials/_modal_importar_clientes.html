@@ -50,7 +50,7 @@
         </div>
         <div style="display:flex; justify-content:flex-end; gap:10px; padding:15px 25px; border-top:1px solid #eee; flex-shrink:0;">
             <button type="button" onclick="closeModalImportar()" style="background:#95a5a6; color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer;">Cancelar</button>
-            <button type="button" id="btnEjecutarImportar" onclick="ejecutarImportar('/clientes/importar')" style="background:#3498db; color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer;">
+            <button type="button" id="btnEjecutarImportar" onclick="ejecutarImportar('{{ url_for('clientes.importar', desde=request.args.get('desde', '')) }}')" style="background:#3498db; color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer;">
                 <i class="fas fa-upload"></i> Importar
             </button>
         </div>

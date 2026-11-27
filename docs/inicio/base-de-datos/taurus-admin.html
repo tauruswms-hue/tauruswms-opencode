@@ -45,7 +45,7 @@
 
         <h2>Script</h2>
         <p>Archivo: <a href="../../migrations/create_admin_mysql.sql"><code>docs/migrations/create_admin_mysql.sql</code></a>
-        (292 líneas). Lo genera <code>modules/schema_generator.py</code>; no se edita a mano.</p>
+        (293 líneas). Lo genera <code>modules/schema_generator.py</code>; no se edita a mano.</p>
         <details class="script">
             <summary>Ver el script completo</summary>
 <pre><code>SET NAMES utf8mb4;
@@ -256,6 +256,7 @@ INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/pedidos/v
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/pedidos/editar/*');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/pedidos/guardar');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/pedidos/eliminar/*');
+INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/pedidos/eliminar_masivo');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/pedidos/importar');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/pedidos/plantilla/*');
 INSERT IGNORE INTO `roles_rutas` (`rol`, `ruta`) VALUES ('OPERADOR', '/pedidos/picking_json');

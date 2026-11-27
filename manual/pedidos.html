@@ -28,6 +28,7 @@
                 </tbody>
             </table>
         </div>
+        <p>En la grilla, el nombre del cliente es un enlace: al apretarlo se abre <strong>Clientes</strong> con ese cliente filtrado, para ver o editar sus datos maestros. Desde ahí, el botón <strong>Volver a Pedidos</strong> regresa a la consola con el mismo cliente filtrado. También podés volver desde el detalle de un pedido, una recepción o una OMC al módulo del que viniste.</p>
 
         <h2>Cargar un pedido</h2>
         <ol>
@@ -38,6 +39,7 @@
             <li>Apretá <strong>Guardar</strong>.</li>
         </ol>
         <p>Si indicaste contenedores y cada uno cumple las condiciones, se crea automáticamente un movimiento hacia el muelle del transporte y el pedido queda en <strong>Trabajo OMC</strong>. Los contenedores que no cumplen se informan con un aviso y quedan fuera; el pedido se guarda igual.</p>
+        <p>Si el cliente no tenía ruta ni transporte y los completás después en <a href="maestros.html">Datos de base</a>, se agregan a los pedidos pendientes que los tenían vacíos. Los pedidos que ya tenían un valor elegido no se modifican.</p>
 
         <h2>Verificar stock</h2>
         <p>Desde la consola, seleccioná los pedidos que querés analizar y apretá <strong>Verificar stock</strong>. El informe agrupa los materiales pedidos y muestra:</p>
@@ -52,7 +54,7 @@
         <ol>
             <li>Seleccioná los pedidos Pendientes y apretá <strong>Preparar</strong>.</li>
             <li>Revisá el resumen de pedidos, clientes, materiales, unidades y ubicaciones con stock.</li>
-            <li>Elegí el modo de preparación que usa tu depósito: <strong>directa</strong>, <strong>cliente</strong> o <strong>dospasos</strong>.</li>
+            <li>Elegí el método de preparación que usa tu depósito: <strong>Preparación simple</strong>, <strong>Preparación consolidada por cliente en un paso</strong> o <strong>Preparación consolidada por cliente en dos pasos</strong>.</li>
             <li>Descargá la lista de picking y seguí las indicaciones de la <a href="preparacion.html">guía de preparación</a>.</li>
         </ol>
         <div class="aviso">
@@ -62,13 +64,14 @@
         <h2>Otras acciones de la consola</h2>
         <ul>
             <li><strong>Cambiar ruta o transporte:</strong> actualiza todos los pedidos seleccionados a la vez.</li>
-            <li><strong>Anular:</strong> sólo se puede usar con pedidos Pendientes. El pedido no se borra: queda en estado Anulado.</li>
+            <li><strong>Eliminar marcados:</strong> anula de una vez todos los pedidos seleccionados que se puedan anular; los demás se informan y quedan como estaban.</li>
+            <li><strong>Anular (por fila):</strong> el pedido no se borra: queda en estado Anulado.</li>
             <li><strong>Editar:</strong> disponible sólo mientras el pedido está Pendiente. Al guardar, los ítems se reemplazan por los nuevos.</li>
         </ul>
 
         <h2>Importar pedidos</h2>
         <p>Desde la consola se puede descargar una plantilla en Excel o CSV e importarla. Las filas con el mismo valor en la columna agrupador forman un pedido; sin ese valor, cada fila es un pedido distinto.</p>
-        <p>Los pedidos importados quedan Pendientes y sin ruta ni transporte: completá esos datos antes de prepararlos. El resultado de la importación informa cuántos se crearon y los errores por fila.</p>
+        <p>Los pedidos importados quedan Pendientes y toman la ruta y el transporte que tenga cargados el cliente. Si la plantilla incluye la clase de pedido, también se guarda; si el cliente no tiene ruta o transporte definidos, podés completarlos antes de prepararlos. El resultado de la importación informa cuántos se crearon y los errores por fila.</p>
 
         <div id="pager"></div>
     </main>

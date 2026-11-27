@@ -45,7 +45,9 @@ from modules.clientes import clientes_bp
 from modules.context import (
     LOGIN_IDLE_TIMEOUT_SECONDS,
     SESSION_MAX_AGE_SECONDS,
+    destino_volver,
     get_tenant_filter,
+    url_volver,
 )
 from modules.db_config import (
     _get_admin_connection,
@@ -288,10 +290,19 @@ app.jinja_env.globals['tiene_permiso_ruta'] = tiene_permiso_ruta
 
 @app.context_processor
 def inyectar_navegacion():
-    """Entrega a las plantillas el menú ya filtrado para el rol actual."""
+    """Entrega a las plantillas el menú filtrado y el enlace de retorno (?desde=)."""
 
     if 'user_id' not in session:
-        return {'nav': construir_navegacion(lambda _ruta: False, request.path, {})}
+        return {'nav': construir_navegacion(lambda _ruta: False, request.path, {}), 'volver': None}
+
+    # Los enlaces entre transacciones pasan ?desde=<modulo>; el destino sale de
+    # una lista cerrada y se oculta si el rol no tiene permiso sobre esa ruta.
+    volver = None
+    desde = request.args.get('desde')
+    destino = destino_volver(desde)
+    url = url_volver(desde, request.args.get('cliente'))
+    if destino and url and tiene_permiso_ruta(url.partition('?')[0]):
+        volver = {'url': url, 'etiqueta': destino[1]}
 
     def puede_mostrarse(ruta):
         # Las rutas fuera de ROUTE_CATALOG sólo exigen login (caso de '/' y '/estado').
@@ -302,7 +313,8 @@ def inyectar_navegacion():
             puede_mostrarse,
             request.path,
             session.get('sidebar_collapsed', {}),
-        )
+        ),
+        'volver': volver,
     }
 
 

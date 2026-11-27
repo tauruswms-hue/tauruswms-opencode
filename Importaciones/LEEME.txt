@@ -53,6 +53,8 @@ QUÉ PERMITE VER CADA ARCHIVO
   - La persona de contacto del archivo queda como primer contacto del cliente;
     los demás contactos se agregan desde la pestaña "Contactos" de la ficha.
   - Un cliente inactivo (CLI005) y uno sin CUIT ni ruta.
+  - Al importar ruta o transporte sobre un cliente existente, se completan sus
+    pedidos Pendientes que tenían esos campos vacíos.
 
 07_materiales.csv
   - Categoría, unidad, unidad del volumen y proveedor habitual indicados por
@@ -72,6 +74,19 @@ QUÉ PERMITE VER CADA ARCHIVO
   - Una clase sin estado indicado (Urgente: queda activa) y una inactiva
     (Exportación).
   - No depende de los demás archivos: se puede importar en cualquier momento.
+
+
+PEDIDOS DE PRUEBA
+-----------------
+09_pedidos.json
+   - Se importa desde la pantalla Pedidos (botón "Importar"), después de los
+     maestros. Depende de 06_clientes.csv, 07_materiales.csv y
+     08_clases_pedido.csv (las clases se indican por nombre en "clase_nombre").
+   - Tiene 5 pedidos: tres con varios renglones, uno de herramientas y uno con
+     dos tipos de stock. Las filas con el mismo "agrupador" forman un pedido.
+   - Quedan en estado Pendiente y toman la ruta y el transporte definidos en
+     cada cliente (sólo si están activos).
+   - Cada importación crea pedidos nuevos; si lo importás dos veces se duplican.
 
 
 CARPETA con_errores

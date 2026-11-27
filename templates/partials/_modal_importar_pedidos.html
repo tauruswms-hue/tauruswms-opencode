@@ -9,7 +9,7 @@
             <div style="background:#f5f0ff; border:1px solid #d8b4fe; border-radius:6px; padding:14px 16px; margin-bottom:18px; font-size:0.88rem;">
                 <p style="margin:0 0 10px; font-weight:bold; color:#8e44ad;"><i class="fas fa-info-circle"></i> Columnas del archivo</p>
                 <p style="margin:0 0 8px; color:#555; font-size:0.83rem;">
-                    Cada fila representa <strong>una línea de material</strong>. Las filas con el mismo <code>agrupador</code> se agrupan en un mismo pedido. Los pedidos se crean en estado <strong>Pendiente</strong>.
+                    Cada fila representa <strong>una línea de material</strong>. Las filas con el mismo <code>agrupador</code> se agrupan en un mismo pedido. Los pedidos se crean en estado <strong>Pendiente</strong> y toman la ruta y el transporte definidos en el cliente.
                 </p>
                 <table style="width:100%; border-collapse:collapse; font-size:0.83rem;">
                     <thead><tr style="background:#ede9fe;">
@@ -20,11 +20,12 @@
                     <tbody>
                         <tr><td style="padding:4px 8px;"><code>agrupador</code></td><td style="padding:4px 8px; color:#e74c3c;">Sí</td><td style="padding:4px 8px;">Agrupa filas en el mismo pedido (ej: IMPORT-2024-001)</td></tr>
                         <tr style="background:#f9f9f9;"><td style="padding:4px 8px;"><code>cliente_codigo</code></td><td style="padding:4px 8px; color:#e74c3c;">Sí</td><td style="padding:4px 8px;">Código del cliente en el sistema</td></tr>
-                        <tr><td style="padding:4px 8px;"><code>fecha_pedido</code></td><td style="padding:4px 8px; color:#27ae60;">No</td><td style="padding:4px 8px;">Formato YYYY-MM-DD. Default: fecha de hoy</td></tr>
-                        <tr style="background:#f9f9f9;"><td style="padding:4px 8px;"><code>observaciones</code></td><td style="padding:4px 8px; color:#27ae60;">No</td><td style="padding:4px 8px;">Una por agrupador (se toma de la primera fila)</td></tr>
-                        <tr><td style="padding:4px 8px;"><code>material_codigo</code></td><td style="padding:4px 8px; color:#e74c3c;">Sí</td><td style="padding:4px 8px;">Código del material (por fila)</td></tr>
-                        <tr style="background:#f9f9f9;"><td style="padding:4px 8px;"><code>cantidad</code></td><td style="padding:4px 8px; color:#e74c3c;">Sí</td><td style="padding:4px 8px;">Cantidad del pedido (numérico)</td></tr>
-                        <tr><td style="padding:4px 8px;"><code>tipo_stock</code></td><td style="padding:4px 8px; color:#27ae60;">No</td><td style="padding:4px 8px;">Libre Venta / Calidad / Bloqueado / Mal Estado. Default: Libre Venta</td></tr>
+                        <tr><td style="padding:4px 8px;"><code>clase_nombre</code></td><td style="padding:4px 8px; color:#27ae60;">No</td><td style="padding:4px 8px;">Nombre de una clase activa (o su ID). Se toma de la primera fila</td></tr>
+                        <tr style="background:#f9f9f9;"><td style="padding:4px 8px;"><code>fecha_pedido</code></td><td style="padding:4px 8px; color:#27ae60;">No</td><td style="padding:4px 8px;">Formato YYYY-MM-DD. Default: fecha de hoy</td></tr>
+                        <tr><td style="padding:4px 8px;"><code>observaciones</code></td><td style="padding:4px 8px; color:#27ae60;">No</td><td style="padding:4px 8px;">Una por agrupador (se toma de la primera fila)</td></tr>
+                        <tr style="background:#f9f9f9;"><td style="padding:4px 8px;"><code>material_codigo</code></td><td style="padding:4px 8px; color:#e74c3c;">Sí</td><td style="padding:4px 8px;">Código del material (por fila)</td></tr>
+                        <tr><td style="padding:4px 8px;"><code>cantidad</code></td><td style="padding:4px 8px; color:#e74c3c;">Sí</td><td style="padding:4px 8px;">Cantidad del pedido (numérico)</td></tr>
+                        <tr style="background:#f9f9f9;"><td style="padding:4px 8px;"><code>tipo_stock</code></td><td style="padding:4px 8px; color:#27ae60;">No</td><td style="padding:4px 8px;">Libre Venta / Calidad / Bloqueado / Mal Estado. Default: Libre Venta</td></tr>
                     </tbody>
                 </table>
             </div>

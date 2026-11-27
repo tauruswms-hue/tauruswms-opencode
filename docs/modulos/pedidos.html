@@ -24,7 +24,7 @@
             <table>
                 <thead><tr><th>Estado</th><th>Significado</th><th>Cómo se llega</th></tr></thead>
                 <tbody>
-                    <tr><td><code>Pendiente</code></td><td>Cargado, sin preparar. Es el único estado en que se puede editar o anular.</td><td>Al crearlo.</td></tr>
+                    <tr><td><code>Pendiente</code></td><td>Cargado, sin preparar. Se puede editar y anular.</td><td>Al crearlo.</td></tr>
                     <tr><td><code>Trabajo</code></td><td>En preparación, con documento de picking generado.</td><td>Con "Preparar" desde la consola.</td></tr>
                     <tr><td><code>Trabajo OMC</code></td><td>En preparación, con una OMC hacia el muelle de salida.</td><td>Al crearlo con contenedores.</td></tr>
                     <tr><td><code>Preparado</code></td><td>Listo para despachar.</td><td>Al confirmar todas las OMC del pedido.</td></tr>
@@ -42,12 +42,21 @@
         <h2>Pantallas</h2>
         <h3>Consola (<code>/pedidos</code>)</h3>
         <p>Listado de pedidos con cliente, ruta, transporte y clase, y las acciones masivas sobre los pedidos
-        seleccionados. El filtro de fechas arranca con los días definidos en los parámetros del tenant.</p>
+        seleccionados. El filtro de fechas arranca con los días definidos en los parámetros del tenant. La razón
+        social del cliente enlaza a <code>/clientes?cliente=&lt;codigo&gt;&amp;desde=pedidos</code>, que filtra la
+        grilla de maestros (sólo si el usuario tiene permiso sobre <code>/clientes</code>) y ofrece
+        <em>Volver a Pedidos</em> con el mismo filtro. El retorno se implementa con un parámetro <code>desde</code>
+        de lista cerrada, resuelto en el context processor de <code>app.py</code> y oculto si el rol no tiene permiso
+        sobre el destino; se aplica también al volver desde el detalle de pedido, recepciones, OMC y despacho.</p>
 
         <h3>Alta y edición (<code>/pedidos/nuevo</code>, <code>/pedidos/editar/&lt;id&gt;</code>)</h3>
         <ul>
             <li><strong>Cabecera</strong>: cliente, clase de pedido, fecha, ruta, transporte, dirección de entrega y
-                observaciones. La ruta y el transporte se proponen según el cliente.</li>
+                observaciones. La ruta y el transporte se proponen según el cliente y, si se dejan vacíos,
+                se guardan los que tenga definidos el cliente (sólo los activos). Al completar después la
+                ruta o el transporte en el maestro de clientes, se rellenan los campos vacíos de los pedidos
+                <code>Pendiente</code> de ese cliente; no se pisan los valores ya cargados ni se tocan otros
+                estados. La regla aplica también al guardar clientes por importación o por intercambio.</li>
             <li><strong>Ítems</strong>: material, cantidad y tipo de stock (por defecto <code>Libre Venta</code>).</li>
             <li><strong>Contenedores</strong> (solo en el alta, opcional): contenedores a enviar al muelle.</li>
         </ul>
@@ -77,7 +86,7 @@
         <h3>Preparar</h3>
         <ol>
             <li>Muestra un resumen: pedidos, clientes, materiales, unidades y ubicaciones de picking con stock.</li>
-            <li>Se elige el modo: <code>directa</code>, <code>cliente</code> o <code>dospasos</code>.</li>
+            <li>Se elige el método: <code>directa</code> (Preparación simple), <code>cliente</code> (Preparación consolidada por cliente en un paso) o <code>dospasos</code> (Preparación consolidada por cliente en dos pasos).</li>
             <li>Se genera el documento de picking en JSON: se descarga y se guarda en
                 <code>picking_docs/AAAA-MM/</code>.</li>
             <li>Los pedidos Pendientes seleccionados pasan a <code>Trabajo</code>.</li>
@@ -91,7 +100,7 @@
         <p>Cambia la ruta, el transporte o ambos en todos los pedidos seleccionados.</p>
 
         <h3>Anular</h3>
-        <p>Solo para pedidos Pendientes. El pedido no se borra: queda en estado Anulado.</p>
+        <p>El botón por fila anula pedidos Pendientes; el botón «Eliminar marcados» anula varios a la vez. También se puede anular un pedido en Trabajo mientras no tenga una OMC pendiente o confirmada. El pedido no se borra: queda en estado Anulado. Los pedidos que no cumplen la regla se informan y no se modifican.</p>
 
         <h2>Documento de picking</h2>
         <div class="tabla-scroll">
@@ -116,6 +125,7 @@
                 <tbody>
                     <tr><td><code>agrupador</code></td><td>No</td><td>Las filas con el mismo valor forman un pedido. Sin valor, cada fila es un pedido.</td></tr>
                     <tr><td><code>cliente_codigo</code></td><td>Sí</td><td>Debe existir.</td></tr>
+                    <tr><td><code>clase_nombre</code></td><td>No</td><td>Nombre de una clase activa (o su ID). Se toma de la primera fila del pedido.</td></tr>
                     <tr><td><code>fecha_pedido</code></td><td>No</td><td>Por defecto, la fecha del día.</td></tr>
                     <tr><td><code>observaciones</code></td><td>No</td><td></td></tr>
                     <tr><td><code>material_codigo</code></td><td>Sí</td><td>Debe existir. Las filas sin material se saltean.</td></tr>
@@ -124,8 +134,8 @@
                 </tbody>
             </table>
         </div>
-        <p>Los pedidos importados quedan Pendientes, sin ruta ni transporte. El resultado informa cuántos se
-        crearon y los errores por fila.</p>
+        <p>Los pedidos importados quedan Pendientes, con la ruta y el transporte definidos en el cliente
+        (sólo si están activos). El resultado informa cuántos se crearon y los errores por fila.</p>
 
         <h2>Rutas y permisos</h2>
         <p>Grupo "Pedidos" del catálogo:</p>
@@ -136,7 +146,7 @@
                     <tr><td><code>/pedidos</code></td><td>Consola.</td></tr>
                     <tr><td><code>/pedidos/nuevo</code>, <code>/pedidos/editar/*</code>, <code>/pedidos/guardar</code></td><td>Alta y edición.</td></tr>
                     <tr><td><code>/pedidos/ver/*</code></td><td>Detalle.</td></tr>
-                    <tr><td><code>/pedidos/eliminar/*</code></td><td>Anulación.</td></tr>
+                    <tr><td><code>/pedidos/eliminar/*</code>, <code>/pedidos/eliminar_masivo</code></td><td>Anulación individual y masiva.</td></tr>
                     <tr><td><code>/pedidos/verificar_stock_masivo</code></td><td>Verificar stock.</td></tr>
                     <tr><td><code>/pedidos/resumen_preparar</code>, <code>/pedidos/picking_json</code>, <code>/pedidos/preparar_masivo</code></td><td>Preparar.</td></tr>
                     <tr><td><code>/pedidos/cambiar_ruta_transporte</code></td><td>Cambio masivo de ruta y transporte.</td></tr>

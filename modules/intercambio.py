@@ -35,6 +35,7 @@ from modules.db_config import (
     get_db_engine,
     get_intercambio_connection,
 )
+from modules.pedidos import completar_logistica_pendientes, detalle_completar_logistica
 from modules.sql_dialect import execute_insert, in_clause_sql, set_engine
 
 logger = logging.getLogger(__name__)
@@ -492,7 +493,8 @@ def _aplicar_registro_cliente(reg, conn_wms, cursor_wms, cursor_admin):
               campos['email'], campos['contacto_nombre'], campos['id_ruta'],
               campos['id_transporte_predeterminado'], campos['activo'], cliente_id))
         _contacto_de_intercambio(cursor_wms, cliente_id, campos['contacto_nombre'], tenant_id)
-        return True, 'actualizado', cliente_id
+        completados = completar_logistica_pendientes(cursor_wms, cliente_id, tenant_id)
+        return True, 'actualizado' + detalle_completar_logistica(completados), cliente_id
 
     cliente_id = execute_insert(cursor_wms, """
         INSERT INTO clientes (codigo, razonsocial, cuit, direccion, localidad,
@@ -504,7 +506,8 @@ def _aplicar_registro_cliente(reg, conn_wms, cursor_wms, cursor_admin):
           campos['email'], campos['contacto_nombre'], campos['id_ruta'],
           campos['id_transporte_predeterminado'], campos['activo'], tenant_id), id_col='id_cliente')
     _contacto_de_intercambio(cursor_wms, cliente_id, campos['contacto_nombre'], tenant_id)
-    return True, 'insertado', cliente_id
+    completados = completar_logistica_pendientes(cursor_wms, cliente_id, tenant_id)
+    return True, 'insertado' + detalle_completar_logistica(completados), cliente_id
 
 
 def _contacto_de_intercambio(cursor_wms, cliente_id, contacto_nombre, tenant_id):

@@ -1,0 +1,132 @@
+[
+  {
+    "agrupador": "PED-PRUEBA-20261127-01",
+    "cliente_codigo": "CLI001",
+    "clase_nombre": "Venta",
+    "fecha_pedido": "2026-11-25",
+    "observaciones": "Prueba de importación: pedido con tres renglones",
+    "material_codigo": "TOR-HEX-1420",
+    "cantidad": "100",
+    "tipo_stock": "Libre Venta"
+  },
+  {
+    "agrupador": "PED-PRUEBA-20261127-01",
+    "cliente_codigo": "CLI001",
+    "clase_nombre": "Venta",
+    "fecha_pedido": "2026-11-25",
+    "observaciones": "Prueba de importación: pedido con tres renglones",
+    "material_codigo": "ARA-PLA-14",
+    "cantidad": "200",
+    "tipo_stock": "Libre Venta"
+  },
+  {
+    "agrupador": "PED-PRUEBA-20261127-01",
+    "cliente_codigo": "CLI001",
+    "clase_nombre": "Venta",
+    "fecha_pedido": "2026-11-25",
+    "observaciones": "Prueba de importación: pedido con tres renglones",
+    "material_codigo": "TUE-HEX-14",
+    "cantidad": "100",
+    "tipo_stock": "Libre Venta"
+  },
+  {
+    "agrupador": "PED-PRUEBA-20261127-02",
+    "cliente_codigo": "CLI002",
+    "clase_nombre": "Venta",
+    "fecha_pedido": "2026-11-26",
+    "observaciones": "Prueba de importación: herramientas",
+    "material_codigo": "MAR-CARP-500",
+    "cantidad": "5",
+    "tipo_stock": "Libre Venta"
+  },
+  {
+    "agrupador": "PED-PRUEBA-20261127-02",
+    "cliente_codigo": "CLI002",
+    "clase_nombre": "Venta",
+    "fecha_pedido": "2026-11-26",
+    "observaciones": "Prueba de importación: herramientas",
+    "material_codigo": "TAL-PER-13",
+    "cantidad": "2",
+    "tipo_stock": "Libre Venta"
+  },
+  {
+    "agrupador": "PED-PRUEBA-20261127-03",
+    "cliente_codigo": "CLI003",
+    "clase_nombre": "Reposición de sucursal",
+    "fecha_pedido": "2026-11-26",
+    "observaciones": "Prueba de importación: pinturas",
+    "material_codigo": "PIN-LAT-20",
+    "cantidad": "10",
+    "tipo_stock": "Libre Venta"
+  },
+  {
+    "agrupador": "PED-PRUEBA-20261127-03",
+    "cliente_codigo": "CLI003",
+    "clase_nombre": "Reposición de sucursal",
+    "fecha_pedido": "2026-11-26",
+    "observaciones": "Prueba de importación: pinturas",
+    "material_codigo": "PIN-ESM-1",
+    "cantidad": "12",
+    "tipo_stock": "Libre Venta"
+  },
+  {
+    "agrupador": "PED-PRUEBA-20261127-03",
+    "cliente_codigo": "CLI003",
+    "clase_nombre": "Reposición de sucursal",
+    "fecha_pedido": "2026-11-26",
+    "observaciones": "Prueba de importación: pinturas",
+    "material_codigo": "DIL-AGU-500",
+    "cantidad": "6",
+    "tipo_stock": "Libre Venta"
+  },
+  {
+    "agrupador": "PED-PRUEBA-20261127-04",
+    "cliente_codigo": "CLI004",
+    "clase_nombre": "Venta",
+    "fecha_pedido": "2026-11-27",
+    "observaciones": "Prueba de importación: materiales eléctricos y cañerías",
+    "material_codigo": "CAB-UNI-25",
+    "cantidad": "4",
+    "tipo_stock": "Libre Venta"
+  },
+  {
+    "agrupador": "PED-PRUEBA-20261127-04",
+    "cliente_codigo": "CLI004",
+    "clase_nombre": "Venta",
+    "fecha_pedido": "2026-11-27",
+    "observaciones": "Prueba de importación: materiales eléctricos y cañerías",
+    "material_codigo": "LLA-TER-2X16",
+    "cantidad": "20",
+    "tipo_stock": "Libre Venta"
+  },
+  {
+    "agrupador": "PED-PRUEBA-20261127-04",
+    "cliente_codigo": "CLI004",
+    "clase_nombre": "Venta",
+    "fecha_pedido": "2026-11-27",
+    "observaciones": "Prueba de importación: materiales eléctricos y cañerías",
+    "material_codigo": "CAN-PVC-110",
+    "cantidad": "8",
+    "tipo_stock": "Libre Venta"
+  },
+  {
+    "agrupador": "PED-PRUEBA-20261127-05",
+    "cliente_codigo": "CLI001",
+    "clase_nombre": "Muestra sin cargo",
+    "fecha_pedido": "2026-11-27",
+    "observaciones": "Prueba de importación: dos tipos de stock",
+    "material_codigo": "GUA-NIT-L",
+    "cantidad": "50",
+    "tipo_stock": "Libre Venta"
+  },
+  {
+    "agrupador": "PED-PRUEBA-20261127-05",
+    "cliente_codigo": "CLI001",
+    "clase_nombre": "Muestra sin cargo",
+    "fecha_pedido": "2026-11-27",
+    "observaciones": "Prueba de importación: dos tipos de stock",
+    "material_codigo": "TOR-HEX-1420",
+    "cantidad": "25",
+    "tipo_stock": "Calidad"
+  }
+]

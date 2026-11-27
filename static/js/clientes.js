@@ -1,5 +1,5 @@
 $(document).ready(function() {
-    $('#tablaClientes').DataTable({
+    const tabla = $('#tablaClientes').DataTable({
         "paging": false,                    // todas las filas en el cuerpo; el scroll lo maneja la grilla
         "scrollY": "calc(100vh - 300px)",
         "scrollX": true,
@@ -22,6 +22,13 @@ $(document).ready(function() {
             }
         }
     });
+
+    // La consola de pedidos enlaza al cliente con ?cliente=<código>: se filtra
+    // la grilla para que se vea directamente la ficha buscada.
+    const codigo = new URLSearchParams(window.location.search).get('cliente');
+    if (codigo) {
+        tabla.column(0).search('^' + $.fn.dataTable.util.escapeRegex(codigo) + '$', true, false).draw();
+    }
 });
 
 // Transportes que se ofrecen en la ficha: los que cubren la ruta elegida (o todos, si la ruta no

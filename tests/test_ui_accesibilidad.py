@@ -78,3 +78,14 @@ def test_estilos_tienen_alias_de_error_y_escala_de_capas():
     assert '.flash-danger' in css
     assert '--z-modal' in css and '--z-toast' in css
     assert '.modal-overlay {' in css
+
+
+def test_informe_de_stock_se_desplaza_sin_perder_cabecera_ni_pie():
+    html = leer('templates/pedidos.html')
+    overlay = re.search(r'<div id="modalInformeStock"[^>]*>', html).group(0)
+    assert 'overflow:hidden' in overlay
+    dialogo = re.search(r'<div id="modalInformeStock".*?>\s*<div style="([^"]+)"', html, re.S).group(1)
+    assert 'display:flex' in dialogo and 'max-height:calc(100dvh' in dialogo
+    contenido = re.search(r'<div id="informe-contenido"[^>]*>', html).group(0)
+    assert 'overflow-y:auto' in contenido
+    assert 'min-height:0' in contenido and 'flex:1' in contenido

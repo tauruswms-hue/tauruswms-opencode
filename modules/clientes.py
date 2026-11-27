@@ -20,9 +20,10 @@ from modules.batch_utils import (
     plantilla_json,
     plantilla_xlsx,
 )
-from modules.context import get_tenant_filter
+from modules.context import destino_volver, get_tenant_filter
 from modules.cuit import cuit_para_guardar, cuit_para_mostrar
 from modules.db_config import get_db_connection
+from modules.pedidos import completar_logistica_pendientes, detalle_completar_logistica
 from modules.sql_dialect import execute_insert, is_duplicate_key_error
 
 clientes_bp = Blueprint('clientes', __name__)
@@ -147,6 +148,17 @@ def _guardar_contactos(cursor, id_cliente, contactos, tenant_id):
                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
                        (id_cliente, c['nombre'], c.get('apellido'), c.get('departamento'), c.get('rol'),
                         c.get('telefono'), c.get('email'), tenant_id))
+
+
+def _redirect_listado(codigo=None):
+    """Vuelve al listado conservando el origen (?desde=) y, si aplica, el filtro del cliente."""
+    desde = (request.form.get('desde') or '').strip().lower()
+    if not destino_volver(desde):
+        return redirect(url_for('clientes.listar'))
+    params = {'desde': desde}
+    if codigo:
+        params['cliente'] = codigo
+    return redirect(url_for('clientes.listar', **params))
 
 
 def _activo(valor, por_defecto=True):
@@ -280,8 +292,10 @@ def guardar():
                 id_cliente = execute_insert(cursor, sql, (*params, tenant_id), id_col='id_cliente')
 
             _guardar_contactos(cursor, id_cliente, contactos, tenant_id)
+            completados = completar_logistica_pendientes(cursor, id_cliente, tenant_id)
             conn.commit()
-            flash("Cliente guardado correctamente", "success")
+            mensaje = "Cliente guardado correctamente" + detalle_completar_logistica(completados)
+            flash(mensaje, "success")
     except ValueError as e:
         conn.rollback()
         flash(str(e), "danger")
@@ -293,7 +307,7 @@ def guardar():
             flash(f"Error al guardar el cliente: {e!s}", "danger")
     finally:
         conn.close()
-    return redirect(url_for('clientes.listar'))
+    return _redirect_listado((d.get('codigo') or '').strip())
 
 
 @clientes_bp.route('/clientes/eliminar/<int:id_cliente>', methods=['POST'])
@@ -308,10 +322,10 @@ def eliminar(id_cliente):
             cliente = cursor.fetchone()
             if not cliente:
                 flash("Cliente no encontrado.", "warning")
-                return redirect(url_for('clientes.listar'))
+                return _redirect_listado()
             if not cliente['activo']:
                 flash(f'El cliente "{cliente["razonsocial"]}" ya estaba inactivo.', "info")
-                return redirect(url_for('clientes.listar'))
+                return _redirect_listado()
 
             cursor.execute("UPDATE clientes SET activo = %s WHERE id_cliente = %s", (False, id_cliente))
             cursor.execute("SELECT COUNT(*) AS n FROM pedidos_cabecera WHERE id_cliente = %s AND estado NOT IN (%s, %s)",
@@ -329,7 +343,7 @@ def eliminar(id_cliente):
         flash(f"No se pudo inactivar el cliente: {e!s}", "danger")
     finally:
         conn.close()
-    return redirect(url_for('clientes.listar'))
+    return _redirect_listado()
 
 
 
@@ -390,7 +404,7 @@ def importar():
     except Exception as e:
         return jsonify({'error': f'Error al leer el archivo: {e!s}'}), 400
 
-    insertados, actualizados, omitidos, errores = 0, 0, [], []
+    insertados, actualizados, omitidos, errores, pedidos_completados = 0, 0, [], [], 0
     conn = get_db_connection()
     try:
         for i, row in enumerate(rows, 1):
@@ -417,6 +431,8 @@ def importar():
                             continue
                         cursor.execute(f"UPDATE clientes SET {', '.join(f'{col} = %s' for col in cambios)} WHERE id_cliente = %s",
                                        (*cambios.values(), existing['id_cliente']))
+                        pedidos_completados += completar_logistica_pendientes(
+                            cursor, existing['id_cliente'], tenant_id)
                         actualizados += 1
                         continue
                     datos = _datos_del_cliente(row)
@@ -447,6 +463,7 @@ def importar():
                     if contacto:
                         # La importación trae un solo contacto: queda como el primero del cliente
                         _guardar_contactos(cursor, id_nuevo, [{'nombre': contacto}], tenant_id)
+                    pedidos_completados += completar_logistica_pendientes(cursor, id_nuevo, tenant_id)
                     insertados += 1
             except Exception as e:
                 errores.append({'fila': i, 'codigo': codigo, 'razon': str(e)})
@@ -457,7 +474,8 @@ def importar():
     finally:
         conn.close()
     return jsonify({'insertados': insertados, 'actualizados': actualizados,
-                    'omitidos': omitidos, 'errores': errores})
+                    'omitidos': omitidos, 'errores': errores,
+                    'pedidos_completados': pedidos_completados})
 
 
 @clientes_bp.route('/clientes/exportar/<formato>')

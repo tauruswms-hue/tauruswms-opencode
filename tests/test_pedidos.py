@@ -3,9 +3,11 @@
 import io
 import re
 import uuid
+from pathlib import Path
 
 import pytest
 
+from modules.pedidos import _CAMPOS_IMPORT_PED
 from tests.conftest import requires_db
 
 PREFIJO = 'ZZX'   # los códigos de prueba empiezan así, para poder limpiarlos
@@ -14,6 +16,25 @@ HOY = '2026-10-08'
 
 def _codigo():
     return PREFIJO + uuid.uuid4().hex[:8].upper()
+
+
+def test_la_ayuda_del_modal_documenta_todas_las_columnas_de_la_plantilla():
+    ayuda = (Path(__file__).resolve().parents[1] / 'templates' / 'partials' / '_modal_importar_pedidos.html').read_text(encoding='utf-8')
+    for campo in _CAMPOS_IMPORT_PED:
+        assert f'<code>{campo}</code>' in ayuda, campo
+
+
+def test_el_modal_de_preparacion_ofrece_los_tres_metodos():
+    plantilla = (Path(__file__).resolve().parents[1] / 'templates' / 'pedidos.html').read_text(encoding='utf-8')
+    for etiqueta in (
+        'Preparación simple',
+        'Preparación consolidada por cliente en un paso',
+        'Preparación consolidada por cliente en dos pasos',
+    ):
+        assert etiqueta in plantilla, etiqueta
+    # Los valores que viajan al servidor no cambian.
+    for modo in ('directa', 'cliente', 'dospasos'):
+        assert f"confirmarPreparar('{modo}')" in plantilla, modo
 
 
 @pytest.fixture
@@ -147,6 +168,64 @@ def test_alta(logged_client, wms, datos):
 
 
 @requires_db
+def test_alta_toma_la_ruta_y_el_transporte_del_cliente(logged_client, wms, datos):
+    """Si el formulario no envía ruta ni transporte, se guardan los del cliente."""
+    cur = wms.cursor()
+    cur.execute("UPDATE clientes SET id_ruta = %s, id_transporte_predeterminado = %s WHERE id_cliente = %s",
+                (datos['ruta'], datos['transporte'], datos['cliente']))
+    wms.commit()
+
+    mensajes = _guardar(logged_client, datos)
+    assert len(mensajes) == 1 and 'guardado' in mensajes[0], mensajes
+    (p,) = _pedidos(wms, datos)
+    assert (p['id_ruta'], p['id_transporte']) == (datos['ruta'], datos['transporte'])
+
+
+@requires_db
+def test_la_razon_social_del_cliente_enlaza_a_sus_datos_maestros(logged_client, wms, datos):
+    _guardar(logged_client, datos)
+    codigo_cliente = datos['codigos'][datos['cliente']]
+    html = logged_client.get('/pedidos').get_data(as_text=True)
+    assert f'href="/clientes?cliente={codigo_cliente}' in html
+    assert 'desde=pedidos' in html
+    assert 'class="enlace-cliente"' in html
+
+
+@requires_db
+@requires_db
+def test_la_consola_vuelve_al_cliente_filtrado_desde_la_grilla(logged_client, wms, datos):
+    _guardar(logged_client, datos)
+    codigo = datos['codigos'][datos['cliente']]
+    # Un pedido de otro cliente para comprobar que el filtro se aplica en el servidor.
+    otro = 'PED-OTRO-' + uuid.uuid4().hex[:6]
+    cur = wms.cursor()
+    cur.execute("""INSERT INTO pedidos_cabecera (nro_pedido, id_cliente, fecha_pedido, estado, tenant_id)
+                   VALUES (%s, %s, CURRENT_DATE, 'Pendiente', %s)""",
+                (otro, datos['cliente_inactivo'], datos['tenant']))
+    wms.commit()
+
+    html = logged_client.get(f'/pedidos?cliente={codigo}').get_data(as_text=True)
+    assert f'href="/clientes?cliente={codigo}&amp;desde=pedidos"' in html
+    assert f'Cliente: {codigo}' in html
+    assert _pedidos(wms, datos)[0]['nro_pedido'] in html
+    assert otro not in html
+
+
+@requires_db
+def test_el_detalle_de_pedido_vuelve_al_modulo_de_origen(logged_client, wms, datos):
+    _guardar(logged_client, datos)
+    (p,) = _pedidos(wms, datos)
+    url = f'/pedidos/ver/{p["id_pedido"]}'
+    assert 'Volver a Pedidos' in logged_client.get(f'{url}?desde=pedidos').get_data(as_text=True)
+    assert 'Volver a OMC' in logged_client.get(f'{url}?desde=omc').get_data(as_text=True)
+    assert 'Volver a Despacho' in logged_client.get(f'{url}?desde=despacho').get_data(as_text=True)
+    # Un origen desconocido nunca genera un enlace de transacción; sigue el Volver generic
+    html = logged_client.get(f'{url}?desde=https://ejemplo.com').get_data(as_text=True)
+    assert 'btn-volver-transaccion' not in html
+    assert 'Volver a Pedidos' not in html
+
+
+@requires_db
 def test_la_numeracion_no_depende_de_la_fecha_ni_de_los_borrados(logged_client, wms, datos):
     """El número salía de contar los pedidos con fecha en el año: con uno fechado en otro año (o uno borrado)
     se repetía, y a partir de ahí no se podía crear ningún pedido más."""
@@ -269,6 +348,54 @@ def test_anular(logged_client, wms, datos):
     assert 'está en estado Despachado' in mensajes[0] and estado == 'Despachado'
     logged_client.post('/pedidos/eliminar/999999999')
     assert _flashes(logged_client) == ['El pedido no existe.']
+
+
+def test_la_ruta_de_anulacion_masiva_es_asignable_y_operativa():
+    from app import _ruta_en_catalogo
+    from modules.schema_generator import ROUTE_CATALOG, ROUTES_OPERADOR
+
+    ruta = '/pedidos/eliminar_masivo'
+    assert any(ruta in grupo['rutas'] for grupo in ROUTE_CATALOG)
+    assert ruta in ROUTES_OPERADOR
+    assert _ruta_en_catalogo(ruta)
+
+
+@requires_db
+def test_anular_varios_pedidos_marcados(logged_client, wms, datos):
+    """La anulación masiva respeta las mismas reglas que el botón individual."""
+    for _ in range(4):
+        _guardar(logged_client, datos)
+    pendiente, trabajo, con_omc, despachado = _pedidos(wms, datos)
+    _estado(wms, trabajo['id_pedido'], 'Trabajo')
+    _estado(wms, con_omc['id_pedido'], 'Trabajo')
+    _estado(wms, despachado['id_pedido'], 'Despachado')
+    codigo_ubicacion = _codigo()
+    id_ubicacion = _alta(wms, """INSERT INTO ubicaciones (codigo, capacidad_maxima, ocupado, orden_picking, activo, tenant_id)
+                                VALUES (%s, 0, 0, 0, 1, %s)""", (codigo_ubicacion, datos['tenant']),
+                         'ubicaciones', 'id', 'codigo', codigo_ubicacion)
+    cur = wms.cursor()
+    cur.execute("""INSERT INTO omc (numero, id_ubicacion_destino, id_pedido, estado, usuario_creacion, tenant_id)
+                   VALUES (%s, %s, %s, 'Pendiente', 'test', %s)""",
+                (_codigo(), id_ubicacion, con_omc['id_pedido'], datos['tenant']))
+    wms.commit()
+
+    ids = [p['id_pedido'] for p in (pendiente, trabajo, con_omc, despachado)] + [999999999]
+    respuesta = logged_client.post('/pedidos/eliminar_masivo', json={'ids': ids})
+    assert respuesta.status_code == 200
+    resultado = respuesta.get_json()
+    assert resultado['anulados'] == [
+        {'id_pedido': p['id_pedido'], 'nro_pedido': p['nro_pedido']} for p in (pendiente, trabajo)
+    ]
+    assert [item['id_pedido'] for item in resultado['omitidos']] == [con_omc['id_pedido'], despachado['id_pedido']]
+    assert resultado['no_encontrados'] == 1
+    assert resultado['message'] == 'Se anularon 2 pedidos. No se pudo anular 3.'
+    assert _estado(wms, pendiente['id_pedido']) == 'Anulado'
+    assert _estado(wms, trabajo['id_pedido']) == 'Anulado'
+    assert _estado(wms, con_omc['id_pedido']) == 'Trabajo'
+    assert _estado(wms, despachado['id_pedido']) == 'Despachado'
+
+    sin_ids = logged_client.post('/pedidos/eliminar_masivo', json={'ids': []})
+    assert sin_ids.status_code == 400 and sin_ids.get_json()['status'] == 'error'
 
 
 # --- Acciones masivas ---

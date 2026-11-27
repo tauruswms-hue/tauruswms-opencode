@@ -8,6 +8,7 @@
 
         <form action="{{ url_for('clientes.guardar') }}" method="POST" id="formCliente" style="display:flex; flex-direction:column; flex:1; min-height:0;">
             <input type="hidden" name="id_cliente" id="form_id_cliente">
+            <input type="hidden" name="desde" value="{{ request.args.get('desde', '') }}">
 
             <div class="cli-tabs">
                 <button type="button" class="cli-tab-btn active" data-tab="tab-cli-datos"><i class="fas fa-id-card"></i> Datos generales</button>
