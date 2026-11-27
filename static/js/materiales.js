@@ -82,7 +82,7 @@ function validarEAN(barcode) {
 $(document).ready(function() {
     $('.mat-tab-btn').on('click', function() { mostrarPestana($(this).data('tab')); });
 
-    $('#tablaMateriales').DataTable({
+    var tabla = $('#tablaMateriales').DataTable({
         "paging": false,                    // todas las filas en el cuerpo; el scroll lo maneja la grilla
         "scrollY": "calc(100vh - 300px)",
         "scrollX": true,
@@ -105,6 +105,13 @@ $(document).ready(function() {
             }
         }
     });
+
+    // El detalle de un pedido enlaza al material con ?material=<código>: se filtra
+    // la grilla para que se vea directamente la ficha buscada.
+    var material = new URLSearchParams(window.location.search).get('material');
+    if (material) {
+        tabla.column(0).search('^' + $.fn.dataTable.util.escapeRegex(material) + '$', true, false).draw();
+    }
 
     $('#formMateriales').on('submit', function(e) {
         var barcode = $('#form_codigo_barras').val();

@@ -52,7 +52,12 @@
                 {% set ts = item.tipo_stock or 'Libre Venta' %}
                 <tr style="border-bottom: 1px solid #eee;">
                     <td style="padding: 12px;"><code>{{ item.material_sku }}</code></td>
-                    <td style="padding: 12px;">{{ item.material_nombre }}</td>
+                    <td style="padding: 12px;">
+                        {% if tiene_permiso_ruta('/materiales') %}
+                        <a href="{{ url_for('materiales.listar', material=item.material_sku, desde='pedido', id_pedido=pedido.id_pedido) }}"
+                           class="enlace-material" title="Ver datos maestros de {{ item.material_nombre }}">{{ item.material_nombre }}</a>
+                        {% else %}{{ item.material_nombre }}{% endif %}
+                    </td>
                     <td style="padding: 12px; text-align: right;"><strong>{{ item.cantidad }}</strong></td>
                     <td style="padding: 12px; text-align: right;">
                         {% set prep = item.Cantidad_preparada or 0 %}

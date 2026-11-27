@@ -300,7 +300,7 @@ def inyectar_navegacion():
     volver = None
     desde = request.args.get('desde')
     destino = destino_volver(desde)
-    url = url_volver(desde, request.args.get('cliente'))
+    url = url_volver(desde, request.args.get('cliente'), request.args.get('id_pedido'))
     if destino and url and tiene_permiso_ruta(url.partition('?')[0]):
         volver = {'url': url, 'etiqueta': destino[1]}
 

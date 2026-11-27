@@ -2,6 +2,7 @@
 
 import io
 import uuid
+from pathlib import Path
 
 import pytest
 from werkzeug.datastructures import FileStorage
@@ -1007,3 +1008,29 @@ def test_el_pedido_conserva_su_material_inactivo_al_editarlo(logged_client, wms,
     assert f'"codigo": "{otro}"' not in datos                       # otro inactivo no se ofrece
     assert 'escMat(m.nombre)' in html                                # el nombre se inserta escapado
     assert f'"codigo": "{del_pedido}"' not in logged_client.get('/pedidos/nuevo').get_data(as_text=True)
+
+
+def test_la_grilla_filtra_por_el_material_viniendo_desde_un_pedido():
+    """El enlace del detalle de pedido pasa ?material=<código> y la grilla lo aplica."""
+    js = (Path(__file__).resolve().parents[1] / 'static' / 'js' / 'materiales.js').read_text(encoding='utf-8')
+    assert "URLSearchParams(window.location.search).get('material')" in js
+    assert 'tabla.column(0).search' in js
+
+
+@requires_db
+def test_la_grilla_ofrece_volver_al_pedido(logged_client, wms):
+    html = logged_client.get('/materiales?desde=pedido&id_pedido=123').get_data(as_text=True)
+    assert 'Volver al Pedido' in html and 'href="/pedidos/ver/123"' in html
+    assert 'Volver al Pedido' not in logged_client.get('/materiales').get_data(as_text=True)
+    # Un id no numérico nunca genera un enlace hacia el detalle
+    html = logged_client.get('/materiales?desde=pedido&id_pedido=abc').get_data(as_text=True)
+    assert 'btn-volver-transaccion' not in html
+
+
+@requires_db
+def test_el_retorno_al_pedido_se_oculta_si_el_rol_no_tiene_permiso(logged_client, wms):
+    with logged_client.session_transaction() as sesion:
+        sesion['rol'] = 'ROL-SIN-PEDIDOS'
+        sesion['rutas_permitidas'] = ['/materiales']
+    html = logged_client.get('/materiales?desde=pedido&id_pedido=123').get_data(as_text=True)
+    assert 'btn-volver-transaccion' not in html

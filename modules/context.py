@@ -15,7 +15,9 @@ LOGIN_IDLE_TIMEOUT_SECONDS = 5 * 60
 # lista cerrada para que el usuario no pueda inducir una URL ajena al WMS.
 VOLVER_DESTINOS = {
     'pedidos': ('pedidos.listar', 'Volver a Pedidos'),
+    'pedido': ('pedidos.ver_detalle', 'Volver al Pedido'),
     'clientes': ('clientes.listar', 'Volver a Clientes'),
+    'materiales': ('materiales.listar', 'Volver a Materiales'),
     'recepciones': ('recepciones.listar', 'Volver a Recepciones'),
     'omc': ('omc.listar', 'Volver a OMC'),
     'despacho': ('despacho.listar', 'Volver a Despacho'),
@@ -28,11 +30,16 @@ def destino_volver(desde):
     return VOLVER_DESTINOS.get((desde or '').strip().lower())
 
 
-def url_volver(desde, cliente=None):
-    """URL de retorno, con el filtro de cliente cuando el origen lo pasó."""
+def url_volver(desde, cliente=None, id_pedido=None):
+    """URL de retorno, con el contexto del origen (filtro de cliente o pedido)."""
     destino = destino_volver(desde)
     if not destino:
         return None
+    if destino[0] == 'pedidos.ver_detalle':
+        # Sólo un id numérico: nunca se construye una URL con dato arbitrario.
+        if not str(id_pedido or '').isdigit():
+            return None
+        return url_for(destino[0], id_pedido=int(id_pedido))
     extras = {}
     if cliente and destino[0] == 'pedidos.listar':
         extras['cliente'] = cliente

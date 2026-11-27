@@ -15,6 +15,15 @@
     <div class="header-actions" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-shrink: 0; position: sticky; top: 0; z-index: 10; background: #f8f9fa; margin: -20px -20px 20px -20px; padding: 10px 20px 8px 20px;">
         <h1><i class="fas fa-boxes"></i> Gestión de Materiales</h1>
         <div style="display:flex; gap:10px; align-items:center;">
+            {% include 'partials/_volver.html' %}
+            {% set material_filtro = request.args.get('material', '') %}
+            {% if material_filtro %}
+            <span style="background:#2b6cb0; color:white; font-size:0.78rem; padding:3px 10px; border-radius:12px; white-space:nowrap;">
+                Material: {{ material_filtro }}
+                <a href="{{ url_for('materiales.listar', desde=request.args.get('desde', ''), id_pedido=request.args.get('id_pedido', '')) if request.args.get('desde') else url_for('materiales.listar') }}"
+                   style="color:white;" aria-label="Quitar filtro de material">&times;</a>
+            </span>
+            {% endif %}
 
             <!-- Exportar dropdown -->
             <div class="mat-dropdown" style="position:relative;">

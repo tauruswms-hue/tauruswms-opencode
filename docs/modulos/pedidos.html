@@ -63,7 +63,11 @@
         <p>Solo se edita un pedido Pendiente. Al guardar la edición, los ítems se reemplazan por los nuevos.</p>
 
         <h3>Detalle (<code>/pedidos/ver/&lt;id&gt;</code>)</h3>
-        <p>Cabecera e ítems del pedido, con la cantidad preparada de cada uno.</p>
+        <p>Cabecera e ítems del pedido, con la cantidad preparada de cada uno. El nombre de cada material enlaza a
+        <code>/materiales?material=&lt;codigo&gt;&amp;desde=pedido&amp;id_pedido=&lt;id&gt;</code>, que filtra la grilla
+        de maestros (sólo si el usuario tiene permiso sobre <code>/materiales</code>). El botón
+        <em>Volver al Pedido</em> regresa al detalle de origen; el retorno usa el mismo mecanismo <code>desde</code>
+        de lista cerrada y valida que <code>id_pedido</code> sea numérico.</p>
 
         <h2>OMC automática al crear el pedido</h2>
         <p>Si en el alta se indican contenedores, se genera una sola <a href="omc.html">OMC</a> que los lleva al

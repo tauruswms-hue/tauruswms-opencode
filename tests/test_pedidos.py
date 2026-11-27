@@ -192,6 +192,15 @@ def test_la_razon_social_del_cliente_enlaza_a_sus_datos_maestros(logged_client, 
 
 
 @requires_db
+def test_el_material_del_detalle_enlaza_a_sus_datos_maestros(logged_client, wms, datos):
+    _guardar(logged_client, datos)
+    (p,) = _pedidos(wms, datos)
+    sku = datos['codigos'][datos['material']]
+    html = logged_client.get(f'/pedidos/ver/{p["id_pedido"]}').get_data(as_text=True)
+    assert f'href="/materiales?material={sku}&amp;desde=pedido&amp;id_pedido={p["id_pedido"]}"' in html
+    assert 'class="enlace-material"' in html
+
+
 @requires_db
 def test_la_consola_vuelve_al_cliente_filtrado_desde_la_grilla(logged_client, wms, datos):
     _guardar(logged_client, datos)
