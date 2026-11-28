@@ -97,10 +97,16 @@ rem --- Resumen ----------------------------------------------------------------
 echo === Resumen ===
 if "%FALLOS%"=="0" (
     echo VERIFICACION OK
+    echo.
+    echo Presione una tecla para cerrar.
+    pause
     endlocal
     exit /b 0
 ) else (
     echo Fallos detectados: %FALLOS%
+    echo.
+    echo Presione una tecla para cerrar.
+    pause
     endlocal
     exit /b 1
 )
