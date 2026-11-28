@@ -55,7 +55,10 @@ cd /d "%APP_DIR%" || exit /b 1
 echo === Commit actual ===
 git rev-parse --short HEAD
 
-for /f "delims=" %%L in ('git status --porcelain') do goto :cambios_locales
+for /f "delims=" %%L in ('git status --porcelain') do (
+    echo Cambio local detectado: %%L
+    goto :cambios_locales
+)
 
 echo === Deteniendo servicios ===
 "%NSSM%" stop TaurusWMS   >nul 2>&1
@@ -72,9 +75,9 @@ if errorlevel 1 (
 )
 echo Backup: %BACKUP%
 
-echo === Actualizando codigo ===
-git fetch --all --prune
-git pull --ff-only
+echo === Actualizando codigo (git pull) ===
+git -C "%APP_DIR%" fetch --all --prune
+git -C "%APP_DIR%" pull --ff-only
 if errorlevel 1 (
     echo Fallo git pull.
     goto :abort
